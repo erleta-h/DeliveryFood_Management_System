@@ -1,0 +1,36 @@
+**/bin/
+**/obj/
+**/[Bb]in/
+**/[Oo]bj/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+.vs/
+*.DotSettings.user
+
+#  Konfigurim lokal (connection string, JWT, etj.) ——
+.env
+src/FoodDelivery.Api/.env
+src/FoodDelivery.Api/appsettings.Development.json
+**/appsettings.*.local.json
+
+#  Frontend (Vite / npm) ——
+web/node_modules/
+web/dist/
+
+# Test / coverage ——
+TestResults/
+*.trx
+coverage*.json
+coverage*.xml
+*.coverage
+*.coveragexml
+
+#  OS / IDE ——
+.DS_Store
+Thumbs.db
+.idea/
+
+#  Logs ——
+*.log
