@@ -1,5 +1,3 @@
-﻿using System.Data;
-
 namespace FoodDelivery.Domain.Entities;
 
 public class UserRole

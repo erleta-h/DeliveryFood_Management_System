@@ -1,4 +1,4 @@
-﻿namespace FoodDelivery.Domain.Entities;
+namespace FoodDelivery.Domain.Entities;
 
 public class User
 {
@@ -28,4 +28,5 @@ public class User
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public ICollection<RestaurantStaff> RestaurantStaffMemberships { get; set; } = new List<RestaurantStaff>();
 }
