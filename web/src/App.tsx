@@ -2,6 +2,7 @@ import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-rout
 import { BrandLogo } from './components/BrandLogo'
 import { GuestRoute } from './components/GuestRoute'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
 import {
   customerBtnGhost,
   customerBtnPrimary,
@@ -38,7 +39,6 @@ function HomePage() {
   )
 }
 
-/** Rrugë vendore kur JWT ka Admin / RestaurantStaff / Driver — pa këto, Navigate nga GuestRoute/Login thyhet. */
 function StubModule({ title }: { title: string }) {
   return (
     <div className={`${customerShellBg} min-h-screen p-8`}>
@@ -79,7 +79,24 @@ export default function App() {
           </Route>
         </Route>
 
-        <Route path="/admin" element={<StubModule title="Admin" />} />
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<Outlet />}>
+            <Route index element={<StubModule title="Admin" />} />
+            <Route path="restaurants" element={<StubModule title="Restorantet" />} />
+            <Route path="orders" element={<StubModule title="Porositë" />} />
+            <Route path="riders" element={<StubModule title="Delivera" />} />
+            <Route path="users" element={<StubModule title="Klientët" />} />
+            <Route path="finance" element={<StubModule title="Financa" />} />
+            <Route path="promotions" element={<StubModule title="Promocione" />} />
+            <Route path="reviews" element={<StubModule title="Vlerësime" />} />
+            <Route path="zones" element={<StubModule title="Zonat & tarifat" />} />
+            <Route path="reports" element={<StubModule title="Raporte" />} />
+            <Route path="security" element={<StubModule title="Siguria" />} />
+            <Route path="support" element={<StubModule title="Support" />} />
+            <Route path="settings" element={<StubModule title="Konfigurime" />} />
+          </Route>
+        </Route>
+
         <Route path="/kitchen" element={<StubModule title="Kuzhina" />} />
         <Route path="/driver" element={<StubModule title="Deliver" />} />
 
