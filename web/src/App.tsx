@@ -1,121 +1,107 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { BrandLogo } from './components/BrandLogo'
+import { GuestRoute } from './components/GuestRoute'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AdminRoute } from './components/AdminRoute'
+import {
+  customerBtnGhost,
+  customerBtnPrimary,
+  customerShellBg,
+} from './lib/customerTheme'
+import AccountPage from './pages/AccountPage'
+import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function HomePage() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className={`${customerShellBg} min-h-screen px-4 py-16`}>
+      <div className="mx-auto max-w-lg text-center">
+        <div className="flex justify-center">
+          <BrandLogo />
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
+        <p className="mt-8 text-zinc-400">Demo autentifikimi — kyçu ose krijo llogari.</p>
+        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <Link
+            to="/login"
+            className={`${customerBtnPrimary} inline-flex justify-center no-underline`}
+          >
+            Hyr
+          </Link>
+          <Link
+            to="/signup"
+            className={`${customerBtnGhost} inline-flex justify-center no-underline`}
+          >
+            Regjistrohu
+          </Link>
         </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   )
 }
 
-export default App
+function StubModule({ title }: { title: string }) {
+  return (
+    <div className={`${customerShellBg} min-h-screen p-8`}>
+      <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-[#222636]/80 p-6 text-zinc-100 backdrop-blur-md">
+        <h1 className="text-xl font-bold">{title}</h1>
+        <p className="mt-2 text-sm text-zinc-400">
+          Ky modul nuk është në këtë projekt minimal (vetëm klienti + auth).
+        </p>
+        <p className="mt-4">
+          <Link to="/app/account" className="text-amber-400 no-underline hover:underline">
+            Llogaria
+          </Link>
+          <span className="text-zinc-600"> · </span>
+          <Link to="/" className="text-amber-400 no-underline hover:underline">
+            Ballina
+          </Link>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route path="/app" element={<Outlet />}>
+            <Route index element={<Navigate to="account" replace />} />
+            <Route path="account" element={<AccountPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<AdminRoute />}>
+          <Route path="/admin" element={<Outlet />}>
+            <Route index element={<StubModule title="Admin" />} />
+            <Route path="restaurants" element={<StubModule title="Restorantet" />} />
+            <Route path="orders" element={<StubModule title="Porositë" />} />
+            <Route path="riders" element={<StubModule title="Delivera" />} />
+            <Route path="users" element={<StubModule title="Klientët" />} />
+            <Route path="finance" element={<StubModule title="Financa" />} />
+            <Route path="promotions" element={<StubModule title="Promocione" />} />
+            <Route path="reviews" element={<StubModule title="Vlerësime" />} />
+            <Route path="zones" element={<StubModule title="Zonat & tarifat" />} />
+            <Route path="reports" element={<StubModule title="Raporte" />} />
+            <Route path="security" element={<StubModule title="Siguria" />} />
+            <Route path="support" element={<StubModule title="Support" />} />
+            <Route path="settings" element={<StubModule title="Konfigurime" />} />
+          </Route>
+        </Route>
+
+        <Route path="/kitchen" element={<StubModule title="Kuzhina" />} />
+        <Route path="/driver" element={<StubModule title="Deliver" />} />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
+}
