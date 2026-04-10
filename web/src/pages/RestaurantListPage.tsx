@@ -65,7 +65,12 @@ export default function RestaurantListPage() {
     let active = true
     setLoading(true)
     setError(null)
-    searchRestaurants(debouncedSearch, categoryId, sortBy, controller.signal)
+    const apiSort = (sortBy === 'proximity' ? 'eta' : sortBy) as
+      | 'rating'
+      | 'eta'
+      | 'name'
+      | 'fee'
+    searchRestaurants(debouncedSearch, categoryId, apiSort, controller.signal)
       .then((list) => {
         if (!active) return
         setItems(
