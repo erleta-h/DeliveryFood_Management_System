@@ -50,7 +50,7 @@ public record KitchenStaffContextResponse(
 
 /// <param name="Note">P.sh. arsye refuzimi — ruhet në histori statusi dhe audit (admin).</param>
 public record UpdateKitchenOrderStatusRequest(int Status, string? Note);
-
+public record KitchenAssignableDriverDto(long UserId, string DisplayName, string VehicleType);
 public record KitchenOrderDto(
     long Id,
     string OrderNumber,
