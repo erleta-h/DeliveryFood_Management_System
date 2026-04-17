@@ -1,4 +1,5 @@
-import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Link ,Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { BrandLogo } from './components/BrandLogo'
 import { GuestRoute } from './components/GuestRoute'
 import { ProtectedRoute } from './components/ProtectedRoute'
@@ -11,6 +12,12 @@ import {
 import AccountPage from './pages/AccountPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+
+const CustomerLayout = lazy(() => import('./layouts/CustomerLayout'))
+const AddressesPage = lazy(() => import('./pages/AddressesPage'))
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
+const OrdersPage = lazy(() => import('./pages/OrdersPage'))
+const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 
 function HomePage() {
   return (
@@ -96,6 +103,31 @@ export default function App() {
             <Route path="settings" element={<StubModule title="Konfigurime" />} />
           </Route>
         </Route>
+
+        <Route element={<ProtectedRoute />}>
+  <Route
+    path="/app"
+    element={
+      <Suspense fallback={<div>Loading...</div>}>
+        <CustomerLayout />
+      </Suspense>
+    }
+  >
+    <Route index element={<Navigate to="restaurants" replace />} />
+
+   
+    <Route path="addresses" element={<AddressesPage />} />
+    <Route path="checkout" element={<CheckoutPage />} />
+    <Route path="orders" element={<OrdersPage />} />
+    <Route path="orders/:id" element={<OrderDetailPage />} />
+  </Route>
+</Route>
+
+ 
+
+
+
+      
 
         <Route path="/kitchen" element={<StubModule title="Kuzhina" />} />
         <Route path="/driver" element={<StubModule title="Deliver" />} />
