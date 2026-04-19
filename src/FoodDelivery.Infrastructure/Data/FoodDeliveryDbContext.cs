@@ -20,7 +20,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
-
+    public DbSet<RestaurantPartnerApplication> RestaurantPartnerApplications => Set<RestaurantPartnerApplication>();
     public object Coupons { get; internal set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
