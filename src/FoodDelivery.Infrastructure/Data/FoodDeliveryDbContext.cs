@@ -21,6 +21,8 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
 
+    public object Coupons { get; internal set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
