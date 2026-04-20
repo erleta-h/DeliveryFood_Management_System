@@ -19,6 +19,9 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<RestaurantPartnerApplication> RestaurantPartnerApplications => Set<RestaurantPartnerApplication>();
+    public object Coupons { get; internal set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -99,7 +102,12 @@ public class FoodDeliveryDbContext : DbContext
 
         modelBuilder.Entity<MenuItem>(e =>
         {
+            e.ToTable("MenuItems");
             e.Property(x => x.Price).HasPrecision(18, 2);
+            e.HasOne(x => x.ImageFile)
+                .WithMany()
+                .HasForeignKey(x => x.ImageFileId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasOne(x => x.MenuCategory)
                 .WithMany(x => x.Items)
                 .HasForeignKey(x => x.MenuCategoryId)
