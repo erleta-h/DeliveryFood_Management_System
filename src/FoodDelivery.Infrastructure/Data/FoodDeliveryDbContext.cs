@@ -20,6 +20,8 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     public object Coupons { get; internal set; }
 
@@ -125,6 +127,36 @@ public class FoodDeliveryDbContext : DbContext
                 .HasForeignKey(x => x.RestaurantId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(x => new { x.UserId, x.RestaurantId }).IsUnique();
+        });
+        modelBuilder.Entity<Payment>(e =>
+        {
+            e.ToTable("Payments");
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.HasOne(x => x.Order)
+                .WithMany(x => x.Payments)
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Review>(e =>
+        {
+            e.ToTable("Reviews");
+            e.HasOne(x => x.Author)
+                .WithMany(x => x.ReviewsWritten)
+                .HasForeignKey(x => x.AuthorUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Driver)
+                .WithMany(x => x.DriverReviews)
+                .HasForeignKey(x => x.DriverUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.Order)
+                .WithMany(x => x.Reviews)
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Restaurant)
+                .WithMany(x => x.Reviews)
+                .HasForeignKey(x => x.RestaurantId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasIndex(x => new { x.OrderId, x.Subject }).IsUnique();
         });
     }
 }

@@ -24,4 +24,5 @@ public class Restaurant
     public FoodCategory FoodCategory { get; set; } = null!;
     public ICollection<MenuCategory> MenuCategories { get; set; } = new List<MenuCategory>();
     public ICollection<RestaurantStaff> Staff { get; set; } = new List<RestaurantStaff>();
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
 }
