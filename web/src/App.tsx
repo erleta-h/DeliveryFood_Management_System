@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { BrandLogo } from './components/BrandLogo'
 import { GuestRoute } from './components/GuestRoute'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { PageSpinner } from './components/PageSpinner'
 import { AdminRoute } from './components/AdminRoute'
 import {
   customerBtnGhost,
@@ -18,6 +19,10 @@ const AddressesPage = lazy(() => import('./pages/AddressesPage'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
+const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'))
+const AdminReviewsPage = lazy(() => import('./pages/AdminReviewsPage'))
+
+const lazyFallback = <PageSpinner />
 
 function HomePage() {
   return (
@@ -93,9 +98,23 @@ export default function App() {
             <Route path="orders" element={<StubModule title="Porositë" />} />
             <Route path="riders" element={<StubModule title="Delivera" />} />
             <Route path="users" element={<StubModule title="Klientët" />} />
-            <Route path="finance" element={<StubModule title="Financa" />} />
+            <Route
+              path="finance"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminFinancePage />
+                </Suspense>
+              }
+            />
             <Route path="promotions" element={<StubModule title="Promocione" />} />
-            <Route path="reviews" element={<StubModule title="Vlerësime" />} />
+             <Route
+              path="reviews"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminReviewsPage />
+                </Suspense>
+              }
+            />
             <Route path="zones" element={<StubModule title="Zonat & tarifat" />} />
             <Route path="reports" element={<StubModule title="Raporte" />} />
             <Route path="security" element={<StubModule title="Siguria" />} />
