@@ -29,4 +29,6 @@ public class User
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<RestaurantStaff> RestaurantStaffMemberships { get; set; } = new List<RestaurantStaff>();
+    public ICollection<Review> DriverReviews { get; set; } = new List<Review>();
+    public ICollection<Review> ReviewsWritten { get; set; } = new List<Review>();
 }

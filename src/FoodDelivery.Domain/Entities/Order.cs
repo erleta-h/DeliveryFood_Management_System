@@ -27,6 +27,9 @@ public class Order
     public Restaurant Restaurant { get; set; } = null!;
     public User User { get; set; } = null!;
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
-    public ICollection<OrderCoupon> OrderCoupons { get; set; } = new List<OrderCoupon>();    
+    public ICollection<OrderCoupon> OrderCoupons { get; set; } = new List<OrderCoupon>();
+
+    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<OrderStatusHistory> StatusHistory { get; set; } = new List<OrderStatusHistory>();
 }
