@@ -9,6 +9,7 @@ using FoodDelivery.Infrastructure;
 using FoodDelivery.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -123,6 +124,7 @@ if (autoMigrate)
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FoodDeliveryDbContext>();
         var dbLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DbStartup");
+        // Aplikon të gjitha migrimet e pazbatuara (çdo migrim i ri shtohet këtu automatikisht).
         await db.Database.MigrateAsync();
         dbLog.LogInformation("Migrimet EF u aplikuan — skema e databazës përputhet me projektin.");
 
@@ -135,6 +137,17 @@ if (autoMigrate)
     catch (Exception ex)
     {
         var dbLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("DbStartup");
+        if (ex.GetBaseException() is SqlException sql && sql.Number == 2714)
+        {
+            dbLog.LogCritical(
+                "Migrimi u ndal sepse u përpoq të krijonte një tabelë (p.sh. FoodCategories) që ekziston tashmë. " +
+                "Kjo zakonisht ndodh kur skema e databazës u krijua më parë, por tabela __EFMigrationsHistory nuk " +
+                "përputhet me migrimet në kod (migrim i «InitialCreate» u ndryshua ose u ribë, ose baza u kopjua pa historinë). " +
+                "Hapat tipikë: (1) në zhvillim, fshi databazën dhe nis sërish që Migrate të krijojë skemën nga e para; " +
+                "ose (2) shto manualisht rreshtat në __EFMigrationsHistory për migrimet e zbatuara, sipas " +
+                "dokumentimit EF, nëse dëshiron të ruash të dhënat.");
+        }
+
         dbLog.LogCritical(ex,
             "Dështoi migrimi (ose seed në Development). Kontrollo ConnectionStrings:DefaultConnection dhe SQL Server.");
         throw;

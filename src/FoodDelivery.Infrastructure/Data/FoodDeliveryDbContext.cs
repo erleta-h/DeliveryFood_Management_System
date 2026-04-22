@@ -24,8 +24,16 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
 
-    public object Coupons { get; internal set; }
-
+    public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+    public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<OrderCoupon> OrderCoupons => Set<OrderCoupon>();
+    public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Delivery> Deliveries => Set<Delivery>();
+    public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
+    public DbSet<Setting> Settings => Set<Setting>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -158,6 +166,68 @@ public class FoodDeliveryDbContext : DbContext
                 .HasForeignKey(x => x.RestaurantId)
                 .OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => new { x.OrderId, x.Subject }).IsUnique();
+        });
+
+        modelBuilder.Entity<CustomerAddress>(e =>
+        {
+            e.ToTable("CustomerAddresses");
+            e.HasOne(x => x.User)
+                .WithMany(x => x.Addresses)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Order>(e =>
+        {
+            e.ToTable("Orders");
+            e.Property(x => x.Subtotal).HasPrecision(18, 2);
+            e.Property(x => x.DeliveryFee).HasPrecision(18, 2);
+            e.Property(x => x.DiscountTotal).HasPrecision(18, 2);
+            e.Property(x => x.Total).HasPrecision(18, 2);
+            e.HasIndex(x => x.OrderNumber).IsUnique();
+        });
+
+        modelBuilder.Entity<OrderItem>(e =>
+        {
+            e.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            e.HasOne(x => x.Order)
+                .WithMany(x => x.Items)
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Delivery>(e =>
+        {
+            e.ToTable("Deliveries");
+            e.HasIndex(x => x.OrderId).IsUnique();
+            e.HasOne(x => x.Order)
+                .WithOne(x => x.Delivery)
+                .HasForeignKey<Delivery>(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Driver)
+                .WithMany(x => x.Deliveries)
+                .HasForeignKey(x => x.DriverUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DriverProfile>(e =>
+        {
+            e.ToTable("DriverProfiles");
+            e.HasKey(x => x.UserId);
+            e.HasOne(x => x.User)
+                .WithOne(x => x.DriverProfile)
+                .HasForeignKey<DriverProfile>(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AuditLog>(e =>
+        {
+            e.ToTable("AuditLogs");
+        });
+
+        modelBuilder.Entity<Setting>(e =>
+        {
+            e.HasIndex(x => x.Key).IsUnique();
         });
     }
 }
