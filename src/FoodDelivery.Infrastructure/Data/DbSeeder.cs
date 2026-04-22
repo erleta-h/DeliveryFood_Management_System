@@ -35,17 +35,9 @@ public static class DbSeeder
         }
 
         var now = DateTime.UtcNow;
-        var categories = new[]
-        {
-            new FoodCategory { Name = "Pizza", SortOrder = 1, CreatedAt = now },
-            new FoodCategory { Name = "Burger & grill", SortOrder = 2, CreatedAt = now },
-            new FoodCategory { Name = "Aziatik", SortOrder = 3, CreatedAt = now },
-            new FoodCategory { Name = "Sushi", SortOrder = 4, CreatedAt = now },
-            new FoodCategory { Name = "Kafe & mëngjes", SortOrder = 5, CreatedAt = now },
-        };
-
-        db.FoodCategories.AddRange(categories);
-        await db.SaveChangesAsync(cancellationToken);
+        // Idempotent: nëse nisja e mëparshme kishte shtuar kategoritë por dështoi më vonë, mos u përpoq
+        // të futesh sërish emra me indeks unik.
+        var categories = await EnsureDemoFoodCategoriesAsync(db, now, cancellationToken);
 
         var pizza = categories[0];
         var burger = categories[1];
@@ -66,7 +58,7 @@ public static class DbSeeder
         };
 
         db.Restaurants.AddRange(restaurants);
-        await db.SaveChangesAsync(cancellationToken);
+        int v = await db.SaveChangesAsync(cancellationToken);
 
         await AddMenuForRestaurantsAsync(db, restaurants, now, cancellationToken);
         await EnsureKitchenStaffUserAsync(
@@ -348,6 +340,76 @@ public static class DbSeeder
         });
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("DbSeeder: u shtua roli {Role}.", CustomerRoleName);
+    }
+
+    /// <summary>
+    /// Kthen kategoritë demo në të njëjtin rend: krijon mungesat; nëse rreshtat ekzistojnë (indeks unik në emër), i përdor.
+    /// Përdor përputhje pa dallim shkronjash dhe <see cref="string.Trim()"/>; kopje të lehta (jo të track-ura) vetëm për
+    /// <c>Id</c> — shmang konfuzin e tracking që efektivisht mund të provojë INSERT të dyfishtë në "Pizza" etj.
+    /// </summary>
+    private static async Task<FoodCategory[]> EnsureDemoFoodCategoriesAsync(
+        FoodDeliveryDbContext db,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        (string Name, int SortOrder)[] spec =
+        {
+            ("Pizza", 1),
+            ("Burger & grill", 2),
+            ("Aziatik", 3),
+            ("Sushi", 4),
+            ("Kafe & mëngjes", 5),
+        };
+
+        // Një round-trip, pa tracking — përndryshe entitetet `Unchanged` ndonjëherë keqinterpretoren në batch-in e
+        // Restaurant.AddRange.
+        var rows = await db.FoodCategories
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var byName = new Dictionary<string, FoodCategory>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in rows)
+        {
+            var k = (r.Name ?? string.Empty).Trim();
+            if (k.Length == 0)
+                continue;
+            if (!byName.ContainsKey(k))
+                byName[k] = r;
+        }
+
+        var list = new List<FoodCategory>(spec.Length);
+        var anyNew = false;
+        foreach (var (name, sortOrder) in spec)
+        {
+            var key = name.Trim();
+            if (byName.TryGetValue(key, out var found))
+            {
+                list.Add(new FoodCategory
+                {
+                    Id = found.Id,
+                    Name = name,
+                    SortOrder = found.SortOrder,
+                    CreatedAt = found.CreatedAt,
+                });
+                continue;
+            }
+
+            anyNew = true;
+            var cat = new FoodCategory
+            {
+                Name = name,
+                SortOrder = sortOrder,
+                CreatedAt = now,
+            };
+            db.FoodCategories.Add(cat);
+            list.Add(cat);
+            byName[key] = cat;
+        }
+
+        if (anyNew)
+            await db.SaveChangesAsync(cancellationToken);
+
+        return list.ToArray();
     }
 
     private static Restaurant NewRestaurant(
