@@ -54,15 +54,13 @@ public sealed class AuthService : IAuthService
             PasswordHash = string.Empty,
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
-        _uow.Repository<User, long>().Add(user);
-        await _uow.SaveChangesAsync(cancellationToken);
-        _uow.Repository<UserRole, long>().Add(new UserRole
+        user.UserRoles.Add(new UserRole
         {
-            UserId = user.Id,
             RoleId = role.Id,
             AssignedAt = now,
             CreatedAt = now,
         });
+        _uow.Repository<User, long>().Add(user);
         await _uow.SaveChangesAsync(cancellationToken);
         var token = _jwt.CreateAccessToken(
             user.Id,
