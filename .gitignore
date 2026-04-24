@@ -9,17 +9,17 @@
 .vs/
 *.DotSettings.user
 
-#  Konfigurim lokal (connection string, JWT, etj.) ——
+#  Konfigurim lokal (connection string, JWT, etj.) ï¿½ï¿½
 .env
 src/FoodDelivery.Api/.env
 src/FoodDelivery.Api/appsettings.Development.json
-**/appsettings.*.local.json
+src\FoodDelivery.Api\appsettings.json
 
-#  Frontend (Vite / npm) ——
+#  Frontend (Vite / npm) ï¿½ï¿½
 web/node_modules/
 web/dist/
 
-# Test / coverage ——
+# Test / coverage ï¿½ï¿½
 TestResults/
 *.trx
 coverage*.json
@@ -27,10 +27,10 @@ coverage*.xml
 *.coverage
 *.coveragexml
 
-#  OS / IDE ——
+#  OS / IDE ï¿½ï¿½
 .DS_Store
 Thumbs.db
 .idea/
 
-#  Logs ——
+#  Logs ï¿½ï¿½
 *.log
