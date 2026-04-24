@@ -5,9 +5,9 @@ import { defineConfig, loadEnv } from 'vite'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  /** Ku të proxyohet /api në dev (API ASP.NET). 502 = ky adres nuk përgjigjet. */
+  /** Duhet të përputhet me `applicationUrl` http në `FoodDelivery.Api/Properties/launchSettings.json` (Kestrel). */
   const apiProxyTarget =
-    env.VITE_DEV_API_PROXY?.trim() || 'http://localhost:5160'
+    env.VITE_DEV_API_PROXY?.trim() || 'http://localhost:5183'
 
   return {
     plugins: [react(), tailwindcss()],

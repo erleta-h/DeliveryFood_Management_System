@@ -1,4 +1,210 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-brand: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
+.landing-brand {
+  font-family: var(--font-brand);
+  font-optical-sizing: auto;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background-color: #171820;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Select / option në forma të errëta (partner, etj.) — shmang tekst të padukshëm */
+/* në listën e sistemit (bardhë mbi bardhë në Windows/Chrome).                    */
+/* -------------------------------------------------------------------------- */
+.partner-form {
+  color-scheme: dark;
+}
+
+select.partner-form-select,
+.partner-form select:not([multiple]) {
+  background-color: #1b2233;
+  color: #f4f4f5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  background-size: 1.125rem;
+  padding-right: 2.5rem;
+}
+
+select.partner-form-select option,
+.partner-form select option {
+  background-color: #1e2433;
+  color: #f4f4f5;
+}
+
+select.partner-form-select option:checked,
+.partner-form select option:checked {
+  background-color: #9a3412;
+  color: #fff;
+}
+
+@keyframes auth-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-auth-panel-in {
+  animation: auth-panel-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Hyrje moderne në ballinë — logo, nav, hero */
+@keyframes site-logo-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+    filter: blur(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes site-logo-food {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes site-logo-delivery {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes site-nav-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes site-hero-enter {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Vetëm wrapper — blur + zbritje; fjalët kanë stagger më poshtë */
+.animate-site-logo-wrap {
+  animation: site-logo-enter 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-site-logo-food {
+  animation: site-logo-food 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+.animate-site-logo-delivery {
+  animation: site-logo-delivery 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both;
+}
+
+.animate-site-nav {
+  animation: site-nav-enter 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both;
+}
+
+.animate-site-hero {
+  animation: site-hero-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+
+.animate-site-hero-sub {
+  animation: site-hero-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.38s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-site-logo-wrap,
+  .animate-site-logo-food,
+  .animate-site-logo-delivery,
+  .animate-site-nav,
+  .animate-site-hero,
+  .animate-site-hero-sub {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes logo-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.brand-logo-text {
+  background-size: 180% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.45s ease;
+}
+
+.group:hover .brand-logo-text {
+  transform: scale(1.045);
+  filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.35));
+  animation: logo-shimmer 2.4s ease-in-out infinite;
+}
+
+/**
+ * Filtrat e restoranteve: fusha e mbyllur = blu e errët; lista e hapur në Chrome/Windows
+ * shpesh është e bardhë — opsionet me tekst të errët mbeten të lexueshme kudo.
+ */
+/* Sfondi i fushës vjen nga klasa Tailwind; vetëm ngjyra e tekstit si fallback */
+select.restaurant-toolbar-select {
+  color: #e4e4e7;
+}
+
+select.restaurant-toolbar-select option {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
 
 select.restaurant-toolbar-select option:checked,
 select.restaurant-toolbar-select option:hover {
