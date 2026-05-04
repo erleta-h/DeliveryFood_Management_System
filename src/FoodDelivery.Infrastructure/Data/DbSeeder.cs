@@ -1,6 +1,7 @@
 using FoodDelivery.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace FoodDelivery.Infrastructure.Data;
@@ -445,5 +446,10 @@ public static class DbSeeder
             CreatedAt = now,
             Description = $"Kuzhinë {name}.",
         };
+    }
+
+    public static async Task SeedAsync(FoodDeliveryDbContext db, ILogger dbLog, IPasswordHasher<User> passwordHasher, IDistributedCache distributedCache)
+    {
+        throw new NotImplementedException();
     }
 }

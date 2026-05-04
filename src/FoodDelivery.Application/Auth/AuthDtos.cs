@@ -7,7 +7,8 @@ public record AuthUserDto(
     string Phone,
     string Line1,
     string City,
-    string? PostalCode);
+    string? PostalCode,
+    bool MustChangePassword);
 
 public record AuthResponseDto(string Token, DateTime ExpiresAtUtc, AuthUserDto User);
 

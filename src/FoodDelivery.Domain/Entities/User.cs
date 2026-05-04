@@ -12,8 +12,13 @@ public class User
     /// <summary>Numër telefoni për kontakt (porosi, dërgesë).</summary>
     public string? Phone { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
+
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
+
+    public bool MustChangePassword { get; set; }
+
+    
 
     /// <summary>Hyrja e fundit me sukses (opsionale).</summary>
     public DateTime? LastLoginAt { get; set; }

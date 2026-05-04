@@ -6,5 +6,6 @@ public interface IJwtTokenIssuer
         long userId,
         string email,
         IReadOnlyList<string> roles,
+        IReadOnlyList<string> permissionNames,
         out DateTime expiresAtUtc);
 }
