@@ -8,6 +8,8 @@ export type AuthUser = {
   line1: string
   city: string
   postalCode?: string | null
+    /** True kur admini ka dhënë fjalëkalim të përkohshëm — paneli kërkon ndryshim para përdorimit të plotë. */
+  mustChangePassword?: boolean
 }
 
 export type AuthResponse = {
@@ -39,6 +41,8 @@ export function mapAuthUser(data: AuthUser): AuthUser {
     line1: data.line1,
     city: data.city,
     postalCode: data.postalCode ?? undefined,
+    mustChangePassword: data.mustChangePassword === true,
+
   }
 }
 

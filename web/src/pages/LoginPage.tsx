@@ -10,8 +10,12 @@ import {
   customerPanelSubtitle,
   customerShellBg,
 } from '../lib/customerTheme'
-import { hasAdminRole, hasCustomerRole, hasDriverRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
+import { canAccessAdminPanel, hasDriverRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
 import { useAuthStore } from '../store/authStore'
+import {
+  clearStaffCustomerAppMode,
+  enableStaffCustomerAppMode,
+} from '../lib/staffCustomerApp'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -31,21 +35,24 @@ export default function LoginPage() {
     setBusy(false)
     if (r.ok) {
       const t = useAuthStore.getState().token
-      const wantAdmin = searchParams.get('next') === 'admin'
-      const wantKitchen = searchParams.get('next') === 'kitchen'
-      if (t && hasAdminRole(t)) {
+      const next = searchParams.get('next')
+      const wantAdmin = next === 'admin'
+      const wantKitchen = next === 'kitchen'
+      const wantClientApp = next === 'app' || next === 'customer'
+
+      if (t && canAccessAdminPanel(t)) {
         navigate('/admin', { replace: true })
         return
       }
       if (wantAdmin) {
         logout()
         setError(
-          'Kjo llogari nuk ka rol Administrator. Përdor emailin e admin-it ose hap /login pa parametër për hyrje klient.',
+          'Kjo llogari nuk ka akses në panelin e platformës (Admin ose Support). Përdor kredencialet e duhura ose hap /login pa parametër për hyrje klient.',
         )
         return
       }
 
-      const wantDriver = searchParams.get('next') === 'driver'
+      const wantDriver = next === 'driver'
       if (wantDriver && t && !hasDriverRole(t)) {
         logout()
         setError(
@@ -54,19 +61,28 @@ export default function LoginPage() {
         return
       }
 
+      /** Stafi i restorantit → paneli i porosive, përveç kur kërkohet qartë aplikacioni klient (`?next=app|customer`). */
+      if (t && hasRestaurantStaffRole(t) && !wantClientApp) {
+        clearStaffCustomerAppMode()
+        navigate('/kitchen/orders', { replace: true })
+        return
+      }
+
       if (t && wantKitchen && hasRestaurantStaffRole(t)) {
-        navigate('/kitchen', { replace: true })
+        clearStaffCustomerAppMode()
+        navigate('/kitchen/orders', { replace: true })
+        return
+      }
+      if (t && wantClientApp && hasRestaurantStaffRole(t)) {
+        enableStaffCustomerAppMode()
+        navigate('/app', { replace: true })
         return
       }
       if (t && wantDriver && hasDriverRole(t)) {
         navigate('/driver', { replace: true })
         return
       }
-      if (t && hasRestaurantStaffRole(t) && !hasCustomerRole(t) && !hasDriverRole(t)) {
-        navigate('/kitchen', { replace: true })
-        return
-      }
-      if (t && hasDriverRole(t) && !hasAdminRole(t)) {
+      if (t && hasDriverRole(t) && !canAccessAdminPanel(t)) {
         navigate('/driver', { replace: true })
         return
       }
@@ -95,7 +111,7 @@ export default function LoginPage() {
               ? 'Hyr si administrator: vendos email dhe fjalëkalim të llogarisë që ka rol Admin në sistem.'
               : searchParams.get('next') === 'driver'
                 ? 'Hyr me llogarinë e miratuar si Deliver (Driver). Nëse je kyçur si klient, përdor kredencialet e Deliver ose dil dhe hy përsëri.'
-                : 'Përdor emailin dhe fjalëkalimin — për klient (regjistrim), kuzhinë ose admin sipas llogarisë.'}
+                : 'Përdor emailin dhe fjalëkalimin. Stafi i restorantit çohet te paneli i kuzhinës; për hyrje si klient me të njëjtën llogari përdor /login?next=app.'}
           </p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
@@ -143,7 +159,7 @@ export default function LoginPage() {
           <p className="mt-8 text-center text-sm text-zinc-400">
             Nuk ke llogari?{' '}
             <Link to="/signup" className="font-semibold text-amber-400 hover:text-amber-300">
-              Regjistrohu
+              Regjistruhu
             </Link>
           </p>
         </section>
