@@ -12,8 +12,13 @@ public class User
     /// <summary>Numër telefoni për kontakt (porosi, dërgesë).</summary>
     public string? Phone { get; set; }
     public string PasswordHash { get; set; } = string.Empty;
+
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
+
+    public bool MustChangePassword { get; set; }
+
+    
 
     /// <summary>Hyrja e fundit me sukses (opsionale).</summary>
     public DateTime? LastLoginAt { get; set; }
@@ -29,4 +34,9 @@ public class User
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<RestaurantStaff> RestaurantStaffMemberships { get; set; } = new List<RestaurantStaff>();
+    public ICollection<CustomerAddress> Addresses { get; set; } = new List<CustomerAddress>();
+    public DriverProfile? DriverProfile { get; set; }
+    public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
+    public ICollection<Review> DriverReviews { get; set; } = new List<Review>();
+    public ICollection<Review> ReviewsWritten { get; set; } = new List<Review>();
 }

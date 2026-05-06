@@ -11,6 +11,7 @@ public class Restaurant
     public string? Description { get; set; }
     public int EstimatedDeliveryMinutes { get; set; }
     public long FoodCategoryId { get; set; }
+    public long? CreatedById { get; set; }
     public bool IsActive { get; set; }
     public bool IsApproved { get; set; }
     public double? Latitude { get; set; }
@@ -20,8 +21,10 @@ public class Restaurant
     public string? Phone { get; set; }
     public int ReviewCount { get; set; }
     public string? Slug { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 
     public FoodCategory FoodCategory { get; set; } = null!;
     public ICollection<MenuCategory> MenuCategories { get; set; } = new List<MenuCategory>();
     public ICollection<RestaurantStaff> Staff { get; set; } = new List<RestaurantStaff>();
+    public ICollection<Review> Reviews { get; set; } = new List<Review>();
 }

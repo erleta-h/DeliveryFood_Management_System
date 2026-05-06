@@ -1,139 +1,333 @@
-import { BrowserRouter, Link ,Navigate, Outlet, Route, Routes } from 'react-router-dom'
-import { lazy, Suspense } from 'react'
-import { BrandLogo } from './components/BrandLogo'
-import { GuestRoute } from './components/GuestRoute'
-import { ProtectedRoute } from './components/ProtectedRoute'
+import { lazy, Suspense, useEffect } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AdminRoute } from './components/AdminRoute'
-import {
-  customerBtnGhost,
-  customerBtnPrimary,
-  customerShellBg,
-} from './lib/customerTheme'
-import AccountPage from './pages/AccountPage'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
+import { GuestRoute } from './components/GuestRoute'
+import { KitchenStaffRoute } from './components/KitchenStaffRoute'
+import { LandingPage } from './components/LandingPage'
+import { PageSpinner } from './components/PageSpinner'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { KitchenAccountPage, KitchenMenuPage } from './lazy/kitchen'
+import { useAuthStore } from './store/authStore'
 
 const CustomerLayout = lazy(() => import('./layouts/CustomerLayout'))
+const RestaurantListPage = lazy(() => import('./pages/RestaurantListPage'))
+const RestaurantDetailPage = lazy(() => import('./pages/RestaurantDetailPage'))
+const CartPage = lazy(() => import('./pages/CartPage'))
 const AddressesPage = lazy(() => import('./pages/AddressesPage'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
+const AccountPage = lazy(() => import('./pages/AccountPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const SignupPage = lazy(() => import('./pages/SignupPage'))
+const KitchenLayout = lazy(() => import('./layouts/KitchenLayout'))
+const KitchenOrdersPage = lazy(() => import('./pages/KitchenOrdersPage'))
+const PartnerApplyPage = lazy(() => import('./pages/PartnerApplyPage'))
+const PartnerLoginPage = lazy(() => import('./pages/PartnerLoginPage'))
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
+const AdminPartnerApplicationsPage = lazy(() => import('./pages/AdminPartnerApplicationsPage'))
+const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'))
+const AdminRestaurantsPage = lazy(() => import('./pages/AdminRestaurantsPage'))
+const AdminCustomersPage = lazy(() => import('./pages/AdminCustomersPage'))
+const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'))
+const AdminPromotionsPage = lazy(() => import('./pages/AdminPromotionsPage'))
+const AdminReviewsPage = lazy(() => import('./pages/AdminReviewsPage'))
+const AdminZonesPage = lazy(() => import('./pages/AdminZonesPage'))
+const AdminRidersPage = lazy(() => import('./pages/AdminRidersPage'))
+const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'))
+const AdminSecurityPage = lazy(() => import('./pages/AdminSecurityPage'))
+const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'))
+const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage'))
 
-function HomePage() {
-  return (
-    <div className={`${customerShellBg} min-h-screen px-4 py-16`}>
-      <div className="mx-auto max-w-lg text-center">
-        <div className="flex justify-center">
-          <BrandLogo />
-        </div>
-        <p className="mt-8 text-zinc-400">Demo autentifikimi — kyçu ose krijo llogari.</p>
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Link
-            to="/login"
-            className={`${customerBtnPrimary} inline-flex justify-center no-underline`}
-          >
-            Hyr
-          </Link>
-          <Link
-            to="/signup"
-            className={`${customerBtnGhost} inline-flex justify-center no-underline`}
-          >
-            Regjistrohu
-          </Link>
-        </div>
-      </div>
-    </div>
-  )
-}
+const lazyFallback = <PageSpinner />
 
-function StubModule({ title }: { title: string }) {
-  return (
-    <div className={`${customerShellBg} min-h-screen p-8`}>
-      <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-[#222636]/80 p-6 text-zinc-100 backdrop-blur-md">
-        <h1 className="text-xl font-bold">{title}</h1>
-        <p className="mt-2 text-sm text-zinc-400">
-          Ky modul nuk është në këtë projekt minimal (vetëm klienti + auth).
-        </p>
-        <p className="mt-4">
-          <Link to="/app/account" className="text-amber-400 no-underline hover:underline">
-            Llogaria
-          </Link>
-          <span className="text-zinc-600"> · </span>
-          <Link to="/" className="text-amber-400 no-underline hover:underline">
-            Ballina
-          </Link>
-        </p>
-      </div>
-    </div>
-  )
-}
+function App() {
+  const bootstrap = useAuthStore((s) => s.bootstrap)
+  const loading = useAuthStore((s) => s.loading)
 
-export default function App() {
+  useEffect(() => {
+    void bootstrap()
+  }, [bootstrap])
+
+  if (loading) return <PageSpinner />
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-
-        <Route element={<GuestRoute />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
-        </Route>
-
-        <Route element={<ProtectedRoute />}>
-          <Route path="/app" element={<Outlet />}>
-            <Route index element={<Navigate to="account" replace />} />
-            <Route path="account" element={<AccountPage />} />
-          </Route>
-        </Route>
-
+        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/partner"
+          element={
+            <Suspense fallback={lazyFallback}>
+              <PartnerApplyPage />
+            </Suspense>
+          }
+        />
         <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<Outlet />}>
-            <Route index element={<StubModule title="Admin" />} />
-            <Route path="restaurants" element={<StubModule title="Restorantet" />} />
-            <Route path="orders" element={<StubModule title="Porositë" />} />
-            <Route path="riders" element={<StubModule title="Delivera" />} />
-            <Route path="users" element={<StubModule title="Klientët" />} />
-            <Route path="finance" element={<StubModule title="Financa" />} />
-            <Route path="promotions" element={<StubModule title="Promocione" />} />
-            <Route path="reviews" element={<StubModule title="Vlerësime" />} />
-            <Route path="zones" element={<StubModule title="Zonat & tarifat" />} />
-            <Route path="reports" element={<StubModule title="Raporte" />} />
-            <Route path="security" element={<StubModule title="Siguria" />} />
-            <Route path="support" element={<StubModule title="Support" />} />
-            <Route path="settings" element={<StubModule title="Konfigurime" />} />
+          <Route
+            path="/admin"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <AdminLayout />
+              </Suspense>
+            }
+          >
+            <Route
+              index
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminDashboardPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="partner-applications"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminPartnerApplicationsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="orders"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminOrdersPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="restaurants"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminRestaurantsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="users"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminCustomersPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="finance"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminFinancePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="promotions"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminPromotionsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="reviews"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminReviewsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="zones"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminZonesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="riders"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminRidersPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="reports"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminReportsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="security"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminSecurityPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="settings"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminSettingsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="support"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminSupportPage />
+                </Suspense>
+              }
+            />
           </Route>
         </Route>
-
+        <Route element={<KitchenStaffRoute />}>
+          <Route
+            path="/kitchen"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <KitchenLayout />
+              </Suspense>
+            }
+          >
+            <Route
+              index
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenOrdersPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="account"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenAccountPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="menu"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenMenuPage />
+                </Suspense>
+              }
+            />
+          </Route>
+        </Route>
+        <Route element={<GuestRoute />}>
+          <Route
+            path="/login"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <LoginPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <SignupPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/partner/login"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <PartnerLoginPage />
+              </Suspense>
+            }
+          />
+        </Route>
         <Route element={<ProtectedRoute />}>
-  <Route
-    path="/app"
-    element={
-      <Suspense fallback={<div>Loading...</div>}>
-        <CustomerLayout />
-      </Suspense>
-    }
-  >
-    <Route index element={<Navigate to="restaurants" replace />} />
-
-   
-    <Route path="addresses" element={<AddressesPage />} />
-    <Route path="checkout" element={<CheckoutPage />} />
-    <Route path="orders" element={<OrdersPage />} />
-    <Route path="orders/:id" element={<OrderDetailPage />} />
-  </Route>
-</Route>
-
- 
-
-
-
-      
-
-        <Route path="/kitchen" element={<StubModule title="Kuzhina" />} />
-        <Route path="/driver" element={<StubModule title="Deliver" />} />
-
+          <Route
+            path="/app"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <CustomerLayout />
+              </Suspense>
+            }
+          >
+            <Route index element={<Navigate to="restaurants" replace />} />
+            <Route
+              path="restaurants"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <RestaurantListPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="restaurants/:id"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <RestaurantDetailPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="cart"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <CartPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="addresses"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AddressesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="checkout"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <CheckoutPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="orders"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <OrdersPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="orders/:id"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <OrderDetailPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="account"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AccountPage />
+                </Suspense>
+              }
+            />
+          </Route>
+        </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
 }
+
+export default App

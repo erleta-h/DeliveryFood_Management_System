@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using FoodDelivery.Application.Auth;
 using FoodDelivery.Application.Configuration;
+using FoodDelivery.Application.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -21,6 +22,7 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
         long userId,
         string email,
         IReadOnlyList<string> roles,
+        IReadOnlyList<string> permissionNames,
         out DateTime expiresAtUtc)
     {
         expiresAtUtc = DateTime.UtcNow.AddMinutes(Math.Max(1, _jwt.AccessTokenMinutes));
@@ -36,6 +38,8 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
         };
         foreach (var r in roleList)
             claims.Add(new Claim(ClaimTypes.Role, r));
+        foreach (var p in permissionNames.Distinct(StringComparer.Ordinal))
+            claims.Add(new Claim(PermissionClaimTypes.Permission, p));
         var token = new JwtSecurityToken(
             issuer: _jwt.Issuer,
             audience: _jwt.Audience,
@@ -45,3 +49,4 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
+

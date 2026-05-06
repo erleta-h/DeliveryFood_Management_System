@@ -4,6 +4,7 @@ public class RestaurantStaff
 {
     public long Id { get; set; }
     public DateTime CreatedAt { get; set; }
+    public long? CreatedById { get; set; }
     public long RestaurantId { get; set; }
     public string Title { get; set; } = string.Empty;
     public long UserId { get; set; }

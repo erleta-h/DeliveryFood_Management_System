@@ -13,13 +13,13 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Swashbuckle.AspNetCore" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\FoodDelivery.Application\FoodDelivery.Application.csproj" />
-    <ProjectReference Include="..\FoodDelivery.Domain\FoodDelivery.Domain.csproj" />
-    <ProjectReference Include="..\FoodDelivery.Infrastructure\FoodDelivery.Infrastructure.csproj" />
+	  <ProjectReference Include="..\FoodDelivery.Infrastructure\FoodDelivery.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
