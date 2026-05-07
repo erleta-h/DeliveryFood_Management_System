@@ -1,4 +1,5 @@
 ﻿using FoodDelivery.Application.Orders;
+using FoodDelivery.Application.Realtime; // Shtuar për Realtime Notifier
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Auth;
 using FoodDelivery.Infrastructure.Data;
@@ -9,10 +10,12 @@ namespace FoodDelivery.Infrastructure.Orders;
 public sealed class OrdersService : IOrdersService
 {
     private readonly FoodDeliveryDbContext _db;
+    private readonly IOrderRealtimeNotifier _realtime; // Shtuar
 
-    public OrdersService(FoodDeliveryDbContext db)
+    public OrdersService(FoodDeliveryDbContext db, IOrderRealtimeNotifier realtime) // Injektuar
     {
         _db = db;
+        _realtime = realtime; // Caktuar
     }
 
     public async Task<(long? OrderId, string? Error)> PlaceOrderAsync(
@@ -136,6 +139,11 @@ public sealed class OrdersService : IOrdersService
         });
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        // --- SHTUAR PËR REALTIME ---
+        // Njofton restorantin që ka ardhur një porosi e re live
+        await _realtime.NotifyRestaurantNewOrderAsync(order.Id, order.RestaurantId, cancellationToken);
+
         return (order.Id, null);
     }
 
