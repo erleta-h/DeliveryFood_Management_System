@@ -4,10 +4,15 @@ public class Notification
 {
     public long Id { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public long? CreatedById { get; set; }
     public bool IsRead { get; set; }
     public string Message { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Type { get; set; } = string.Empty;
+
+    public DateTime? UpdatedAt { get; set; }
+    public long? UpdatedById { get; set; }
     public long UserId { get; set; }
 
     public User User { get; set; } = null!;

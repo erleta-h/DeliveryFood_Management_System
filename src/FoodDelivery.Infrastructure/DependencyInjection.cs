@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using FoodDelivery.Application.Notifications;
+using FoodDelivery.Infrastructure.Notifications;
 
 namespace FoodDelivery.Infrastructure;
 
@@ -21,7 +23,7 @@ public static class DependencyInjection
 
         services.AddDbContext<FoodDeliveryDbContext>(options =>
             options.UseSqlServer(connectionString));
-
+        services.AddScoped<ICustomerNotificationService, CustomerNotificationService>();
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
