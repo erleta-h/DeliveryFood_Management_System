@@ -18,20 +18,20 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost]
-    [ProducesResponseType(typeof(long), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(PlaceOrderResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<long>> Place(
+    public async Task<ActionResult<PlaceOrderResponse>> Place(
         [FromBody] PlaceOrderRequest request,
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null) return Unauthorized();
 
-        var (orderId, error) = await _orders.PlaceOrderAsync(userId.Value, request, cancellationToken);
-        if (orderId is null)
+        var (response, error) = await _orders.PlaceOrderAsync(userId.Value, request, cancellationToken);
+        if (response is null)
             return BadRequest(new { message = error });
 
-        return CreatedAtAction(nameof(GetOne), new { id = orderId }, orderId);
+        return CreatedAtAction(nameof(GetOne), new { id = response.OrderId }, response);
     }
 
     [HttpGet("my")]
@@ -56,5 +56,32 @@ public class OrdersController : ControllerBase
         if (userId is null) return Unauthorized();
         var order = await _orders.GetMyOrderAsync(userId.Value, id, cancellationToken);
         return order is null ? NotFound() : Ok(order);
+    }
+
+    /// <summary>Anulon porosinë në pritje kur pagesa me kartë nuk është kryer (refuzim nga banka / klienti).</summary>
+    [HttpPost("my/{id:long}/cancel-unpaid-stripe")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> CancelUnpaidStripe(long id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var (ok, error) = await _orders.CancelUnpaidStripeOrderAsync(userId.Value, id, cancellationToken);
+        if (!ok) return BadRequest(new { message = error });
+
+        return NoContent();
+    }
+
+    /// <summary>Heq porosinë nga «Porositë e mia» (historia e klientit); porosia mbetet në sistem.</summary>
+    [HttpDelete("my/{id:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> HideFromMyHistory(long id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+        var ok = await _orders.HideOrderFromCustomerHistoryAsync(userId.Value, id, cancellationToken);
+        return ok ? NoContent() : NotFound();
     }
 }
