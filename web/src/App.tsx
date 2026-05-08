@@ -18,6 +18,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
+const CustomerNotificationsPage = lazy(() => import('./pages/CustomerNotificationsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
 const KitchenLayout = lazy(() => import('./layouts/KitchenLayout'))
@@ -314,6 +315,7 @@ function App() {
                 </Suspense>
               }
             />
+            
             <Route
               path="account"
               element={
@@ -322,7 +324,16 @@ function App() {
                 </Suspense>
               }
             />
+            <Route
+  path="notifications"
+  element={
+    <Suspense fallback={lazyFallback}>
+      <CustomerNotificationsPage />
+    </Suspense>
+  }
+/>
           </Route>
+
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -13,10 +13,16 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<FoodCategory> FoodCategories => Set<FoodCategory>();
     public DbSet<MenuCategory> MenuCategories => Set<MenuCategory>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Restaurant> Restaurants => Set<Restaurant>();
     public DbSet<RestaurantStaff> RestaurantStaff => Set<RestaurantStaff>();
     public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<Permission> Permissions => Set<Permission>();       // Kom shtu
+    public DbSet<RolePermission> RolePermissions => Set<RolePermission>(); // Kom shtu
+
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
@@ -34,6 +40,8 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
     public DbSet<Setting> Settings => Set<Setting>();
+
+    public DbSet<WebPushSubscription> WebPushSubscriptions => Set<WebPushSubscription>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -124,6 +132,22 @@ public class FoodDeliveryDbContext : DbContext
                 .HasForeignKey(x => x.MenuCategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.HasOne(x => x.User)
+                .WithMany(x => x.Notifications)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
 
         modelBuilder.Entity<RestaurantStaff>(e =>
         {
@@ -228,6 +252,18 @@ public class FoodDeliveryDbContext : DbContext
         modelBuilder.Entity<Setting>(e =>
         {
             e.HasIndex(x => x.Key).IsUnique();
+        });
+
+        modelBuilder.Entity<WebPushSubscription>(e =>
+        {
+            e.HasOne(x => x.User)
+                .WithMany(x => x.WebPushSubscriptions)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Endpoint).HasMaxLength(2048).IsRequired();
+            e.Property(x => x.P256dh).HasMaxLength(256).IsRequired();
+            e.Property(x => x.Auth).HasMaxLength(128).IsRequired();
+            e.HasIndex(x => x.Endpoint).IsUnique();
         });
     }
 }
