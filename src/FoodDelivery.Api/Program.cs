@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using DotNetEnv;
 using FoodDelivery.Api.Security;
 using FoodDelivery.Application;
@@ -9,12 +7,15 @@ using FoodDelivery.Application.Security;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure;
 using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Infrastructure.Realtime;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text;
+using System.Text.Json;
 
 Env.TraversePath();
 
@@ -84,6 +85,11 @@ builder.Services.AddAuthorization(options =>
             policy.RequireClaim(PermissionClaimTypes.Permission, perm);
         });
     }
+});
+
+builder.Services.AddSignalR().AddJsonProtocol(o =>
+{
+    o.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
 });
 
 builder.Services.AddControllers().AddJsonOptions(o =>
@@ -217,7 +223,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
-
+app.MapHub<OrderTrackingHub>("/hubs/orders");
 app.MapControllers();
 
 app.Run();
