@@ -9,6 +9,9 @@ public sealed record AdminDriverListItemDto(
     string VehicleType,
     string? LicensePlate,
     bool IsOnline,
+    double? LastLatitude,
+    double? LastLongitude,
+    DateTime? LastLocationAtUtc,
     DateTime CreatedAt);
 
 public sealed record AdminDriverListResultDto(

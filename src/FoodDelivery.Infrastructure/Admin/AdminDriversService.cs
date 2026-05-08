@@ -1,5 +1,6 @@
 using FoodDelivery.Application.Admin;
-using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Application.Persistence;
+using FoodDelivery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace FoodDelivery.Infrastructure.Admin;
@@ -8,11 +9,11 @@ public sealed class AdminDriversService : IAdminDriversService
 {
     private const int MaxPageSize = 100;
 
-    private readonly FoodDeliveryDbContext _db;
+    private readonly IUnitOfWork _uow;
 
-    public AdminDriversService(FoodDeliveryDbContext db)
+    public AdminDriversService(IUnitOfWork uow)
     {
-        _db = db;
+        _uow = uow;
     }
 
     public async Task<AdminDriverListResultDto> ListAsync(
@@ -23,7 +24,7 @@ public sealed class AdminDriversService : IAdminDriversService
         var p = Math.Max(1, page);
         var ps = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var q = _db.DriverProfiles.AsNoTracking();
+        var q = _uow.Repository<DriverProfile, long>().Query.AsNoTracking();
         var total = await q.CountAsync(cancellationToken);
         var items = await q
             .OrderBy(d => d.User.Email)
@@ -38,6 +39,9 @@ public sealed class AdminDriversService : IAdminDriversService
                 d.VehicleType,
                 d.LicensePlate,
                 d.IsOnline,
+                d.LastLatitude,
+                d.LastLongitude,
+                d.LastLocationAtUtc,
                 d.CreatedAt))
             .ToListAsync(cancellationToken);
 
@@ -49,7 +53,7 @@ public sealed class AdminDriversService : IAdminDriversService
         AdminDriverPatchRequest request,
         CancellationToken cancellationToken = default)
     {
-        var profile = await _db.DriverProfiles
+        var profile = await _uow.Repository<DriverProfile, long>().Query
             .Include(d => d.User)
             .FirstOrDefaultAsync(d => d.UserId == userId, cancellationToken);
         if (profile is null)
@@ -62,7 +66,7 @@ public sealed class AdminDriversService : IAdminDriversService
 
         profile.UpdatedAt = DateTime.UtcNow;
         profile.User.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _uow.SaveChangesAsync(cancellationToken);
         return null;
     }
 }
