@@ -3,7 +3,7 @@
 public interface IOrdersService
 {
     /// <summary>Vendos porosinë; kopjon telefonin e klientit në <c>Order.ContactPhone</c>.</summary>
-    Task<(long? OrderId, string? Error)> PlaceOrderAsync(
+    Task<(PlaceOrderResponse? Response, string? Error)> PlaceOrderAsync(
         long userId,
         PlaceOrderRequest request,
         CancellationToken cancellationToken = default);
@@ -12,7 +12,17 @@ public interface IOrdersService
         long userId,
         CancellationToken cancellationToken = default);
 
-    Task<CustomerOrderDetailDto?> GetMyOrderAsync(
+    /// <summary>Heq porosinë nga lista e klientit (historia); nuk fshin të dhënat nga platforma.</summary>
+    Task<bool> HideOrderFromCustomerHistoryAsync(
+        long userId,
+        long orderId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Anulon porosinë në pritje kur pagesa me kartë nuk është kryer (refuzim / klienti largohet).
+    /// Idempotent nëse porosia është tashmë e anuluar.
+    /// </summary>
+    Task<(bool Ok, string? Error)> CancelUnpaidStripeOrderAsync(
         long userId,
         long orderId,
         CancellationToken cancellationToken = default);

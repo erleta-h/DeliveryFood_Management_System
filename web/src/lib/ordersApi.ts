@@ -4,6 +4,10 @@ import { apiPath } from './apiBase'
 export const FULFILLMENT_DELIVERY = 0
 export const FULFILLMENT_PICKUP = 1
 
+/** Përputhet me `OrderPaymentMethod` në API. */
+export const PAYMENT_COD = 0
+export const PAYMENT_STRIPE = 1
+
 export type PlaceOrderLine = { menuItemId: number; quantity: number }
 
 export type CustomerOrderSummary = {
@@ -15,6 +19,8 @@ export type CustomerOrderSummary = {
   status: number
   fulfillmentType: number
   total: number
+  /** Kur korrieri ka pranuar — chat-i aktiv në faqen e detajit. */
+  deliveryChatAvailable?: boolean
 }
 
 export type CustomerOrderItem = {
@@ -41,10 +47,46 @@ export type CustomerOrderDetail = {
   city: string
   postalCode: string | null
   items: CustomerOrderItem[]
+  restaurantLatitude: number | null
+  restaurantLongitude: number | null
+  customerLatitude: number | null
+  customerLongitude: number | null
+  driverLatitude: number | null
+  driverLongitude: number | null
+  /** Kur korrieri ka pranuar dërgesën — shfaq chat-in me tekst. */
+  deliveryChatAvailable?: boolean
+  /** True kur pagesa Stripe nuk është kapur ende — duhet /orders/:id/pay. */
+  pendingStripePayment?: boolean
+  /** Faza Deliver (0–4); null për pickup / pa dërgesë — përputhet me `DeliveryDriverLeg` në API. */
+  deliveryLegStatus?: number | null
+}
+
+const STRIPE_CHECKOUT_ORDER_KEY = 'fdStripeCheckoutOrderId'
+
+export function setStripeCheckoutOrderSession(orderId: number) {
+  sessionStorage.setItem(STRIPE_CHECKOUT_ORDER_KEY, String(orderId))
+}
+
+export function clearStripeCheckoutOrderSession() {
+  sessionStorage.removeItem(STRIPE_CHECKOUT_ORDER_KEY)
+}
+
+export function readStripeCheckoutOrderSession(): number | null {
+  const v = sessionStorage.getItem(STRIPE_CHECKOUT_ORDER_KEY)
+  if (v == null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
 }
 
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
+}
+
+export type PlaceOrderOneTimeAddress = {
+  line1: string
+  city: string
+  postalCode?: string
+  line2?: string
 }
 
 export async function placeOrder(
@@ -55,8 +97,15 @@ export async function placeOrder(
     customerNotes?: string
     /** 0 = dërgesë, 1 = marrje në restoran */
     fulfillmentType?: number
+    /** 0 = para në dorëzim, 1 = Stripe */
+    paymentMethod?: number
+    /** Vetëm për dërgesë: adresë tjetër vetëm për këtë porosi (krijohet rresht i ri «Porosi (një herë)»). */
+    oneTimeDeliveryAddress?: PlaceOrderOneTimeAddress | null
   },
-): Promise<{ ok: true; orderId: number } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; orderId: number; requiresStripePayment: boolean }
+  | { ok: false; message: string }
+> {
   const res = await fetch(apiPath('/api/orders'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
@@ -68,12 +117,32 @@ export async function placeOrder(
       })),
       customerNotes: body.customerNotes ?? null,
       fulfillmentType: body.fulfillmentType ?? FULFILLMENT_DELIVERY,
+      paymentMethod: body.paymentMethod ?? PAYMENT_COD,
+      oneTimeDeliveryAddress: body.oneTimeDeliveryAddress ?? null,
     }),
   })
   if (res.status === 201) {
-    const orderId = (await res.json()) as number
-    return { ok: true, orderId }
+    const data = (await res.json()) as { orderId: number; requiresStripePayment: boolean }
+    return { ok: true, orderId: data.orderId, requiresStripePayment: data.requiresStripePayment }
   }
+  try {
+    const j = (await res.json()) as { message?: string }
+    return { ok: false, message: j.message ?? `HTTP ${res.status}` }
+  } catch {
+    return { ok: false, message: `HTTP ${res.status}` }
+  }
+}
+
+/** Anulon porosinë në pritje kur pagesa me kartë refuzohet / nuk përfundon (server e vendos «anuluar»). */
+export async function cancelUnpaidStripeOrder(
+  token: string,
+  orderId: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/orders/my/${orderId}/cancel-unpaid-stripe`), {
+    method: 'POST',
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 204) return { ok: true }
   try {
     const j = (await res.json()) as { message?: string }
     return { ok: false, message: j.message ?? `HTTP ${res.status}` }
@@ -100,4 +169,23 @@ export async function fetchMyOrder(
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<CustomerOrderDetail>
+}
+
+/** Heq porosinë nga «Porositë e mia» (nuk e fshin nga platforma për restorantin/adminin). */
+export async function hideMyOrderFromHistory(
+  token: string,
+  orderId: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/orders/my/${orderId}`), {
+    method: 'DELETE',
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 204) return { ok: true }
+  if (res.status === 404) return { ok: false, message: 'Porosia nuk u gjet.' }
+  try {
+    const j = (await res.json()) as { message?: string }
+    return { ok: false, message: j.message ?? `HTTP ${res.status}` }
+  } catch {
+    return { ok: false, message: `HTTP ${res.status}` }
+  }
 }
