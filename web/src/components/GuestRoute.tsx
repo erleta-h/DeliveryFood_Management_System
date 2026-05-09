@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { hasAdminRole, hasCustomerRole, hasDriverRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
+import { canAccessAdminPanel, hasDriverRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
 import { useAuthStore } from '../store/authStore'
 
 /**
@@ -10,14 +10,23 @@ export function GuestRoute() {
   const token = useAuthStore((s) => s.token)
   const location = useLocation()
   if (token) {
-    if (hasAdminRole(token)) return <Navigate to="/admin" replace />
-    if (hasDriverRole(token)) return <Navigate to="/driver" replace />
-    if (hasRestaurantStaffRole(token) && !hasCustomerRole(token))
-      return <Navigate to="/kitchen" replace />
-    const wantDriverLogin =
-      location.pathname === '/login' && new URLSearchParams(location.search).get('next') === 'driver'
+    if (canAccessAdminPanel(token)) return <Navigate to="/admin" replace />
+
+    const next = new URLSearchParams(location.search).get('next')
+    const wantDriverLogin = location.pathname === '/login' && next === 'driver'
+    const wantClientApp = next === 'app' || next === 'customer'
+
+    /** Stafi → kuzhina, përveç nëse po hap /login me `next=driver` ose `next=app|customer`. */
+    if (hasRestaurantStaffRole(token) && !wantDriverLogin && !wantClientApp)
+      return <Navigate to="/kitchen/orders" replace />
+
+    if (hasDriverRole(token)) {
+      if (wantDriverLogin) return <Outlet />
+      return <Navigate to="/driver" replace />
+    }
     if (wantDriverLogin) return <Outlet />
     return <Navigate to="/app" replace />
   }
   return <Outlet />
 }
+
