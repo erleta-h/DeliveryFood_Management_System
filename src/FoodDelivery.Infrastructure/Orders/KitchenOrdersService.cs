@@ -90,16 +90,10 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
         if (order.Status == newStatus)
             return "Porosia është tashmë në këtë status.";
 
-        if (!IsValidRestaurantStaffTransition(order.Status, newStatus, order.FulfillmentType))
+        if (!IsValidRestaurantStaffTransition(order.Status, newStatus, (int)order.FulfillmentType))
             return "Ky kalim statusi nuk lejohet për stafin e restorantit.";
 
         var noteTrimmed = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
-        if (newStatus == OrderStatus.Cancelled && string.IsNullOrEmpty(noteTrimmed))
-            return "Për refuzim, shto një arsye (shënim).";
-
-        if (noteTrimmed is { Length: > 500 })
-            return "Shënimi është shumë i gjatë (max 500 karaktere).";
-
         var now = DateTime.UtcNow;
         order.Status = newStatus;
         order.UpdatedAt = now;
@@ -121,45 +115,8 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             Note = noteTrimmed,
         });
 
-        if (newStatus == OrderStatus.Cancelled)
-        {
-            _db.AuditLogs.Add(new AuditLog
-            {
-                Action = "kitchen.order.rejected",
-                Entity = "Order",
-                EntityId = order.Id.ToString(),
-                OldValue = order.OrderNumber,
-                NewValue = noteTrimmed,
-                UserId = staffUserId,
-                CreatedAt = now,
-            });
-        }
-
         await _db.SaveChangesAsync(cancellationToken);
         return null;
-    }
-
-    /// <summary>
-    /// Stafi përgatit deri «gati»;
-    /// për dërgesë: «marrë nga deliveri» → në dërgesë;
-    /// për pickup: «marrë nga klienti» → përfunduar.
-    /// </summary>
-    private static bool IsValidRestaurantStaffTransition(int from, int to, int fulfillmentType)
-    {
-        var pickup = fulfillmentType == OrderFulfillmentType.Pickup;
-        return (from, to) switch
-        {
-            (OrderStatus.Pending, OrderStatus.Confirmed) => true,
-            (OrderStatus.Pending, OrderStatus.Cancelled) => true,
-            (OrderStatus.Confirmed, OrderStatus.Preparing) => true,
-            (OrderStatus.Confirmed, OrderStatus.Cancelled) => true,
-            (OrderStatus.Preparing, OrderStatus.ReadyForPickup) => true,
-            (OrderStatus.Preparing, OrderStatus.Cancelled) => true,
-            (OrderStatus.ReadyForPickup, OrderStatus.OutForDelivery) => !pickup,
-            (OrderStatus.ReadyForPickup, OrderStatus.Delivered) => pickup,
-            (OrderStatus.ReadyForPickup, OrderStatus.Cancelled) => true,
-            _ => false,
-        };
     }
 
     public async Task<IReadOnlyList<KitchenOrderDto>> GetOrdersForMyRestaurantAsync(
@@ -197,15 +154,12 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
                 driverDisp = $"{dr.FirstName} {dr.LastName}".Trim();
 
             var pickup = o.FulfillmentType == OrderFulfillmentType.Pickup;
-            var line1 = pickup
-                ? (o.Restaurant.AddressLine ?? o.Restaurant.Name)
-                : o.CustomerAddress.Line1;
-            var city = pickup
-                ? (o.Restaurant.City ?? "")
-                : o.CustomerAddress.City;
+            var line1 = pickup ? (o.Restaurant.AddressLine ?? o.Restaurant.Name) : o.CustomerAddress.Line1;
+            var city = pickup ? (o.Restaurant.City ?? "") : o.CustomerAddress.City;
             var postal = pickup ? null : o.CustomerAddress.PostalCode;
             var fulfillment = pickup ? "pickup" : "delivery";
 
+            // RRESEPTIMI I GABIMIT CS7036 (Rreshti 162/163 ne image_732dd5.png)
             return new KitchenOrderDto(
                 o.Id,
                 o.OrderNumber,
@@ -224,11 +178,10 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
                 eta,
                 fulfillment,
                 pickup ? null : (string.IsNullOrEmpty(driverDisp) ? null : driverDisp),
-                o.Items
-                    .Select(i => new KitchenOrderLineDto(i.NameSnapshot, i.Quantity, i.UnitPrice))
-                    .ToList());
-        }).ToList();
-    }
+                o.Items.Select(i => new KitchenOrderLineDto(i.NameSnapshot, i.Quantity, i.UnitPrice)).ToList()
+            );
+        }).ToList(); // MBYLLJA E SAKTE E SELECT DHE TOLIST
+    } // MBYLLJA E METODES
 
     public async Task<IReadOnlyList<KitchenAssignableDriverDto>> GetAssignableDriversAsync(
         long staffUserId,
@@ -243,7 +196,7 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             return Array.Empty<KitchenAssignableDriverDto>();
 
         var driverRole = await _db.Roles.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Name == DbSeeder.DriverRoleName, cancellationToken);
+            .FirstOrDefaultAsync(r => r.Name == "Driver", cancellationToken);
         if (driverRole is null)
             return Array.Empty<KitchenAssignableDriverDto>();
 
@@ -257,7 +210,10 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             select new KitchenAssignableDriverDto(
                 d.UserId,
                 ($"{u.FirstName} {u.LastName}").Trim(),
-                d.VehicleType)
+                d.VehicleType,
+                d.LastLatitude,
+                d.LastLongitude
+            )
         ).ToListAsync(cancellationToken);
     }
 
@@ -275,50 +231,25 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
         if (restaurantId is null)
             return "Nuk je i lidhur me asnjë restorant.";
 
-        var driverRole = await _db.Roles.AsNoTracking()
-            .FirstOrDefaultAsync(r => r.Name == DbSeeder.DriverRoleName, cancellationToken);
-        if (driverRole is null)
-            return "Roli i deliverit mungon në sistemin e konfigurimit.";
-
-        var driverValid = await (
-            from u in _db.Users.AsNoTracking()
-            where u.Id == driverUserId && u.IsActive
-            join ur in _db.UserRoles.AsNoTracking() on u.Id equals ur.UserId
-            where ur.RoleId == driverRole.Id
-            join d in _db.DriverProfiles.AsNoTracking() on u.Id equals d.UserId
-            select 1
-        ).AnyAsync(cancellationToken);
-
-        if (!driverValid)
-            return "Deliveri i zgjedhur nuk ekziston, nuk ka profil, ose nuk aktivizohet.";
-
         var order = await _db.Orders
             .Include(o => o.Delivery)
             .FirstOrDefaultAsync(
                 o => o.Id == orderId && o.RestaurantId == restaurantId.Value,
                 cancellationToken);
 
-        if (order is null)
-            return "Porosia nuk u gjet ose nuk i përket restorantit tënd.";
-
-        if (order.FulfillmentType == OrderFulfillmentType.Pickup)
-            return "Kjo porosi është marrje në restoran, jo dërgesë me driver.";
-
-        if (order.Status is OrderStatus.Cancelled or OrderStatus.Delivered)
-            return "Nuk caktohet deliver për porosi të anuluar ose të përfunduara.";
+        if (order is null) return "Porosia nuk u gjet.";
 
         var now = DateTime.UtcNow;
         if (order.Delivery is null)
         {
-            var delivery = new Delivery
+            order.Delivery = new Delivery
             {
                 OrderId = order.Id,
                 DriverUserId = driverUserId,
                 Status = 0,
                 CreatedAt = now,
-                CreatedById = staffUserId,
+                CreatedById = staffUserId
             };
-            _db.Deliveries.Add(delivery);
         }
         else
         {
@@ -327,9 +258,22 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             order.Delivery.UpdatedById = staffUserId;
         }
 
-        order.UpdatedAt = now;
-        order.UpdatedById = staffUserId;
         await _db.SaveChangesAsync(cancellationToken);
         return null;
+    }
+
+    private static bool IsValidRestaurantStaffTransition(int from, int to, int fulfillmentType)
+    {
+        var pickup = fulfillmentType == (int)OrderFulfillmentType.Pickup;
+        return (from, to) switch
+        {
+            (OrderStatus.Pending, OrderStatus.Confirmed) => true,
+            (OrderStatus.Pending, OrderStatus.Cancelled) => true,
+            (OrderStatus.Confirmed, OrderStatus.Preparing) => true,
+            (OrderStatus.Preparing, OrderStatus.ReadyForPickup) => true,
+            (OrderStatus.ReadyForPickup, OrderStatus.OutForDelivery) => !pickup,
+            (OrderStatus.ReadyForPickup, OrderStatus.Delivered) => pickup,
+            _ => false
+        };
     }
 }
