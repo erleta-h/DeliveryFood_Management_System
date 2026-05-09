@@ -40,6 +40,13 @@ const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'))
 const AdminSecurityPage = lazy(() => import('./pages/AdminSecurityPage'))
 const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'))
 const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage'))
+const DriverEarningsPage = lazy(() => import('./pages/DriverEarningsPage'))
+const DriverHistoryPage = lazy(() => import('./pages/DriverHistoryPage'))
+const DriverApplyPage = lazy(() => import('./pages/DriverApplyPage'))
+const DriverNotificationsPage = lazy(() => import('./pages/DriverNotificationsPage'))
+const DriverPerformancePage = lazy(() => import('./pages/DriverPerformancePage'))
+const DriverProfilePage = lazy(() => import('./pages/DriverProfilePage'))
+const DriverSupportPage = lazy(() => import('./pages/DriverSupportPage'))
 
 const lazyFallback = <PageSpinner />
 
@@ -65,6 +72,22 @@ function App() {
             </Suspense>
           }
         />
+        <Route
+          path="/driver/apply"
+          element={
+            <Suspense fallback={lazyFallback}>
+              <DriverApplyPage />
+            </Suspense>
+          }
+        />
+        <Route
+              path="profile"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverProfilePage />
+                </Suspense>
+              }
+            />
         <Route element={<AdminRoute />}>
           <Route
             path="/admin"
@@ -87,6 +110,54 @@ function App() {
               element={
                 <Suspense fallback={lazyFallback}>
                   <AdminPartnerApplicationsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="earnings"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverEarningsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="earnings"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverEarningsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="history"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverHistoryPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="notifications"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverNotificationsPage />
+                </Suspense>
+              }
+            />
+             <Route
+              path="stats"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverPerformancePage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="support"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverSupportPage />
                 </Suspense>
               }
             />

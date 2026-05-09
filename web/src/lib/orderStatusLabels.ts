@@ -1,3 +1,13 @@
+
+/** Përputhet me `OrderStatus` në backend (`FoodDelivery.Application.Orders.OrderStatus`). */
+export const ORDER_STATUS_DELIVERED = 4
+export const ORDER_STATUS_CANCELLED = 9
+
+export function isTerminalOrderStatus(status: number): boolean {
+  return status === ORDER_STATUS_DELIVERED || status === ORDER_STATUS_CANCELLED
+}
+
+
 /** Përputhet me `OrderStatus` në backend. */
 export const orderStatusLabelSq: Record<number, string> = {
   0: 'Në pritje',
