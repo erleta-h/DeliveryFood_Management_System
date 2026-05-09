@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AdminDriversMap } from '../components/AdminDriversMap'
 import { adminPatchDriver, fetchAdminDrivers, type AdminDriverListResult } from '../lib/adminApi'
 import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
@@ -11,6 +12,18 @@ export default function AdminRidersPage() {
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
+
+  const mapDrivers = useMemo(() => {
+    if (!data) return []
+    return data.items
+      .filter((d) => d.lastLatitude != null && d.lastLongitude != null)
+      .map((d) => ({
+        userId: d.userId,
+        lat: d.lastLatitude as number,
+        lng: d.lastLongitude as number,
+        label: `${d.firstName} ${d.lastName}`.trim() || d.email,
+      }))
+  }, [data])
 
   const load = useCallback(async () => {
     if (!token) return
@@ -52,7 +65,7 @@ export default function AdminRidersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-zinc-100">Delivera</h1>
-        <p className="mt-1 text-sm text-zinc-400">Profilin e deliverit e krijon backend-i; lista bazohet në DriverProfiles.</p>
+        <p className="mt-1 text-sm text-zinc-400">Profilin Deliver e krijon backend-i; lista bazohet në DriverProfiles.</p>
       </div>
 
       {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
@@ -67,6 +80,20 @@ export default function AdminRidersPage() {
 
       {data && !loading && data.total > 0 ? (
         <>
+          {mapDrivers.length > 0 ? (
+            <section className={`${customerCardMuted} p-4`}>
+              <h2 className="text-sm font-semibold text-zinc-200">Harta — GPS i fundit (faqja {page})</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                OpenStreetMap + Leaflet (falas, si zgjedhësi i adresës). Vetëm deliverat me lokacion të raportuar nga
+                aplikacioni.
+              </p>
+              <AdminDriversMap drivers={mapDrivers} className="mt-3" />
+            </section>
+          ) : (
+            <p className="text-xs text-zinc-500">
+              Asnjë deliver në këtë faqe nuk ka GPS të fundit — harta shfaqet kur ata janë online dhe dërgojnë lokacion.
+            </p>
+          )}
           <div className="overflow-x-auto rounded-xl border border-white/10">
             <table className="min-w-full text-left text-sm text-zinc-300">
               <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
@@ -74,6 +101,7 @@ export default function AdminRidersPage() {
                   <th className="px-3 py-2">Deliveri</th>
                   <th className="px-3 py-2">Mjeti</th>
                   <th className="px-3 py-2">Online</th>
+                  <th className="px-3 py-2">GPS</th>
                   <th className="px-3 py-2">Llogaria</th>
                   <th className="px-3 py-2">Veprime</th>
                 </tr>
@@ -92,6 +120,11 @@ export default function AdminRidersPage() {
                       {d.licensePlate ? ` · ${d.licensePlate}` : ''}
                     </td>
                     <td className="px-3 py-2">{d.isOnline ? 'Po' : 'Jo'}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-zinc-500">
+                      {d.lastLatitude != null && d.lastLongitude != null
+                        ? `${d.lastLatitude.toFixed(4)}, ${d.lastLongitude.toFixed(4)}`
+                        : '—'}
+                    </td>
                     <td className="px-3 py-2">{d.userIsActive ? 'Aktiv' : 'I bllokuar'}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-2">
