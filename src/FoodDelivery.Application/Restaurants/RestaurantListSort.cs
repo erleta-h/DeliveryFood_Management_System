@@ -16,4 +16,7 @@ public enum RestaurantListSort
 
     /// <summary>Tarifa më e ulët e dërgesës së pari.</summary>
     DeliveryFee = 3,
+
+    /// <summary>Më afër klientit (kërkon <c>customerLat</c> / <c>customerLng</c> në API); pa koordinata bie te rating.</summary>
+    Proximity = 4,
 }
