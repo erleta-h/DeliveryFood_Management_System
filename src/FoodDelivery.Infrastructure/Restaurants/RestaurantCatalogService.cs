@@ -1,7 +1,10 @@
+using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Restaurants;
 using FoodDelivery.Domain.Entities;
-using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Infrastructure.Caching;
+using FoodDelivery.Infrastructure.Orders;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace FoodDelivery.Infrastructure.Restaurants;
 
@@ -9,30 +12,52 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
 {
     private const int MaxPreviewItemsPerRestaurant = 12;
 
-    private readonly FoodDeliveryDbContext _db;
+    private static readonly TimeSpan CategoriesTtl = TimeSpan.FromMinutes(2);
 
-    public RestaurantCatalogService(FoodDeliveryDbContext db)
+    private static readonly TimeSpan MenuTtl = TimeSpan.FromSeconds(45);
+
+    private static readonly TimeSpan SummaryTtl = TimeSpan.FromSeconds(60);
+
+    private readonly IUnitOfWork _uow;
+    private readonly IDistributedCache _cache;
+
+    public RestaurantCatalogService(IUnitOfWork uow, IDistributedCache cache)
     {
-        _db = db;
+        _uow = uow;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyList<FoodCategoryOptionDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
-        return await _db.FoodCategories
+        var cached = await DistributedJsonCache
+            .GetAsync<List<FoodCategoryOptionDto>>(_cache, RestaurantCatalogCacheKeys.FoodCategories, cancellationToken)
+            .ConfigureAwait(false);
+        if (cached is not null)
+            return cached;
+
+        var list = await _uow.Repository<FoodCategory, long>().Query
             .AsNoTracking()
             .OrderBy(c => c.SortOrder)
             .ThenBy(c => c.Name)
             .Select(c => new FoodCategoryOptionDto(c.Id, c.Name, c.SortOrder))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await DistributedJsonCache
+            .SetAsync(_cache, RestaurantCatalogCacheKeys.FoodCategories, list, CategoriesTtl, cancellationToken)
+            .ConfigureAwait(false);
+        return list;
     }
 
     public async Task<IReadOnlyList<RestaurantListItemDto>> SearchAsync(
         string? search,
         long? categoryId,
         RestaurantListSort sort,
+        double? customerLat,
+        double? customerLng,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Restaurants
+        var query = _uow.Repository<Restaurant, long>().Query
             .AsNoTracking()
             .Where(r => r.IsActive && r.IsApproved);
 
@@ -52,7 +77,14 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             }
         }
 
-        IOrderedQueryable<Restaurant> ordered = sort switch
+        double clat = 0, clng = 0;
+        var useProximity = sort == RestaurantListSort.Proximity
+            && TryCustomerGeo(customerLat, customerLng, out clat, out clng);
+        var effectiveSort = sort == RestaurantListSort.Proximity && !useProximity
+            ? RestaurantListSort.Rating
+            : sort;
+
+        IOrderedQueryable<Restaurant> ordered = effectiveSort switch
         {
             RestaurantListSort.Rating => query
                 .OrderByDescending(r => r.AverageRating)
@@ -62,6 +94,7 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             RestaurantListSort.DeliveryFee => query
                 .OrderBy(r => r.DeliveryFee),
             RestaurantListSort.Name => query.OrderBy(r => r.Name),
+            RestaurantListSort.Proximity => query.OrderBy(r => r.Id),
             _ => query.OrderBy(r => r.Name),
         };
 
@@ -79,27 +112,57 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                 r.AverageRating,
                 r.ReviewCount,
                 r.EstimatedDeliveryMinutes,
+                r.Latitude,
+                r.Longitude,
             })
             .ToListAsync(cancellationToken);
+
+        if (useProximity)
+        {
+            rows = rows
+                .OrderBy(r => DriverGeo.DistanceKm(clat, clng, r.Latitude, r.Longitude) ?? double.MaxValue)
+                .ToList();
+        }
 
         var ids = rows.Select(x => x.Id).ToList();
         var previews = await LoadPreviewItemsAsync(ids, cancellationToken);
 
         return rows
-            .Select(r => new RestaurantListItemDto(
-                r.Id,
-                r.Name,
-                r.Slug,
-                r.City,
-                r.AddressLine,
-                r.CategoryName,
-                r.FoodCategoryId,
-                r.DeliveryFee,
-                r.AverageRating,
-                r.ReviewCount,
-                r.EstimatedDeliveryMinutes,
-                previews.GetValueOrDefault(r.Id, Array.Empty<RestaurantProductPreviewDto>())))
+            .Select(r =>
+            {
+                double? dist = null;
+                if (useProximity)
+                    dist = DriverGeo.DistanceKm(clat, clng, r.Latitude, r.Longitude);
+
+                return new RestaurantListItemDto(
+                    r.Id,
+                    r.Name,
+                    r.Slug,
+                    r.City,
+                    r.AddressLine,
+                    r.CategoryName,
+                    r.FoodCategoryId,
+                    r.DeliveryFee,
+                    r.AverageRating,
+                    r.ReviewCount,
+                    r.EstimatedDeliveryMinutes,
+                    previews.GetValueOrDefault(r.Id, Array.Empty<RestaurantProductPreviewDto>()),
+                    dist);
+            })
             .ToList();
+    }
+
+    private static bool TryCustomerGeo(double? lat, double? lng, out double clat, out double clng)
+    {
+        clat = 0;
+        clng = 0;
+        if (lat is not { } la || lng is not { } lo)
+            return false;
+        if (la is < -90 or > 90 || lo is < -180 or > 180)
+            return false;
+        clat = la;
+        clng = lo;
+        return true;
     }
 
     private async Task<Dictionary<long, IReadOnlyList<RestaurantProductPreviewDto>>> LoadPreviewItemsAsync(
@@ -109,7 +172,7 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
         if (restaurantIds.Count == 0)
             return new Dictionary<long, IReadOnlyList<RestaurantProductPreviewDto>>();
 
-        var raw = await _db.MenuItems
+        var raw = await _uow.Repository<MenuItem, long>().Query
             .AsNoTracking()
             .Where(i => i.IsAvailable && restaurantIds.Contains(i.MenuCategory.RestaurantId))
             .OrderBy(i => i.MenuCategory.RestaurantId)
@@ -144,23 +207,62 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
         long restaurantId,
         CancellationToken cancellationToken = default)
     {
-        return await _db.Restaurants
+        var key = RestaurantCatalogCacheKeys.RestaurantSummary(restaurantId);
+        var cached = await DistributedJsonCache
+            .GetAsync<RestaurantSummaryDto>(_cache, key, cancellationToken)
+            .ConfigureAwait(false);
+        if (cached is not null)
+            return cached;
+
+        var row = await _uow.Repository<Restaurant, long>().Query
             .AsNoTracking()
             .Where(r => r.Id == restaurantId && r.IsActive && r.IsApproved)
-            .Select(r => new RestaurantSummaryDto(r.Id, r.Name, r.DeliveryFee))
-            .FirstOrDefaultAsync(cancellationToken);
+            .Select(r => new RestaurantSummaryDto(
+                r.Id,
+                r.Name,
+                r.DeliveryFee,
+                r.EstimatedDeliveryMinutes,
+                r.AddressLine,
+                r.City,
+                r.Latitude,
+                r.Longitude,
+                r.MinOrderAmount))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (row is null)
+            return null;
+
+        await DistributedJsonCache
+            .SetAsync(_cache, key, row, SummaryTtl, cancellationToken)
+            .ConfigureAwait(false);
+        return row;
     }
 
     public async Task<IReadOnlyList<RestaurantMenuCategoryDto>> GetRestaurantMenuAsync(
         long restaurantId,
         CancellationToken cancellationToken = default)
     {
-        var exists = await _db.Restaurants.AsNoTracking()
-            .AnyAsync(r => r.Id == restaurantId && r.IsActive && r.IsApproved, cancellationToken);
-        if (!exists)
-            return Array.Empty<RestaurantMenuCategoryDto>();
+        var key = RestaurantCatalogCacheKeys.RestaurantMenu(restaurantId);
+        var cached = await DistributedJsonCache
+            .GetAsync<List<RestaurantMenuCategoryDto>>(_cache, key, cancellationToken)
+            .ConfigureAwait(false);
+        if (cached is not null)
+            return cached;
 
-        return await _db.MenuCategories
+        var exists = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
+            .AnyAsync(r => r.Id == restaurantId && r.IsActive && r.IsApproved, cancellationToken)
+            .ConfigureAwait(false);
+        if (!exists)
+        {
+            var empty = new List<RestaurantMenuCategoryDto>();
+            await DistributedJsonCache
+                .SetAsync(_cache, key, empty, TimeSpan.FromSeconds(30), cancellationToken)
+                .ConfigureAwait(false);
+            return Array.Empty<RestaurantMenuCategoryDto>();
+        }
+
+        var menu = await _uow.Repository<MenuCategory, long>().Query
             .AsNoTracking()
             .Where(c => c.RestaurantId == restaurantId)
             .OrderBy(c => c.SortOrder)
@@ -179,6 +281,12 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                         i.IsAvailable,
                         MenuItemImageUrls.PublicUrl(i.ImageFileId)))
                     .ToList()))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await DistributedJsonCache
+            .SetAsync(_cache, key, menu, MenuTtl, cancellationToken)
+            .ConfigureAwait(false);
+        return menu;
     }
 }
