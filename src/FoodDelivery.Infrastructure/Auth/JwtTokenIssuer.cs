@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Linq;
 using FoodDelivery.Application.Auth;
 using FoodDelivery.Application.Configuration;
 using FoodDelivery.Application.Security;
@@ -49,4 +50,3 @@ public sealed class JwtTokenIssuer : IJwtTokenIssuer
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
-

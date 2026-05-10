@@ -9,7 +9,6 @@ public class MenuCategory
     public int SortOrder { get; set; }
 
     // Ndryshoji nga string? n� long?
-    public long? CreatedById { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
 

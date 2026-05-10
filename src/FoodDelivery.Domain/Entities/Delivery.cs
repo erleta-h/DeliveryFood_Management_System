@@ -7,16 +7,16 @@ public class Delivery
     public long? CreatedById { get; set; }
     //Kur Deliver-it iu ofrua porosia
     public DateTime? OfferedAtUtc { get; set; }
-    // Kur pranoi ofertën.
+    // Kur pranoi ofertï¿½n.
     public DateTime? AcceptedAtUtc { get; set; }
     public DateTime? ArrivedAtRestaurantUtc { get; set; }
     public DateTime? DeliveredAt { get; set; }
     public long DriverUserId { get; set; }
     public long OrderId { get; set; }
     public DateTime? PickedUpAt { get; set; }
-    // Faza e Deliver (pending accept, në restorant, në rrugë, etj.)
+    // Faza e Deliver (pending accept, nï¿½ restorant, nï¿½ rrugï¿½, etj.)
     public int Status { get; set; }
-    //JSON i ID-ve të driver-ëve që morën ofertë dhe e refuzuan / skadoi (për radhë auto).
+    //JSON i ID-ve tï¿½ driver-ï¿½ve qï¿½ morï¿½n ofertï¿½ dhe e refuzuan / skadoi (pï¿½r radhï¿½ auto).
     public string? AutoDispatchExcludedDriverIdsJson { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }

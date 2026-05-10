@@ -7,6 +7,7 @@ import {
   registerCustomer,
   type AuthUser,
 } from '../lib/authApi'
+import { clearStaffCustomerAppMode } from '../lib/staffCustomerApp'
 
 const TOKEN_KEY = 'fd_token'
 /** Regjistrimi i vjetër demo — hiqet që të mos përzihet me përdoruesit në SQL. */
@@ -32,6 +33,8 @@ type AuthState = {
   }) => Promise<{ ok: boolean; error?: string }>
   setToken: (token: string | null) => void
   logout: () => void
+  /** Rifreskon /api/auth/me (p.sh. pas ndryshimit të fjalëkalimit). */
+  refreshUser: () => Promise<void>
   updateProfile: (
     partial: Partial<Pick<UserProfile, 'line1' | 'city' | 'postalCode' | 'phone'>>,
   ) => Promise<{ ok: boolean; error?: string }>
@@ -111,7 +114,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: () => {
     localStorage.removeItem(TOKEN_KEY)
+    clearStaffCustomerAppMode()
     set({ token: null, user: null })
+  },
+
+  refreshUser: async () => {
+    const { token } = get()
+    if (!token) return
+    const user = await fetchCurrentUser(token)
+    if (user) set({ user })
   },
 
   updateProfile: async (partial) => {
