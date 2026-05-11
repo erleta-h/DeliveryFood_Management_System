@@ -1,5 +1,7 @@
 /** Seksione plani produkti — UI + përmbajtje; API përveç dashboard & partner-applications vjen më vonë. */
 
+import { getPermissionsFromToken, hasAdminRole } from './jwtRoles'
+
 export type AdminSectionDef = {
   id: string
   navLabel: string
@@ -26,7 +28,20 @@ export const ADMIN_SECTIONS: Record<string, AdminSectionDef> = {
       'Ndryshon komisionin për secilin restorant',
       'Shikon performancën e restorantit (porosi, ankesa, vlerësime)',
       'Mund ta bllokojë restorantin në rast shkeljesh',
-      'Menaxhon kategoritë e ushqimit që restoranti mund të përdorë',
+      'Kategoritë globale të ushqimit menaxhohen te moduli «Kategoritë e ushqimit»',
+    ],
+  },
+  foodCategories: {
+    id: 'foodCategories',
+    navLabel: 'Kategoritë e ushqimit',
+    title: 'Kategoritë globale të ushqimit',
+    icon: '🍽️',
+    intro:
+      'Lista e kategorive që klientët filtrojnë në katalog dhe që çdo restorant zgjedh në onboarding — me invalidim të cache-it pas ndryshimesh.',
+    features: [
+      'Krijon, përditëson dhe fshin kategori (emër unik, renditje, përshkrim)',
+      'Sheh sa restorante përdorin secilën kategori — bllokon fshirjen nëse ka lidhje',
+      'Pas ruajtjes pastrohet cache-i i listës publike të kategorive',
     ],
   },
   orders: {
@@ -184,6 +199,40 @@ export const ADMIN_SECTION_IDS = Object.keys(ADMIN_SECTIONS) as (keyof typeof AD
 
 export type AdminNavGroup = { title: string; items: { to: string; label: string; icon: string }[] }
 
+/** Leja RBAC e nevojshme për çdo rrugë paneli (për përdorues me rol Support — Admin sheh gjithçka). */
+export const ADMIN_ROUTE_PERMISSION: Record<string, string> = {
+  '/admin': 'admin.dashboard',
+  '/admin/partner-applications': 'admin.partner_applications',
+  '/admin/driver-applications': 'admin.driver_applications',
+  '/admin/restaurants': 'admin.restaurants',
+  '/admin/food-categories': 'admin.food_categories',
+  '/admin/orders': 'admin.orders',
+  '/admin/riders': 'admin.drivers',
+  '/admin/zones': 'admin.zones',
+  '/admin/users': 'admin.customers',
+  '/admin/support': 'admin.support',
+  '/admin/finance': 'admin.finance',
+  '/admin/promotions': 'admin.coupons',
+  '/admin/reviews': 'admin.reviews',
+  '/admin/reports': 'admin.reports',
+  '/admin/data-port': 'admin.data_port',
+  '/admin/cms': 'admin.cms',
+  '/admin/security': 'admin.audit',
+  '/admin/settings': 'admin.settings',
+}
+
+export function getVisibleAdminNavGroups(token: string | null): AdminNavGroup[] {
+  if (!token || hasAdminRole(token)) return ADMIN_NAV_GROUPS
+  const perms = getPermissionsFromToken(token)
+  return ADMIN_NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const req = ADMIN_ROUTE_PERMISSION[item.to]
+      return req ? perms.includes(req) : false
+    }),
+  })).filter((g) => g.items.length > 0)
+}
+
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     title: 'Përmbledhje',
@@ -193,7 +242,9 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     title: 'Operacionet',
     items: [
       { to: '/admin/partner-applications', label: 'Aplikimet partner', icon: '📝' },
+      { to: '/admin/driver-applications', label: 'Aplikimet Deliver', icon: '🛵' },
       { to: '/admin/restaurants', label: 'Restorantet', icon: '🏪' },
+      { to: '/admin/food-categories', label: 'Kategoritë e ushqimit', icon: '🍽️' },
       { to: '/admin/orders', label: 'Porositë', icon: '📦' },
       { to: '/admin/riders', label: 'Delivera', icon: '🛵' },
       { to: '/admin/zones', label: 'Zonat & tarifat', icon: '🗺️' },
@@ -221,6 +272,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     title: 'Analiza & sistemi',
     items: [
       { to: '/admin/reports', label: 'Raporte', icon: '📊' },
+      { to: '/admin/data-port', label: 'Eksport / import', icon: '📥' },
+      { to: '/admin/cms', label: 'CMS (faqja kryesore)', icon: '📄' },
       { to: '/admin/security', label: 'Siguria', icon: '🔐' },
       { to: '/admin/settings', label: 'Konfigurime', icon: '⚙️' },
     ],

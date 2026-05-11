@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
-import { ADMIN_NAV_GROUPS } from '../lib/adminNav'
+import { getVisibleAdminNavGroups } from '../lib/adminNav'
 import { customerShellBg } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
 
@@ -16,6 +16,8 @@ function navClass(isActive: boolean) {
 export default function AdminLayout() {
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
+  const navGroups = getVisibleAdminNavGroups(token)
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -67,7 +69,7 @@ export default function AdminLayout() {
             </div>
 
             <nav className="flex flex-1 flex-col gap-6" aria-label="Admin">
-              {ADMIN_NAV_GROUPS.map((group) => (
+              {navGroups.map((group) => (
                 <div key={group.title}>
                   <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
                     {group.title}
