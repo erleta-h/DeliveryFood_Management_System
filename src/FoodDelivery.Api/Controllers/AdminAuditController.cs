@@ -1,4 +1,5 @@
 using FoodDelivery.Application.Admin;
+using FoodDelivery.Application.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,7 +7,7 @@ namespace FoodDelivery.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/audit")]
-[Authorize(Roles = "Admin")]
+[Authorize(Policy = PermissionPolicyNames.AdminAudit)]
 public sealed class AdminAuditController : ControllerBase
 {
     private readonly IAdminAuditService _svc;
