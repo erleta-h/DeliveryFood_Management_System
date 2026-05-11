@@ -69,6 +69,7 @@ export function RestaurantBrowseToolbar({
           <option value="eta">Koha e dërgesës</option>
           <option value="name">Emri A–Z</option>
           <option value="fee">Tarifa e dërgesës</option>
+          <option value="proximity">Afër meje (GPS)</option>
         </select>
       </div>
 
