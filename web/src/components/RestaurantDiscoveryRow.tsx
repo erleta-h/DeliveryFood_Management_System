@@ -61,6 +61,17 @@ export function RestaurantDiscoveryRow({ restaurant }: { restaurant: RestaurantL
                 <span aria-hidden>⭐</span>
                 {r.averageRating.toFixed(1)}
               </span>
+              {r.distanceKm != null ? (
+                <>
+                  <span aria-hidden className="text-zinc-700">
+                    ·
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-emerald-400/90">
+                    <span aria-hidden>📍</span>
+                    ~{r.distanceKm.toFixed(1)} km
+                  </span>
+                </>
+              ) : null}
             </p>
             <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-zinc-600">
               {r.categoryName}

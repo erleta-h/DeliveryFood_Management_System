@@ -12,4 +12,5 @@ public record RestaurantListItemDto(
     decimal AverageRating,
     int ReviewCount,
     int EstimatedDeliveryMinutes,
-    IReadOnlyList<RestaurantProductPreviewDto> PreviewItems);
+    IReadOnlyList<RestaurantProductPreviewDto> PreviewItems,
+    double? DistanceKm = null);

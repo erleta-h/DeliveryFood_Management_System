@@ -23,6 +23,8 @@ export type RestaurantListItem = {
   reviewCount: number
   estimatedDeliveryMinutes: number
   previewItems: RestaurantProductPreview[]
+  /** Kur sort=proximity dhe ke dërguar koordinata klienti. */
+  distanceKm?: number | null
 }
 
 export type FoodCategoryOption = {
@@ -48,6 +50,12 @@ export type RestaurantSummary = {
   id: number
   name: string
   deliveryFee: number
+  estimatedDeliveryMinutes: number
+  addressLine: string | null
+  city: string | null
+  latitude: number | null
+  longitude: number | null
+  minOrderAmount: number
 }
 
 export async function fetchRestaurantSummary(
@@ -66,15 +74,20 @@ export async function fetchRestaurantSummary(
 export async function searchRestaurants(
   q: string,
   categoryId: number | null,
-  /** Përputhet me API: rating, eta, name, fee */
-  sort: 'rating' | 'eta' | 'name' | 'fee',
+  /** Perputhet me API : rating, eta, name, fee, proximity */
+  sort: 'rating' | 'eta' | 'name' | 'fee' | 'proximity',
   signal?: AbortSignal,
+  customerGeo?: { lat: number; lng: number } | null,
 ): Promise<RestaurantListItem[]> {
   const params = new URLSearchParams()
   const trimmed = q.trim()
   if (trimmed) params.set('q', trimmed)
   if (categoryId != null) params.set('categoryId', String(categoryId))
   params.set('sort', sort)
+  if (sort === 'proximity' && customerGeo) {
+    params.set('customerLat', String(customerGeo.lat))
+    params.set('customerLng', String(customerGeo.lng))
+  }
   const query = params.toString()
   const url = apiPath(`/api/restaurants?${query}`)
   const res = await fetch(url, { signal })
