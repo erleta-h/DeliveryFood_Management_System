@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
+  fetchCustomerNotificationUnreadCount,
   fetchCustomerNotifications,
   markAllCustomerNotificationsRead,
   markCustomerNotificationRead,
@@ -8,6 +9,7 @@ import {
 } from '../lib/customerNotificationsApi'
 import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
+import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
 
 function typeLabelSq(type: string): string {
   if (type === 'support_reply') return 'Support'
@@ -17,6 +19,8 @@ function typeLabelSq(type: string): string {
 
 export default function CustomerNotificationsPage() {
   const token = useAuthStore((s) => s.token)
+  const navigate = useNavigate()
+  const setUnreadCount = useCustomerNotificationsStore((s) => s.setUnreadCount)
   const [rows, setRows] = useState<CustomerNotificationRow[]>([])
   const [err, setErr] = useState<string | null>(null)
   const [busyAll, setBusyAll] = useState(false)
@@ -28,15 +32,30 @@ export default function CustomerNotificationsPage() {
     setRows(list)
   }, [token])
 
+  const refreshUnread = useCallback(async () => {
+    if (!token) return
+    try {
+      const c = await fetchCustomerNotificationUnreadCount(token)
+      setUnreadCount(c)
+    } catch {
+      /* ignore */
+    }
+  }, [token, setUnreadCount])
+
   useEffect(() => {
     void load().catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Gabim'))
   }, [load])
+
+  useEffect(() => {
+    void refreshUnread()
+  }, [refreshUnread])
 
   async function onReadAll() {
     if (!token) return
     setBusyAll(true)
     try {
       await markAllCustomerNotificationsRead(token)
+      setUnreadCount(0)
       await load()
     } finally {
       setBusyAll(false)
@@ -49,7 +68,11 @@ export default function CustomerNotificationsPage() {
       const ok = await markCustomerNotificationRead(token, n.id)
       if (ok) {
         setRows((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
+        await refreshUnread()
       }
+    }
+    if (n.type === 'support_reply') {
+      navigate('/app/support')
     }
   }
 

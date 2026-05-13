@@ -18,6 +18,7 @@ const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
+const SupportPage = lazy(() => import('./pages/SupportPage'))
 const CustomerNotificationsPage = lazy(() => import('./pages/CustomerNotificationsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
@@ -392,6 +393,14 @@ function App() {
               element={
                 <Suspense fallback={lazyFallback}>
                   <AccountPage />
+                </Suspense>
+              }
+            />
+                <Route
+              path="support"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <SupportPage />
                 </Suspense>
               }
             />
