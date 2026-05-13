@@ -23,6 +23,9 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Permission> Permissions => Set<Permission>();       // Kom shtu
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>(); // Kom shtu
 
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+    public DbSet<SupportTicketMessage> SupportTicketMessages => Set<SupportTicketMessage>();
+
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
@@ -254,6 +257,9 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.Key).IsUnique();
         });
 
+    
+
+
         modelBuilder.Entity<WebPushSubscription>(e =>
         {
             e.HasOne(x => x.User)
@@ -264,6 +270,43 @@ public class FoodDeliveryDbContext : DbContext
             e.Property(x => x.P256dh).HasMaxLength(256).IsRequired();
             e.Property(x => x.Auth).HasMaxLength(128).IsRequired();
             e.HasIndex(x => x.Endpoint).IsUnique();
+        });
+
+        modelBuilder.Entity<SupportTicket>(e =>
+        {
+            e.Property(x => x.Subject).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            e.Property(x => x.AdminNote).HasMaxLength(2000);
+            e.HasOne(x => x.User)
+                .WithMany(x => x.SupportTickets)
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Order)
+                .WithMany()
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Restaurant)
+                .WithMany()
+                .HasForeignKey(x => x.RestaurantId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.OrderId);
+            e.HasIndex(x => x.RestaurantId);
+        });
+
+        modelBuilder.Entity<SupportTicketMessage>(e =>
+        {
+            e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
+            e.HasOne(x => x.SupportTicket)
+                .WithMany(x => x.Messages)
+                .HasForeignKey(x => x.SupportTicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Author)
+                .WithMany(x => x.SupportTicketMessages)
+                .HasForeignKey(x => x.AuthorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.SupportTicketId);
+            e.HasIndex(x => x.CreatedAt);
         });
     }
 }
