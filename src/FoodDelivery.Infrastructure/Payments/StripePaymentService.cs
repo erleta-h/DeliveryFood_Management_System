@@ -139,8 +139,8 @@ public sealed class StripePaymentService : IStripePaymentService
                             order.UserId,
                             order.OrderNumber,
                             cancellationToken);
-                        await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken)
-                            .ConfigureAwait(false);
+                       // await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken)
+                           // .ConfigureAwait(false);
                     }
                 }
             }
@@ -175,6 +175,6 @@ public sealed class StripePaymentService : IStripePaymentService
             .FirstOrDefaultAsync(cancellationToken);
 
         await _realtime.NotifyRestaurantNewOrderAsync(payment.OrderId, restaurantId, cancellationToken);
-        await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken).ConfigureAwait(false);
+        //await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken).ConfigureAwait(false);
     }
 }

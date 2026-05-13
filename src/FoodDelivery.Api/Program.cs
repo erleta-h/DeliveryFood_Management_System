@@ -178,10 +178,13 @@ if (autoMigrate)
         await using var scope = app.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<FoodDeliveryDbContext>();
         var dbLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DbStartup");
+       
 
         await db.Database.MigrateAsync();
 
         dbLog.LogInformation("Migrimet EF u aplikuan — skema e databazës përputhet me projektin.");
+
+        await DbSeeder.EnsureRbacAndCmsDefaultsAsync(db, dbLog);
 
         if (app.Environment.IsDevelopment())
         {
