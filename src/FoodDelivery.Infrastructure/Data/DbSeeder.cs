@@ -1,4 +1,5 @@
 using FoodDelivery.Domain.Entities;
+using FoodDelivery.Application.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
@@ -14,6 +15,7 @@ public static class DbSeeder
     public const string RestaurantStaffRoleName = "RestaurantStaff";
     public const string DriverRoleName = "Driver";
     public const string KitchenSeedEmail = "kitchen@fooddelivery.local";
+    public const string SupportRoleName = "Support";
 
     public static async Task SeedAsync(
         FoodDeliveryDbContext db,
@@ -323,6 +325,157 @@ public static class DbSeeder
             "DbSeeder: u krijua admin {Email} (fjalëkalimi: Admin123!) — përdore për /api/admin.",
             AdminSeedEmail);
     }
+
+    public static async Task EnsureRbacAndCmsDefaultsAsync(
+        FoodDeliveryDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureRbacPermissionsAsync(db, logger, cancellationToken);
+        await EnsureCmsDefaultSettingsAsync(db, logger, cancellationToken);
+    }
+
+    private static async Task EnsureRbacPermissionsAsync(
+        FoodDeliveryDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var adminRole = await db.Roles.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Name == AdminRoleName, cancellationToken);
+        if (adminRole is null)
+            return;
+
+        var addedPerm = 0;
+        foreach (var name in PermissionNames.All)
+        {
+            var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
+            if (perm is null)
+            {
+                perm = new Permission
+                {
+                    Name = name,
+                    Description = $"Leje: {name}",
+                    CreatedAt = now,
+                };
+                db.Permissions.Add(perm);
+                await db.SaveChangesAsync(cancellationToken);
+                addedPerm++;
+            }
+
+            var existsLink = await db.RolePermissions.AnyAsync(
+                rp => rp.RoleId == adminRole.Id && rp.PermissionId == perm.Id,
+                cancellationToken);
+            if (!existsLink)
+            {
+                db.RolePermissions.Add(new RolePermission
+                {
+                    RoleId = adminRole.Id,
+                    PermissionId = perm.Id,
+                    CreatedAt = now,
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        if (addedPerm > 0)
+            logger.LogInformation("DbSeeder: u shtuan {N} leje të reja RBAC.", addedPerm);
+
+        await EnsureSupportRoleAndPermissionAsync(db, now, logger, cancellationToken);
+    }
+
+    private static async Task EnsureSupportRoleAndPermissionAsync(
+        FoodDeliveryDbContext db,
+        DateTime now,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var supportRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == SupportRoleName, cancellationToken);
+        if (supportRole is null)
+        {
+            supportRole = new Role
+            {
+                Name = SupportRoleName,
+                Description = "Support — tiketa klientësh (leje e kufizuar)",
+                CreatedAt = now,
+            };
+            db.Roles.Add(supportRole);
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("DbSeeder: u shtua roli {Role}.", SupportRoleName);
+        }
+
+        var perm = await db.Permissions.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Name == PermissionNames.AdminSupport, cancellationToken);
+        if (perm is null)
+            return;
+
+        var existsLink = await db.RolePermissions.AnyAsync(
+            rp => rp.RoleId == supportRole.Id && rp.PermissionId == perm.Id,
+            cancellationToken);
+        if (existsLink)
+            return;
+
+        db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = supportRole.Id,
+            PermissionId = perm.Id,
+            CreatedAt = now,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(
+            "DbSeeder: rolit {Role} iu lidh leja {Perm}.",
+            SupportRoleName,
+            PermissionNames.AdminSupport);
+    }
+
+    /// <summary>Vlera fillestare për CMS (faqja kryesore) — jo të dhëna biznesi.</summary>
+    private static async Task EnsureCmsDefaultSettingsAsync(
+        FoodDeliveryDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var defaults = new (string Key, string Value, string? Description)[]
+        {
+            ("cms.landing.hero_title", "Ushqim i shpejtë, në derën tënde", "Titulli kryesor i landing"),
+            (
+                "cms.landing.hero_highlight",
+                "në derën tënde",
+                "Fragmenti me theks (gradient) në titull"),
+            (
+                "cms.landing.hero_subtitle",
+                "Zbulo restorante, porosit online dhe ndiq porositë — me llogari, adresë dhe qytet për dorëzim të saktë.",
+                "Nëntitulli nën hero"),
+            ("cms.landing.partner_eyebrow", "Për restorante & biznese", "Etiketa mbi seksionin partner"),
+            ("cms.landing.partner_title", "Bëhu partner me ne", "Titulli i seksionit partner"),
+            (
+                "cms.landing.partner_body",
+                "Nëse dëshiron të listosh menunë dhe të marrësh porosi përmes platformës, apliko fillimisht këtu. Ekipi ynë shqyrton çdo kërkesë; pas kontratës dhe miratimit, hapet aksesi në panel — nuk krijohet llogari pa atë hap.",
+                "Teksti përshkrues partner"),
+        };
+
+        var now = DateTime.UtcNow;
+        var added = 0;
+        foreach (var (key, value, desc) in defaults)
+        {
+            if (await db.Settings.AnyAsync(s => s.Key == key, cancellationToken))
+                continue;
+            db.Settings.Add(new Setting
+            {
+                Key = key,
+                Value = value,
+                Description = desc,
+                CreatedAt = now,
+            });
+            added++;
+        }
+
+        if (added > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("DbSeeder: u shtuan {N} çelësa të paracaktuar CMS.", added);
+        }
+    }
+
 
     private static async Task EnsureCustomerRoleAsync(
         FoodDeliveryDbContext db,

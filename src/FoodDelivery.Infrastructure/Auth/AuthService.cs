@@ -1,5 +1,5 @@
 using FoodDelivery.Application.Auth;
-using FoodDelivery.Application.Maps;
+//using FoodDelivery.Application.Maps;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -14,18 +14,19 @@ public sealed class AuthService : IAuthService
     private readonly IUnitOfWork _uow;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenIssuer _jwt;
-    private readonly IGeocodingService _geocode;
+   // private readonly IGeocodingService _geocode;
 
     public AuthService(
         IUnitOfWork uow,
         IPasswordHasher<User> passwordHasher,
-        IJwtTokenIssuer jwt,
-        IGeocodingService geocode)
+        IJwtTokenIssuer jwt //,
+       // IGeocodingService geocode
+      )
     {
         _uow = uow;
         _passwordHasher = passwordHasher;
         _jwt = jwt;
-        _geocode = geocode;
+       //_geocode = geocode;
     }
 
     public async Task<AuthResult> RegisterCustomerAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default)
@@ -198,9 +199,9 @@ public sealed class AuthService : IAuthService
 
     private async Task ApplyGeocodeAsync(CustomerAddress addr, CancellationToken cancellationToken)
     {
-        var (lat, lng) = await _geocode.GeocodeAddressAsync(addr.Line1, addr.City, addr.PostalCode, cancellationToken);
-        addr.Latitude = lat;
-        addr.Longitude = lng;
+       // var (lat, lng) = await _geocode.GeocodeAddressAsync(addr.Line1, addr.City, addr.PostalCode, cancellationToken);
+        //addr.Latitude = lat;
+       // addr.Longitude = lng;
     }
 
     public async Task<string?> ChangePasswordAsync(

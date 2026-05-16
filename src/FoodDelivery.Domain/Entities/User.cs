@@ -39,7 +39,11 @@ public class User
     public ICollection<Delivery> Deliveries { get; set; } = new List<Delivery>();
     public ICollection<Review> DriverReviews { get; set; } = new List<Review>();
 
+    public ICollection<Order> Orders { get; set; } = new List<Order>();
+
     public ICollection<WebPushSubscription> WebPushSubscriptions { get; set; } = new List<WebPushSubscription>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
     public ICollection<Review> ReviewsWritten { get; set; } = new List<Review>();
+    public ICollection<SupportTicket> SupportTickets { get; set; } = new List<SupportTicket>();
+    public ICollection<SupportTicketMessage> SupportTicketMessages { get; set; } = new List<SupportTicketMessage>();
 }

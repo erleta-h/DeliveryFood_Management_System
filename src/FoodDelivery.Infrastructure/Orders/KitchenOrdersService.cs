@@ -178,7 +178,17 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
                 eta,
                 fulfillment,
                 pickup ? null : (string.IsNullOrEmpty(driverDisp) ? null : driverDisp),
-                o.Items.Select(i => new KitchenOrderLineDto(i.NameSnapshot, i.Quantity, i.UnitPrice)).ToList()
+                pickup ? null : o.Delivery?.DriverUserId,//e kom shtu 
+                o.Items.Select(i => new KitchenOrderLineDto(i.NameSnapshot, i.Quantity, i.UnitPrice)).ToList(),
+                pickup ? null : (string?)null,
+                pickup ? null : o.Delivery?.Status,
+                pickup ? null : o.Delivery?.OfferedAtUtc,
+                pickup ? null : o.Delivery?.AcceptedAtUtc,
+                pickup ? null : o.Delivery?.ArrivedAtRestaurantUtc,
+                o.Restaurant.Latitude,
+                o.Restaurant.Longitude,
+                pickup ? null : o.CustomerAddress.Latitude,
+                pickup ? null : o.CustomerAddress.Longitude
             );
         }).ToList(); // MBYLLJA E SAKTE E SELECT DHE TOLIST
     } // MBYLLJA E METODES

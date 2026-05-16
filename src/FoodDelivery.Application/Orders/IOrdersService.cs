@@ -12,6 +12,11 @@ public interface IOrdersService
         long userId,
         CancellationToken cancellationToken = default);
 
+    Task<CustomerOrderDetailDto?> GetMyOrderAsync(
+        long userId,
+        long orderId,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Heq porosinë nga lista e klientit (historia); nuk fshin të dhënat nga platforma.</summary>
     Task<bool> HideOrderFromCustomerHistoryAsync(
         long userId,

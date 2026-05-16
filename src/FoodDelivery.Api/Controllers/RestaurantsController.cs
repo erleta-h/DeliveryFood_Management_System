@@ -15,7 +15,7 @@ public class RestaurantsController : ControllerBase
         _catalog = catalog;
     }
 
-   
+    /// <summary>Kërko restorante sipas tekstit (emër, qytet, adresë, kategori) dhe filtri i kategorisë.</summary>
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<RestaurantListItemDto>), StatusCodes.Status200OK)]
@@ -23,14 +23,16 @@ public class RestaurantsController : ControllerBase
         [FromQuery] string? q,
         [FromQuery] long? categoryId,
         [FromQuery] string? sort,
+        [FromQuery] double? customerLat,
+        [FromQuery] double? customerLng,
         CancellationToken cancellationToken)
     {
         var sortMode = ParseListSort(sort);
-        var list = await _catalog.SearchAsync(q, categoryId, sortMode, cancellationToken);
+        var list = await _catalog.SearchAsync(q, categoryId, sortMode, customerLat, customerLng, cancellationToken);
         return Ok(list);
     }
 
-    
+    /// <summary>Parametri <c>sort</c>: rating, eta, name, fee, proximity (kërkon customerLat &amp; customerLng).</summary>
     private static RestaurantListSort ParseListSort(string? sort) =>
         sort?.Trim().ToLowerInvariant() switch
         {
@@ -38,6 +40,7 @@ public class RestaurantsController : ControllerBase
             "eta" => RestaurantListSort.EstimatedDelivery,
             "name" => RestaurantListSort.Name,
             "fee" => RestaurantListSort.DeliveryFee,
+            "proximity" => RestaurantListSort.Proximity,
             _ => RestaurantListSort.Rating,
         };
 
@@ -50,7 +53,7 @@ public class RestaurantsController : ControllerBase
         return Ok(list);
     }
 
-   
+    /// <summary>Emër + tarifë dërgese (p.sh. për shportën pa listë të plotë).</summary>
     [HttpGet("{id:long}")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(RestaurantSummaryDto), StatusCodes.Status200OK)]
