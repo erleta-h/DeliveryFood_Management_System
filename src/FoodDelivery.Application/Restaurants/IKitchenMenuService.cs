@@ -6,6 +6,7 @@ public interface IKitchenMenuService
         long staffUserId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>null Id = gabim; përndryshe Id i kategorisë së re.</summary>
     Task<(long? Id, string? Error)> CreateCategoryAsync(
         long staffUserId,
         KitchenMenuCreateCategoryRequest request,
@@ -37,5 +38,18 @@ public interface IKitchenMenuService
         long staffUserId,
         long itemId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Ngarko / zëvendëso foton e artikullit (JPEG, PNG, WebP, GIF).</summary>
+    Task<string?> SetItemImageAsync(
+        long staffUserId,
+        long itemId,
+        Stream fileStream,
+        string originalFileName,
+        string contentType,
+        long contentLength,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Hiq foton e artikullit.</summary>
+    Task<string?> ClearItemImageAsync(long staffUserId, long itemId, CancellationToken cancellationToken = default);
 }
 
