@@ -1,8 +1,7 @@
-using FoodDelivery.Domain.Entities;
 using FoodDelivery.Application.Security;
+using FoodDelivery.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
 namespace FoodDelivery.Infrastructure.Data;
@@ -38,9 +37,18 @@ public static class DbSeeder
         }
 
         var now = DateTime.UtcNow;
-        // Idempotent: nëse nisja e mëparshme kishte shtuar kategoritë por dështoi më vonë, mos u përpoq
-        // të futesh sërish emra me indeks unik.
-        var categories = await EnsureDemoFoodCategoriesAsync(db, now, cancellationToken);
+
+        var categories = new[]
+        {
+            new FoodCategory { Name = "Pizza", SortOrder = 1, CreatedAt = now },
+            new FoodCategory { Name = "Burger & grill", SortOrder = 2, CreatedAt = now },
+            new FoodCategory { Name = "Aziatik", SortOrder = 3, CreatedAt = now },
+            new FoodCategory { Name = "Sushi", SortOrder = 4, CreatedAt = now },
+            new FoodCategory { Name = "Kafe & mëngjes", SortOrder = 5, CreatedAt = now },
+        };
+
+        db.FoodCategories.AddRange(categories);
+        await db.SaveChangesAsync(cancellationToken);
 
         var pizza = categories[0];
         var burger = categories[1];
@@ -61,9 +69,10 @@ public static class DbSeeder
         };
 
         db.Restaurants.AddRange(restaurants);
-        int v = await db.SaveChangesAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         await AddMenuForRestaurantsAsync(db, restaurants, now, cancellationToken);
+
         await EnsureKitchenStaffUserAsync(
             db,
             passwordHasher,
@@ -84,10 +93,12 @@ public static class DbSeeder
         var restaurants = await db.Restaurants.ToListAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var added = 0;
+
         foreach (var r in restaurants)
         {
             if (await db.MenuCategories.AnyAsync(c => c.RestaurantId == r.Id, cancellationToken))
                 continue;
+
             await AddMenuForSingleRestaurantAsync(db, r.Id, now, cancellationToken);
             added++;
         }
@@ -106,7 +117,6 @@ public static class DbSeeder
             await AddMenuForSingleRestaurantAsync(db, r.Id, now, cancellationToken);
     }
 
-    /// <summary>Kategori + 2 artikuj demo — përdoret nga seed dhe nga miratimi i aplikimit të partnerit.</summary>
     public static async Task AddMenuForSingleRestaurantAsync(
         FoodDeliveryDbContext db,
         long restaurantId,
@@ -120,6 +130,7 @@ public static class DbSeeder
             SortOrder = 1,
             CreatedAt = now,
         };
+
         db.MenuCategories.Add(mc);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -132,6 +143,7 @@ public static class DbSeeder
             IsAvailable = true,
             CreatedAt = now,
         });
+
         db.MenuItems.Add(new MenuItem
         {
             MenuCategoryId = mc.Id,
@@ -141,6 +153,7 @@ public static class DbSeeder
             IsAvailable = true,
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -158,6 +171,7 @@ public static class DbSeeder
             .FirstAsync(r => r.Name == RestaurantStaffRoleName, cancellationToken);
 
         var now = DateTime.UtcNow;
+
         var user = new User
         {
             Email = KitchenSeedEmail,
@@ -168,7 +182,9 @@ public static class DbSeeder
             CreatedAt = now,
             PasswordHash = string.Empty,
         };
+
         user.PasswordHash = passwordHasher.HashPassword(user, "Staff123!");
+
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -181,8 +197,11 @@ public static class DbSeeder
         });
 
         long restaurantId;
+
         if (preferredRestaurantId is { } rid)
+        {
             restaurantId = rid;
+        }
         else
         {
             restaurantId = await db.Restaurants.AsNoTracking()
@@ -200,8 +219,9 @@ public static class DbSeeder
         });
 
         await db.SaveChangesAsync(cancellationToken);
+
         logger.LogInformation(
-            "DbSeeder: u krijua përdoruesi i kuzhinës {Email} (fjalëkalimi: Staff123!) për restorant Id={Rid}.",
+            "DbSeeder: u krijua përdoruesi i kuzhinës {Email} për restorant Id={Rid}.",
             KitchenSeedEmail,
             restaurantId);
     }
@@ -215,12 +235,14 @@ public static class DbSeeder
             return;
 
         var now = DateTime.UtcNow;
+
         db.Roles.Add(new Role
         {
             Name = RestaurantStaffRoleName,
             Description = "Staf restoranti — shikon porositë",
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("DbSeeder: u shtua roli {Role}.", RestaurantStaffRoleName);
     }
@@ -234,12 +256,14 @@ public static class DbSeeder
             return;
 
         var now = DateTime.UtcNow;
+
         db.Roles.Add(new Role
         {
             Name = DriverRoleName,
             Description = "Deliver — marrje dhe dorëzim porosish",
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("DbSeeder: u shtua roli {Role}.", DriverRoleName);
     }
@@ -253,12 +277,14 @@ public static class DbSeeder
             return;
 
         var now = DateTime.UtcNow;
+
         db.Roles.Add(new Role
         {
             Name = AdminRoleName,
             Description = "Platformë — aplikimet partner dhe miratimi",
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("DbSeeder: u shtua roli {Role}.", AdminRoleName);
     }
@@ -279,9 +305,11 @@ public static class DbSeeder
         if (existing is not null)
         {
             var hasAdmin = existing.UserRoles.Any(ur => ur.RoleId == adminRole.Id);
+
             if (!hasAdmin)
             {
                 var now = DateTime.UtcNow;
+
                 db.UserRoles.Add(new UserRole
                 {
                     UserId = existing.Id,
@@ -289,7 +317,9 @@ public static class DbSeeder
                     AssignedAt = now,
                     CreatedAt = now,
                 });
+
                 await db.SaveChangesAsync(cancellationToken);
+
                 logger.LogInformation(
                     "DbSeeder: përdoruesit {Email} iu shtua roli {Role}.",
                     AdminSeedEmail,
@@ -300,6 +330,7 @@ public static class DbSeeder
         }
 
         var nowCreate = DateTime.UtcNow;
+
         var user = new User
         {
             Email = AdminSeedEmail,
@@ -310,9 +341,12 @@ public static class DbSeeder
             CreatedAt = nowCreate,
             PasswordHash = string.Empty,
         };
+
         user.PasswordHash = passwordHasher.HashPassword(user, "Admin123!");
+
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
+
         db.UserRoles.Add(new UserRole
         {
             UserId = user.Id,
@@ -320,9 +354,11 @@ public static class DbSeeder
             AssignedAt = nowCreate,
             CreatedAt = nowCreate,
         });
+
         await db.SaveChangesAsync(cancellationToken);
+
         logger.LogInformation(
-            "DbSeeder: u krijua admin {Email} (fjalëkalimi: Admin123!) — përdore për /api/admin.",
+            "DbSeeder: u krijua admin {Email} — përdore për /api/admin.",
             AdminSeedEmail);
     }
 
@@ -341,15 +377,19 @@ public static class DbSeeder
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
+
         var adminRole = await db.Roles.AsNoTracking()
             .FirstOrDefaultAsync(r => r.Name == AdminRoleName, cancellationToken);
+
         if (adminRole is null)
             return;
 
         var addedPerm = 0;
+
         foreach (var name in PermissionNames.All)
         {
             var perm = await db.Permissions.FirstOrDefaultAsync(p => p.Name == name, cancellationToken);
+
             if (perm is null)
             {
                 perm = new Permission
@@ -358,6 +398,7 @@ public static class DbSeeder
                     Description = $"Leje: {name}",
                     CreatedAt = now,
                 };
+
                 db.Permissions.Add(perm);
                 await db.SaveChangesAsync(cancellationToken);
                 addedPerm++;
@@ -366,6 +407,7 @@ public static class DbSeeder
             var existsLink = await db.RolePermissions.AnyAsync(
                 rp => rp.RoleId == adminRole.Id && rp.PermissionId == perm.Id,
                 cancellationToken);
+
             if (!existsLink)
             {
                 db.RolePermissions.Add(new RolePermission
@@ -374,6 +416,7 @@ public static class DbSeeder
                     PermissionId = perm.Id,
                     CreatedAt = now,
                 });
+
                 await db.SaveChangesAsync(cancellationToken);
             }
         }
@@ -391,27 +434,32 @@ public static class DbSeeder
         CancellationToken cancellationToken)
     {
         var supportRole = await db.Roles.FirstOrDefaultAsync(r => r.Name == SupportRoleName, cancellationToken);
+
         if (supportRole is null)
         {
             supportRole = new Role
             {
                 Name = SupportRoleName,
-                Description = "Support — tiketa klientësh (leje e kufizuar)",
+                Description = "Support — tiketa klientësh",
                 CreatedAt = now,
             };
+
             db.Roles.Add(supportRole);
             await db.SaveChangesAsync(cancellationToken);
+
             logger.LogInformation("DbSeeder: u shtua roli {Role}.", SupportRoleName);
         }
 
         var perm = await db.Permissions.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Name == PermissionNames.AdminSupport, cancellationToken);
+
         if (perm is null)
             return;
 
         var existsLink = await db.RolePermissions.AnyAsync(
             rp => rp.RoleId == supportRole.Id && rp.PermissionId == perm.Id,
             cancellationToken);
+
         if (existsLink)
             return;
 
@@ -421,14 +469,16 @@ public static class DbSeeder
             PermissionId = perm.Id,
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
+
         logger.LogInformation(
             "DbSeeder: rolit {Role} iu lidh leja {Perm}.",
             SupportRoleName,
             PermissionNames.AdminSupport);
     }
 
-    /// <summary>Vlera fillestare për CMS (faqja kryesore) — jo të dhëna biznesi.</summary>
+    /// <summary>Vlera fillestare per CMS (faqja kryesore) — jo te dhena biznesi.</summary>
     private static async Task EnsureCmsDefaultSettingsAsync(
         FoodDeliveryDbContext db,
         ILogger logger,
@@ -436,29 +486,31 @@ public static class DbSeeder
     {
         var defaults = new (string Key, string Value, string? Description)[]
         {
-            ("cms.landing.hero_title", "Ushqim i shpejtë, në derën tënde", "Titulli kryesor i landing"),
-            (
-                "cms.landing.hero_highlight",
-                "në derën tënde",
-                "Fragmenti me theks (gradient) në titull"),
-            (
-                "cms.landing.hero_subtitle",
-                "Zbulo restorante, porosit online dhe ndiq porositë — me llogari, adresë dhe qytet për dorëzim të saktë.",
-                "Nëntitulli nën hero"),
-            ("cms.landing.partner_eyebrow", "Për restorante & biznese", "Etiketa mbi seksionin partner"),
-            ("cms.landing.partner_title", "Bëhu partner me ne", "Titulli i seksionit partner"),
-            (
-                "cms.landing.partner_body",
-                "Nëse dëshiron të listosh menunë dhe të marrësh porosi përmes platformës, apliko fillimisht këtu. Ekipi ynë shqyrton çdo kërkesë; pas kontratës dhe miratimit, hapet aksesi në panel — nuk krijohet llogari pa atë hap.",
-                "Teksti përshkrues partner"),
+        ("cms.landing.hero_title", "Ushqim i shpejtë, në derën tënde", "Titulli kryesor i landing"),
+        (
+            "cms.landing.hero_highlight",
+            "në derën tënde",
+            "Fragmenti me theks (gradient) në titull"),
+        (
+            "cms.landing.hero_subtitle",
+            "Zbulo restorante, porosit online dhe ndiq porositë — me llogari, adresë dhe qytet për dorëzim të saktë.",
+            "Nëntitulli nën hero"),
+        ("cms.landing.partner_eyebrow", "Për restorante & biznese", "Etiketa mbi seksionin partner"),
+        ("cms.landing.partner_title", "Bëhu partner me ne", "Titulli i seksionit partner"),
+        (
+            "cms.landing.partner_body",
+            "Nëse dëshiron të listosh menunë dhe të marrësh porosi përmes platformës, apliko fillimisht këtu. Ekipi ynë shqyrton çdo kërkesë; pas kontratës dhe miratimit, hapet aksesi në panel — nuk krijohet llogari pa atë hap.",
+            "Teksti përshkrues partner"),
         };
 
         var now = DateTime.UtcNow;
         var added = 0;
+
         foreach (var (key, value, desc) in defaults)
         {
             if (await db.Settings.AnyAsync(s => s.Key == key, cancellationToken))
                 continue;
+
             db.Settings.Add(new Setting
             {
                 Key = key,
@@ -466,6 +518,7 @@ public static class DbSeeder
                 Description = desc,
                 CreatedAt = now,
             });
+
             added++;
         }
 
@@ -476,7 +529,6 @@ public static class DbSeeder
         }
     }
 
-
     private static async Task EnsureCustomerRoleAsync(
         FoodDeliveryDbContext db,
         ILogger logger,
@@ -486,84 +538,16 @@ public static class DbSeeder
             return;
 
         var now = DateTime.UtcNow;
+
         db.Roles.Add(new Role
         {
             Name = CustomerRoleName,
             Description = "Klient",
             CreatedAt = now,
         });
+
         await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("DbSeeder: u shtua roli {Role}.", CustomerRoleName);
-    }
-
-    /// <summary>
-    /// Kthen kategoritë demo në të njëjtin rend: krijon mungesat; nëse rreshtat ekzistojnë (indeks unik në emër), i përdor.
-    /// Përdor përputhje pa dallim shkronjash dhe <see cref="string.Trim()"/>; kopje të lehta (jo të track-ura) vetëm për
-    /// <c>Id</c> — shmang konfuzin e tracking që efektivisht mund të provojë INSERT të dyfishtë në "Pizza" etj.
-    /// </summary>
-    private static async Task<FoodCategory[]> EnsureDemoFoodCategoriesAsync(
-        FoodDeliveryDbContext db,
-        DateTime now,
-        CancellationToken cancellationToken)
-    {
-        (string Name, int SortOrder)[] spec =
-        {
-            ("Pizza", 1),
-            ("Burger & grill", 2),
-            ("Aziatik", 3),
-            ("Sushi", 4),
-            ("Kafe & mëngjes", 5),
-        };
-
-        // Një round-trip, pa tracking — përndryshe entitetet `Unchanged` ndonjëherë keqinterpretoren në batch-in e
-        // Restaurant.AddRange.
-        var rows = await db.FoodCategories
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var byName = new Dictionary<string, FoodCategory>(StringComparer.OrdinalIgnoreCase);
-        foreach (var r in rows)
-        {
-            var k = (r.Name ?? string.Empty).Trim();
-            if (k.Length == 0)
-                continue;
-            if (!byName.ContainsKey(k))
-                byName[k] = r;
-        }
-
-        var list = new List<FoodCategory>(spec.Length);
-        var anyNew = false;
-        foreach (var (name, sortOrder) in spec)
-        {
-            var key = name.Trim();
-            if (byName.TryGetValue(key, out var found))
-            {
-                list.Add(new FoodCategory
-                {
-                    Id = found.Id,
-                    Name = name,
-                    SortOrder = found.SortOrder,
-                    CreatedAt = found.CreatedAt,
-                });
-                continue;
-            }
-
-            anyNew = true;
-            var cat = new FoodCategory
-            {
-                Name = name,
-                SortOrder = sortOrder,
-                CreatedAt = now,
-            };
-            db.FoodCategories.Add(cat);
-            list.Add(cat);
-            byName[key] = cat;
-        }
-
-        if (anyNew)
-            await db.SaveChangesAsync(cancellationToken);
-
-        return list.ToArray();
     }
 
     private static Restaurant NewRestaurant(
@@ -580,6 +564,7 @@ public static class DbSeeder
         double? longitude = null)
     {
         var now = DateTime.UtcNow;
+
         return new Restaurant
         {
             Name = name,
@@ -599,10 +584,5 @@ public static class DbSeeder
             CreatedAt = now,
             Description = $"Kuzhinë {name}.",
         };
-    }
-
-    public static async Task SeedAsync(FoodDeliveryDbContext db, ILogger dbLog, IPasswordHasher<User> passwordHasher, IDistributedCache distributedCache)
-    {
-        throw new NotImplementedException();
     }
 }

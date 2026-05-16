@@ -5,9 +5,7 @@ using FoodDelivery.Application.Payments;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Realtime;
 using FoodDelivery.Domain.Entities;
-using FoodDelivery.Infrastructure.Caching;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Options;
 using Stripe;
 
@@ -18,18 +16,15 @@ public sealed class StripePaymentService : IStripePaymentService
     private readonly IUnitOfWork _uow;
     private readonly StripeSettings _stripe;
     private readonly IOrderRealtimeNotifier _realtime;
-    private readonly IDistributedCache _cache;
 
     public StripePaymentService(
         IUnitOfWork uow,
         IOptions<StripeSettings> stripe,
-        IOrderRealtimeNotifier realtime,
-        IDistributedCache cache)
+        IOrderRealtimeNotifier realtime)
     {
         _uow = uow;
         _stripe = stripe.Value;
         _realtime = realtime;
-        _cache = cache;
     }
 
     public async Task<(string? ClientSecret, string? Error)> CreatePaymentIntentForOrderAsync(
@@ -45,10 +40,13 @@ public sealed class StripePaymentService : IStripePaymentService
         var order = await _uow.Repository<Order, long>().Query
             .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
+
         if (order is null)
             return (null, "Porosia nuk u gjet.");
 
-        var payment = order.Payments.FirstOrDefault(p => p.Provider == "stripe" && p.Status == PaymentStatus.Pending);
+        var payment = order.Payments.FirstOrDefault(
+            p => p.Provider == "stripe" && p.Status == PaymentStatus.Pending);
+
         if (payment is null)
             return (null, "Kjo porosi nuk përdor pagesë me kartë ose pagesa është përpunuar.");
 
@@ -56,13 +54,20 @@ public sealed class StripePaymentService : IStripePaymentService
 
         if (!string.IsNullOrEmpty(payment.ExternalId))
         {
-            var existing = await service.GetAsync(payment.ExternalId, cancellationToken: cancellationToken);
+            var existing = await service.GetAsync(
+                payment.ExternalId,
+                cancellationToken: cancellationToken);
+
             if (existing.Status == "succeeded")
                 return (null, "Pagesa është kryer.");
+
             return (existing.ClientSecret, null);
         }
 
-        var amountCents = (long)Math.Round(payment.Amount * 100m, MidpointRounding.AwayFromZero);
+        var amountCents = (long)Math.Round(
+            payment.Amount * 100m,
+            MidpointRounding.AwayFromZero);
+
         var options = new PaymentIntentCreateOptions
         {
             Amount = amountCents,
@@ -71,29 +76,53 @@ public sealed class StripePaymentService : IStripePaymentService
             {
                 ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture),
             },
-            AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions { Enabled = true },
+            AutomaticPaymentMethods =
+                new PaymentIntentAutomaticPaymentMethodsOptions
+                {
+                    Enabled = true
+                },
         };
 
         var intent = await service.CreateAsync(options, cancellationToken: cancellationToken);
+
         payment.ExternalId = intent.Id;
         payment.UpdatedAt = DateTime.UtcNow;
+
         await _uow.SaveChangesAsync(cancellationToken);
+
         return (intent.ClientSecret, null);
     }
 
-    public async Task HandleWebhookAsync(string json, string stripeSignature, CancellationToken cancellationToken = default)
+    public async Task HandleWebhookAsync(
+        string json,
+        string stripeSignature,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(_stripe.SecretKey) || string.IsNullOrWhiteSpace(_stripe.WebhookSecret))
-            throw new InvalidOperationException("Stripe ose webhook secret mungon.");
+        if (string.IsNullOrWhiteSpace(_stripe.SecretKey) ||
+            string.IsNullOrWhiteSpace(_stripe.WebhookSecret))
+        {
+            throw new InvalidOperationException(
+                "Stripe ose webhook secret mungon.");
+        }
 
         StripeConfiguration.ApiKey = _stripe.SecretKey;
 
-        var stripeEvent = EventUtility.ConstructEvent(json, stripeSignature, _stripe.WebhookSecret, throwOnApiVersionMismatch: false);
+        var stripeEvent = EventUtility.ConstructEvent(
+            json,
+            stripeSignature,
+            _stripe.WebhookSecret,
+            throwOnApiVersionMismatch: false);
 
         if (stripeEvent.Type == EventTypes.PaymentIntentSucceeded)
         {
             if (stripeEvent.Data.Object is PaymentIntent pi)
-                await MarkStripePaymentCapturedAsync(pi.Id, pi.Status, cancellationToken);
+            {
+                await MarkStripePaymentCapturedAsync(
+                    pi.Id,
+                    pi.Status,
+                    cancellationToken);
+            }
+
             return;
         }
 
@@ -103,7 +132,10 @@ public sealed class StripePaymentService : IStripePaymentService
             {
                 var payment = await _uow.Repository<Payment, long>().Query
                     .Include(p => p.Order)
-                    .FirstOrDefaultAsync(p => p.ExternalId == failed.Id, cancellationToken);
+                    .FirstOrDefaultAsync(
+                        p => p.ExternalId == failed.Id,
+                        cancellationToken);
+
                 if (payment is { Provider: "stripe", Order: { } order })
                 {
                     payment.Status = PaymentStatus.Failed;
@@ -111,20 +143,25 @@ public sealed class StripePaymentService : IStripePaymentService
                     payment.RawPayload = failed.LastPaymentError?.Message;
 
                     var cancelled = false;
+
                     if (order.Status == OrderStatus.Pending)
                     {
                         var now = DateTime.UtcNow;
+
                         order.Status = OrderStatus.Cancelled;
                         order.UpdatedAt = now;
                         order.UpdatedById = null;
-                        _uow.Repository<OrderStatusHistory, long>().Add(new OrderStatusHistory
-                        {
-                            OrderId = order.Id,
-                            Status = OrderStatus.Cancelled,
-                            Note = "stripe:payment_failed",
-                            CreatedAt = now,
-                            CreatedById = null,
-                        });
+
+                        _uow.Repository<OrderStatusHistory, long>().Add(
+                            new OrderStatusHistory
+                            {
+                                OrderId = order.Id,
+                                Status = OrderStatus.Cancelled,
+                                Note = "stripe:payment_failed",
+                                CreatedAt = now,
+                                CreatedById = null,
+                            });
+
                         cancelled = true;
                     }
 
@@ -147,13 +184,19 @@ public sealed class StripePaymentService : IStripePaymentService
         }
     }
 
-    private async Task MarkStripePaymentCapturedAsync(string? externalId, string? status, CancellationToken cancellationToken)
+    private async Task MarkStripePaymentCapturedAsync(
+        string? externalId,
+        string? status,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(externalId))
             return;
 
         var payment = await _uow.Repository<Payment, long>().Query
-            .FirstOrDefaultAsync(p => p.ExternalId == externalId, cancellationToken);
+            .FirstOrDefaultAsync(
+                p => p.ExternalId == externalId,
+                cancellationToken);
+
         if (payment is not { Provider: "stripe" })
             return;
 
@@ -161,19 +204,21 @@ public sealed class StripePaymentService : IStripePaymentService
             return;
 
         var wasPending = payment.Status == PaymentStatus.Pending;
+
         payment.Status = PaymentStatus.Captured;
         payment.UpdatedAt = DateTime.UtcNow;
         payment.RawPayload = status;
+
         await _uow.SaveChangesAsync(cancellationToken);
 
         if (!wasPending)
             return;
 
-        var restaurantId = await _uow.Repository<Order, long>().Query.AsNoTracking()
+        var restaurantId = await _uow.Repository<Order, long>().Query
+            .AsNoTracking()
             .Where(o => o.Id == payment.OrderId)
             .Select(o => o.RestaurantId)
             .FirstOrDefaultAsync(cancellationToken);
-
         await _realtime.NotifyRestaurantNewOrderAsync(payment.OrderId, restaurantId, cancellationToken);
         //await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken).ConfigureAwait(false);
     }
