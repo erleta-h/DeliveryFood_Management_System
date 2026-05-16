@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { DeliveryMapPicker } from './DeliveryMapPicker'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { DeliveryLocationMapDialog } from './DeliveryLocationMapDialog'
 import { KOSOVO_CITIES } from '../lib/kosovoCities'
 import { loadDeliveryLocation, saveDeliveryLocation } from '../lib/deliveryLocationStorage'
 import { reverseGeocode, searchAddress } from '../lib/nominatim'
@@ -49,7 +49,6 @@ export function DeliveryAddressSection() {
   const [busy, setBusy] = useState(false)
   const [geoHint, setGeoHint] = useState<string | null>(null)
   const [mapOpen, setMapOpen] = useState(false)
-  const reverseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     const saved = loadDeliveryLocation()
@@ -59,39 +58,9 @@ export function DeliveryAddressSection() {
     }
   }, [])
 
-  useEffect(
-    () => () => {
-      clearTimeout(reverseTimer.current)
-    },
-    [],
-  )
-
-  useEffect(() => {
-    if (!mapOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = prev
-    }
-  }, [mapOpen])
-
   const persist = useCallback((addr: string, lat: number, lng: number) => {
     saveDeliveryLocation({ address: addr, lat, lng, city })
   }, [city])
-
-  const scheduleReverse = useCallback(
-    (lat: number, lng: number) => {
-      setMarker([lat, lng])
-      clearTimeout(reverseTimer.current)
-      reverseTimer.current = setTimeout(async () => {
-        setBusy(true)
-        const name = await reverseGeocode(lat, lng)
-        setBusy(false)
-        if (name) setAddress(name)
-      }, 450)
-    },
-    [],
-  )
 
   const onSearchSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -135,21 +104,6 @@ export function DeliveryAddressSection() {
       },
       { enableHighAccuracy: true, timeout: 12_000 },
     )
-  }
-
-  const confirmMapSelection = async () => {
-    setBusy(true)
-    const [lat, lng] = marker
-    const name = await reverseGeocode(lat, lng)
-    setBusy(false)
-    if (name) {
-      setAddress(name)
-      persist(name, lat, lng)
-    } else {
-      persist(address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`, lat, lng)
-    }
-    setMapOpen(false)
-    setGeoHint(null)
   }
 
   return (
@@ -198,53 +152,23 @@ export function DeliveryAddressSection() {
         </form>
       </div>
 
-      {mapOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="map-picker-title"
-        >
-          <div className="flex max-h-[min(90vh,640px)] w-full max-w-2xl flex-col rounded-t-3xl border border-white/10 bg-[#1a1d2b] p-4 shadow-2xl sm:rounded-3xl sm:p-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 id="map-picker-title" className="text-lg font-semibold text-zinc-100">
-                Zgjedh vendin në hartë
-              </h2>
-              <button
-                type="button"
-                onClick={() => setMapOpen(false)}
-                className="rounded-full px-3 py-1.5 text-sm font-medium text-zinc-400 transition hover:bg-white/10 hover:text-zinc-200"
-              >
-                Mbyll
-              </button>
-            </div>
-            <p className="mb-2 text-xs text-zinc-500">
-              Kliko ose zhvendos pikën. Pastaj ruaj — adresa shfaqet te shiriti dhe ruhet lokalisht.
-            </p>
-            <div className="min-h-[240px] flex-1 overflow-hidden rounded-2xl sm:min-h-[320px]">
-              <DeliveryMapPicker position={marker} onPositionChange={scheduleReverse} className="h-[min(50vh,360px)] w-full sm:h-[360px]" />
-            </div>
-            {busy ? <p className="mt-2 text-xs text-zinc-400">Duke lexuar adresën…</p> : null}
-            <div className="mt-4 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setMapOpen(false)}
-                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-zinc-200 hover:bg-white/10"
-              >
-                Anulo
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmMapSelection()}
-                disabled={busy}
-                className="rounded-full bg-gradient-to-b from-amber-500 to-amber-700 px-5 py-2.5 text-sm font-semibold text-zinc-950 shadow-md disabled:opacity-50"
-              >
-                Ruaj adresën
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <DeliveryLocationMapDialog
+        open={mapOpen}
+        onClose={() => {
+          setMapOpen(false)
+          setGeoHint(null)
+        }}
+        city={city}
+        seedPosition={marker}
+        onPreviewAddress={(name) => {
+          if (name) setAddress(name)
+        }}
+        onAfterSave={(loc) => {
+          setAddress(loc.address)
+          setMarker([loc.lat, loc.lng])
+        }}
+        description="Kliko ose zhvendos pikën. Pastaj ruaj — adresa shfaqet te shiriti dhe ruhet lokalisht."
+      />
     </>
   )
 }
