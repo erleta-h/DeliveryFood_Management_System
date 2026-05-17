@@ -9,7 +9,7 @@ import {
 } from '../lib/customerNotificationsApi'
 import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
-import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
+import { useCustomerNotificationsStore } from '../store/customerNotificationsStore.ts'
 
 function typeLabelSq(type: string): string {
   if (type === 'support_reply') return 'Support'
