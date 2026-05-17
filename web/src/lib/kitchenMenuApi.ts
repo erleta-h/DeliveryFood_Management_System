@@ -84,7 +84,7 @@ export async function createKitchenMenuItem(
     description?: string | null
     isAvailable?: boolean
   },
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; id: number } | { ok: false; message: string }> {
   const res = await fetch(apiPath('/api/kitchen/menu/items'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
@@ -96,7 +96,13 @@ export async function createKitchenMenuItem(
       isAvailable: body.isAvailable ?? true,
     }),
   })
-  if (res.status === 201) return { ok: true }
+  if (res.status === 201) {
+    const raw: unknown = await res.json()
+    const id = typeof raw === 'number' ? raw : Number(raw)
+    if (!Number.isFinite(id))
+      return { ok: false, message: 'Përgjigje e pavlefshme nga serveri.' }
+    return { ok: true, id }
+  }
   return { ok: false, message: await readMessage(res) }
 }
 
@@ -119,6 +125,34 @@ export async function deleteKitchenMenuItem(
   id: number,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/kitchen/menu/items/${id}`), {
+    method: 'DELETE',
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 204) return { ok: true }
+  return { ok: false, message: await readMessage(res) }
+}
+
+export async function uploadKitchenMenuItemImage(
+  token: string,
+  itemId: number,
+  file: File,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetch(apiPath(`/api/kitchen/menu/items/${itemId}/image`), {
+    method: 'POST',
+    headers: { ...authHeader(token) },
+    body: fd,
+  })
+  if (res.status === 204) return { ok: true }
+  return { ok: false, message: await readMessage(res) }
+}
+
+export async function deleteKitchenMenuItemImage(
+  token: string,
+  itemId: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/kitchen/menu/items/${itemId}/image`), {
     method: 'DELETE',
     headers: { ...authHeader(token) },
   })

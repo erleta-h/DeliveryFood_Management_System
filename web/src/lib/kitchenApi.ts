@@ -33,12 +33,25 @@ export type KitchenOrder = {
   assignedDriverDisplay: string | null
   assignedDriverUserId: number | null
   lines: KitchenOrderLine[]
+  /** Lloj mjeti nga profili i Deliver (API i ri). */
+  assignedDriverVehicleType?: string | null
+  /** Delivery.Status (DeliveryDriverLeg); null për pickup. */
+  deliveryLegStatus?: number | null
+  deliveryOfferedAtUtc?: string | null
+  deliveryAcceptedAtUtc?: string | null
+  deliveryArrivedAtRestaurantUtc?: string | null
+  restaurantLatitude?: number | null
+  restaurantLongitude?: number | null
+  deliveryDestinationLatitude?: number | null
+  deliveryDestinationLongitude?: number | null
 }
 
 export type KitchenAssignableDriver = {
   userId: number
   displayName: string
   vehicleType: string
+  lastLatitude?: number | null
+  lastLongitude?: number | null
 }
 
 export type KitchenTodayStats = {
@@ -88,6 +101,26 @@ export async function fetchKitchenOrders(token: string): Promise<KitchenOrder[]>
   return res.json() as Promise<KitchenOrder[]>
 }
 
+export type KitchenOrderHistoryResult = {
+  items: KitchenOrder[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export async function fetchKitchenOrderHistory(
+  token: string,
+  page = 1,
+  pageSize = 20,
+): Promise<KitchenOrderHistoryResult> {
+  const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  const res = await fetch(`${apiPath('/api/kitchen/orders/history')}?${qs}`, {
+    headers: { ...authHeader(token) },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<KitchenOrderHistoryResult>
+}
+
 export async function fetchKitchenAssignableDrivers(token: string): Promise<KitchenAssignableDriver[]> {
   const res = await fetch(apiPath('/api/kitchen/drivers/assignable'), {
     headers: { ...authHeader(token) },
@@ -100,11 +133,15 @@ export async function patchKitchenAssignDriver(
   token: string,
   orderId: number,
   driverUserId: number,
+  options?: { immediateHandoff?: boolean },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/kitchen/orders/${orderId}/assign-driver`), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
-    body: JSON.stringify({ driverUserId }),
+    body: JSON.stringify({
+      driverUserId,
+      immediateHandoff: options?.immediateHandoff === true,
+    }),
   })
   if (res.status === 204) return { ok: true }
   let message = `Gabim ${res.status}`
@@ -130,6 +167,27 @@ export async function patchKitchenOrderStatus(
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify(body),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try {
+    const j = (await res.json()) as { message?: string }
+    if (j.message) message = j.message
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, message }
+}
+
+export async function patchKitchenPrepMinutes(
+  token: string,
+  orderId: number,
+  prepMinutes: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/kitchen/orders/${orderId}/prep-minutes`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ prepMinutes }),
   })
   if (res.status === 204) return { ok: true }
   let message = `Gabim ${res.status}`
