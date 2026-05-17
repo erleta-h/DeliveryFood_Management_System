@@ -1,10 +1,12 @@
 ﻿using FoodDelivery.Api.Security;
 using FoodDelivery.Application.Restaurants;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FoodDelivery.Api.Controllers;
 
+/// <summary>Menaxhimi i menysë vetëm për restorantin ku stafi është i lidhur.</summary>
 [ApiController]
 [Route("api/kitchen/menu")]
 [Authorize(Roles = "RestaurantStaff")]
@@ -116,6 +118,51 @@ public sealed class KitchenMenuController : ControllerBase
         if (userId is null) return Unauthorized();
 
         var err = await _menu.DeleteItemAsync(userId.Value, id, cancellationToken);
+        if (err is not null)
+            return BadRequest(new { message = err });
+        return NoContent();
+    }
+
+    /// <summary>Ngarko foto për artikull (JPEG, PNG, WebP, GIF).</summary>
+    [HttpPost("items/{id:long}/image")]
+    [RequestSizeLimit(6_291_456)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 6_291_456)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadItemImage(
+        long id,
+        IFormFile? file,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Zgjidh një foto." });
+
+        await using var stream = file.OpenReadStream();
+        var err = await _menu.SetItemImageAsync(
+            userId.Value,
+            id,
+            stream,
+            file.FileName,
+            file.ContentType ?? "application/octet-stream",
+            file.Length,
+            cancellationToken);
+        if (err is not null)
+            return BadRequest(new { message = err });
+        return NoContent();
+    }
+
+    [HttpDelete("items/{id:long}/image")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> DeleteItemImage(long id, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var err = await _menu.ClearItemImageAsync(userId.Value, id, cancellationToken);
         if (err is not null)
             return BadRequest(new { message = err });
         return NoContent();

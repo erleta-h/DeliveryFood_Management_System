@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { fetchKitchenContext, type KitchenStaffContext } from './../lib/kitchenApi'
-import { customerBtnPrimary, customerShellBg } from '../lib/customerTheme'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { fetchKitchenContext, type KitchenStaffContext } from '../lib/kitchenApi'
+import { hasCustomerRole } from '../lib/jwtRoles'
+import { customerBtnPrimary } from '../lib/customerTheme'
+import { enableStaffCustomerAppMode } from '../lib/staffCustomerApp'
 import { useAuthStore } from '../store/authStore'
 
 type CtxPhase = 'loading' | 'ready' | 'unauthorized' | 'error'
@@ -9,13 +11,14 @@ type CtxPhase = 'loading' | 'ready' | 'unauthorized' | 'error'
 function navClass(isActive: boolean) {
   return `rounded-lg px-3 py-2 text-sm transition-colors ${
     isActive
-      ? 'bg-amber-500/15 font-medium text-amber-100 ring-1 ring-amber-500/25'
-      : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
+      ? 'bg-[#009fe3]/18 font-medium text-white ring-1 ring-[#009fe3]/35'
+      : 'text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200'
   }`
 }
 
 export default function KitchenLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
@@ -55,19 +58,23 @@ export default function KitchenLayout() {
     void navigate('/partner/login', { replace: true })
   }
 
+  if (user?.mustChangePassword && location.pathname !== '/kitchen/account') {
+    return <Navigate to="/kitchen/account" replace />
+  }
+
   return (
-    <div className={`${customerShellBg} min-h-screen`}>
-      <header className="border-b border-amber-500/20 bg-[#1e1a14]/90 px-3 py-3 backdrop-blur-md sm:px-4">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-[#0c0e12] font-sans text-zinc-200 antialiased">
+      <header className="border-b border-white/[0.06] bg-[#13151a] px-3 py-3 sm:px-4">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-500/90">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
               {ctxPhase === 'loading' && token ? (
                 <span className="animate-pulse text-zinc-500">Duke lidhur me restorantin…</span>
               ) : (
                 restaurantTitle
               )}
             </p>
-            <p className="mt-0.5 text-sm text-zinc-300">
+            <p className="mt-0.5 text-sm font-medium text-zinc-200">
               {user?.firstName} {user?.lastName}
               {kitchenCtx?.isLinked && kitchenCtx.slug ? (
                 <>
@@ -82,8 +89,11 @@ export default function KitchenLayout() {
             </p>
           </div>
           <nav className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <NavLink to="/kitchen" end className={({ isActive }) => navClass(isActive)}>
+            <NavLink to="/kitchen/orders" className={({ isActive }) => navClass(isActive)}>
               Porositë
+            </NavLink>
+            <NavLink to="/kitchen/history" className={({ isActive }) => navClass(isActive)}>
+              Historiku
             </NavLink>
             <NavLink to="/kitchen/menu" className={({ isActive }) => navClass(isActive)}>
               Menuja
@@ -91,6 +101,15 @@ export default function KitchenLayout() {
             <NavLink to="/kitchen/account" className={({ isActive }) => navClass(isActive)}>
               Llogaria
             </NavLink>
+            {token && hasCustomerRole(token) ? (
+              <Link
+                to="/app/restaurants"
+                onClick={() => enableStaffCustomerAppMode()}
+                className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+              >
+                Porosit si klient
+              </Link>
+            ) : null}
             <Link
               to="/"
               className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
@@ -109,7 +128,7 @@ export default function KitchenLayout() {
       </header>
 
       {ctxPhase === 'unauthorized' ? (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
+        <div className="mx-auto max-w-6xl px-4 pt-4">
           <div className="rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             <p className="font-medium">Sesioni nuk është më i vlefshëm ose nuk ke akses në panel.</p>
             <p className="mt-1 text-xs text-red-200/80">
@@ -123,7 +142,7 @@ export default function KitchenLayout() {
       ) : null}
 
       {ctxPhase === 'error' ? (
-        <div className="mx-auto max-w-4xl px-4 pt-4">
+        <div className="mx-auto max-w-6xl px-4 pt-4">
           <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             Nuk u lexua dot lidhja me restorantin (rrjet ose server). Rifresko faqen ose kontrollo nëse API është
             ndezur.
@@ -132,7 +151,7 @@ export default function KitchenLayout() {
       ) : null}
 
       {ctxPhase === 'ready' && kitchenCtx && !kitchenCtx.isLinked ? (
-        <div className="mx-auto max-w-4xl px-4 pt-6">
+        <div className="mx-auto max-w-6xl px-4 pt-6">
           <p className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             <strong className="font-semibold">Llogaria nuk është lidhur me restorant.</strong> Ke rol stafi në sistem,
             por mungon rreshti <code className="rounded bg-black/30 px-1">RestaurantStaff</code> (cilin restoran
@@ -143,7 +162,7 @@ export default function KitchenLayout() {
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-6xl px-3 py-6 sm:px-4 sm:py-8">
+      <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 sm:py-7">
         <Outlet />
       </main>
     </div>

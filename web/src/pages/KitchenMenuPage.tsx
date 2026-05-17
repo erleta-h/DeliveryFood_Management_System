@@ -5,12 +5,15 @@ import {
   createKitchenMenuItem,
   deleteKitchenCategory,
   deleteKitchenMenuItem,
+  deleteKitchenMenuItemImage,
   fetchKitchenMenu,
   updateKitchenCategory,
   updateKitchenMenuItem,
+  uploadKitchenMenuItemImage,
   type KitchenMenuCategoryRow,
   type KitchenMenuItemRow,
-} from './../lib/kitchenMenuApi'
+} from '../lib/kitchenMenuApi'
+import { apiPath } from '../lib/apiBase'
 import { isKitchenHttpUnauthorized } from '../lib/kitchenApi'
 import {
   customerBtnGhost,
@@ -35,9 +38,14 @@ export default function KitchenMenuPage() {
   const [newCatName, setNewCatName] = useState('')
   const [catDraft, setCatDraft] = useState<Record<number, { name: string; sortOrder: string }>>({})
   const [itemDraft, setItemDraft] = useState<
-    Record<number, { name: string; price: string; description: string; expanded: boolean }>
+    Record<
+      number,
+      { name: string; price: string; description: string; expanded: boolean; newImageFile?: File }
+    >
   >({})
-  const [newItem, setNewItem] = useState<Record<number, { name: string; price: string; description: string }>>({})
+  const [newItem, setNewItem] = useState<
+    Record<number, { name: string; price: string; description: string; imageFile: File | null }>
+  >({})
 
   const load = useCallback(async () => {
     if (!token) return
@@ -150,11 +158,22 @@ export default function KitchenMenuPage() {
     if (d.description !== (orig.description ?? ''))
       body.description = d.description.trim() === '' ? null : d.description.trim()
     if (Number.isFinite(price) && price !== orig.price) body.price = price
-    if (Object.keys(body).length === 0) {
+    const hasNewImage = d.newImageFile instanceof File
+    if (Object.keys(body).length === 0 && !hasNewImage) {
       setFlash('Nuk ka ndryshime te artikulli.')
       return
     }
-    const r = await run(async () => updateKitchenMenuItem(token, itemId, body))
+    const r = await run(async () => {
+      if (Object.keys(body).length > 0) {
+        const up = await updateKitchenMenuItem(token, itemId, body)
+        if (!up.ok) return up
+      }
+      if (hasNewImage) {
+        const im = await uploadKitchenMenuItemImage(token, itemId, d.newImageFile!)
+        if (!im.ok) return im
+      }
+      return { ok: true as const }
+    })
     if (r && !r.ok) setError(r.message)
     else {
       setFlash('Artikulli u përditësua.')
@@ -163,6 +182,17 @@ export default function KitchenMenuPage() {
         delete n[itemId]
         return n
       })
+      await load()
+    }
+  }
+
+  async function clearItemImage(itemId: number) {
+    if (!token) return
+    if (!window.confirm('Hiq foton e artikullit?')) return
+    const r = await run(async () => deleteKitchenMenuItemImage(token, itemId))
+    if (r && !r.ok) setError(r.message)
+    else {
+      setFlash('Fotoja u hoq.')
       await load()
     }
   }
@@ -180,25 +210,32 @@ export default function KitchenMenuPage() {
 
   async function onCreateItem(catId: number) {
     if (!token) return
-    const raw = newItem[catId] ?? { name: '', price: '', description: '' }
+    const raw = newItem[catId] ?? { name: '', price: '', description: '', imageFile: null }
     const name = raw.name.trim()
     const price = parseFloat(raw.price.replace(',', '.'))
+    const file = raw.imageFile
     if (!name || !Number.isFinite(price) || price < 0) {
       setError('Për artikull të ri: emër dhe çmim të vlefshëm.')
       return
     }
-    const r = await run(async () =>
-      createKitchenMenuItem(token, {
+    const r = await run(async () => {
+      const created = await createKitchenMenuItem(token, {
         menuCategoryId: catId,
         name,
         price,
         description: raw.description.trim() || null,
         isAvailable: true,
-      }),
-    )
+      })
+      if (!created.ok) return created
+      if (file) {
+        const im = await uploadKitchenMenuItemImage(token, created.id, file)
+        if (!im.ok) return im
+      }
+      return { ok: true as const }
+    })
     if (r && !r.ok) setError(r.message)
     else {
-      setNewItem((n) => ({ ...n, [catId]: { name: '', price: '', description: '' } }))
+      setNewItem((n) => ({ ...n, [catId]: { name: '', price: '', description: '', imageFile: null } }))
       setFlash('Artikulli u shtua.')
       await load()
     }
@@ -216,7 +253,7 @@ export default function KitchenMenuPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <Link to="/kitchen" className="text-sm text-amber-400/90 hover:text-amber-300">
+          <Link to="/kitchen/orders" className="text-sm text-amber-400/90 hover:text-amber-300">
             ← Porositë
           </Link>
           <h1 className="mt-2 text-2xl font-bold text-zinc-100">Menuja e restorantit</h1>
@@ -349,6 +386,7 @@ export default function KitchenMenuPage() {
               <table className="w-full min-w-[28rem] text-left text-sm text-zinc-300">
                 <thead>
                   <tr className="border-b border-white/10 text-xs uppercase text-zinc-500">
+                    <th className="w-14 py-2 pr-2">Foto</th>
                     <th className="py-2 pr-2">Artikulli</th>
                     <th className="py-2 pr-2">Çmimi (€)</th>
                     <th className="py-2 pr-2">Në ofertë</th>
@@ -358,7 +396,7 @@ export default function KitchenMenuPage() {
                 <tbody>
                   {cat.items.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-6 text-center text-xs text-zinc-600">
+                      <td colSpan={5} className="py-6 text-center text-xs text-zinc-600">
                         Nuk ka artikuj — shto më poshtë.
                       </td>
                     </tr>
@@ -368,6 +406,20 @@ export default function KitchenMenuPage() {
                       const d = itemDraft[it.id]
                       return (
                         <tr key={it.id} className="border-b border-white/[0.04] align-top">
+                          <td className="py-2 pr-2 align-middle">
+                            {it.imageUrl ? (
+                              <img
+                                src={apiPath(it.imageUrl)}
+                                alt=""
+                                className="h-12 w-12 rounded-md border border-white/10 object-cover"
+                              />
+                            ) : (
+                              <div
+                                className="h-12 w-12 rounded-md border border-dashed border-white/15 bg-black/30"
+                                aria-hidden
+                              />
+                            )}
+                          </td>
                           <td className="py-2 pr-2">
                             <p className="font-medium text-zinc-100">{it.name}</p>
                             {it.description ? (
@@ -385,6 +437,7 @@ export default function KitchenMenuPage() {
                                         price: x[it.id]?.price ?? String(it.price),
                                         description: x[it.id]?.description ?? (it.description ?? ''),
                                         expanded: true,
+                                        newImageFile: x[it.id]?.newImageFile,
                                       },
                                     }))
                                   }
@@ -401,6 +454,7 @@ export default function KitchenMenuPage() {
                                         price: e.target.value,
                                         description: x[it.id]?.description ?? (it.description ?? ''),
                                         expanded: true,
+                                        newImageFile: x[it.id]?.newImageFile,
                                       },
                                     }))
                                   }
@@ -417,6 +471,7 @@ export default function KitchenMenuPage() {
                                         price: x[it.id]?.price ?? String(it.price),
                                         description: e.target.value,
                                         expanded: true,
+                                        newImageFile: x[it.id]?.newImageFile,
                                       },
                                     }))
                                   }
@@ -424,6 +479,43 @@ export default function KitchenMenuPage() {
                                   placeholder="Përshkrim (opsional)"
                                   rows={2}
                                 />
+                                <div>
+                                  <label className={customerLabelSm}>Foto (opsionale)</label>
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    disabled={mutating || sessionExpired}
+                                    className="mt-1 block w-full text-[11px] text-zinc-400 file:mr-2 file:rounded file:border-0 file:bg-zinc-700 file:px-2 file:py-1 file:text-zinc-100"
+                                    onChange={(e) => {
+                                      const f = e.target.files?.[0]
+                                      setItemDraft((x) => ({
+                                        ...x,
+                                        [it.id]: {
+                                          name: x[it.id]?.name ?? it.name,
+                                          price: x[it.id]?.price ?? String(it.price),
+                                          description: x[it.id]?.description ?? (it.description ?? ''),
+                                          expanded: true,
+                                          newImageFile: f,
+                                        },
+                                      }))
+                                    }}
+                                  />
+                                  {d?.newImageFile ? (
+                                    <p className="mt-1 text-[10px] text-amber-200/80">
+                                      E zgjedhur: {d.newImageFile.name}
+                                    </p>
+                                  ) : null}
+                                  {it.imageUrl && !d?.newImageFile ? (
+                                    <button
+                                      type="button"
+                                      className={`${customerBtnGhost} mt-2 px-2 py-1 text-[10px]`}
+                                      disabled={mutating || sessionExpired}
+                                      onClick={() => void clearItemImage(it.id)}
+                                    >
+                                      Hiq foton
+                                    </button>
+                                  ) : null}
+                                </div>
                               </div>
                             ) : null}
                           </td>
@@ -453,6 +545,7 @@ export default function KitchenMenuPage() {
                                       price: String(it.price),
                                       description: it.description ?? '',
                                       expanded: !exp,
+                                      newImageFile: undefined,
                                     },
                                   }))
                                 }
@@ -499,6 +592,7 @@ export default function KitchenMenuPage() {
                         name: e.target.value,
                         price: n[cat.id]?.price ?? '',
                         description: n[cat.id]?.description ?? '',
+                        imageFile: n[cat.id]?.imageFile ?? null,
                       },
                     }))
                   }
@@ -515,6 +609,7 @@ export default function KitchenMenuPage() {
                         name: n[cat.id]?.name ?? '',
                         price: e.target.value,
                         description: n[cat.id]?.description ?? '',
+                        imageFile: n[cat.id]?.imageFile ?? null,
                       },
                     }))
                   }
@@ -540,6 +635,7 @@ export default function KitchenMenuPage() {
                       name: n[cat.id]?.name ?? '',
                       price: n[cat.id]?.price ?? '',
                       description: e.target.value,
+                      imageFile: n[cat.id]?.imageFile ?? null,
                     },
                   }))
                 }
@@ -548,6 +644,32 @@ export default function KitchenMenuPage() {
                 rows={2}
                 disabled={mutating || sessionExpired}
               />
+              <div className="mt-2">
+                <label className={customerLabelSm}>Foto e ushqimit (opsionale)</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  disabled={mutating || sessionExpired}
+                  className="mt-1 block w-full text-xs text-zinc-400 file:mr-2 file:rounded file:border-0 file:bg-zinc-700 file:px-2 file:py-1 file:text-zinc-100"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null
+                    setNewItem((n) => ({
+                      ...n,
+                      [cat.id]: {
+                        name: n[cat.id]?.name ?? '',
+                        price: n[cat.id]?.price ?? '',
+                        description: n[cat.id]?.description ?? '',
+                        imageFile: f,
+                      },
+                    }))
+                  }}
+                />
+                {newItem[cat.id]?.imageFile ? (
+                  <p className="mt-1 text-[11px] text-amber-200/80">
+                    {newItem[cat.id]!.imageFile!.name}
+                  </p>
+                ) : null}
+              </div>
             </div>
           </li>
         ))}

@@ -24,14 +24,30 @@ public interface IKitchenOrdersService
         string? note,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Përditëson minutat e vlerësuara të përgatitjes (porosi në pritje / përgatitje).</summary>
+    Task<string?> UpdateOrderPrepMinutesAsync(
+        long staffUserId,
+        long orderId,
+        int prepMinutes,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<KitchenAssignableDriverDto>> GetAssignableDriversAsync(
         long staffUserId,
         CancellationToken cancellationToken = default);
 
-    /// <summary>null = sukses; përndryshe mesazh për klientin API.</summary>
+    /// <summary>Cakton (ose ndërron) Deliver për porosi dërgesë në status «gati». Krijon rresht Delivery nëse mungon.</summary>
+    /// <param name="immediateHandoff">Nëse true, porosia kalon menjëherë në «në dërgesë» (si pas marrjes nga restoranti).</param>
     Task<string?> AssignDeliveryDriverAsync(
         long staffUserId,
         long orderId,
         long driverUserId,
+        bool immediateHandoff,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Porosi të përfunduara / anuluara (faqezim) për restorantin e stafit.</summary>
+    Task<KitchenOrderHistoryResultDto> GetOrderHistoryAsync(
+        long staffUserId,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
 }
