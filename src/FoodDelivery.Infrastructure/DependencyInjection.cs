@@ -11,6 +11,12 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using FoodDelivery.Application.Notifications;
 using FoodDelivery.Infrastructure.Notifications;
+using FoodDelivery.Application.Admin;
+using FoodDelivery.Application.SiteContent;
+using FoodDelivery.Infrastructure.Admin;
+using FoodDelivery.Infrastructure.SiteContent;
+using FoodDelivery.Infrastructure.Maps;     
+using FoodDelivery.Infrastructure.Payments;
 
 namespace FoodDelivery.Infrastructure;
 
@@ -30,6 +36,11 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IJwtTokenIssuer, JwtTokenIssuer>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAdminCmsService, AdminCmsService>();
+        services.AddScoped<IPublicSiteContentService, PublicSiteContentService>();
+        services.Configure<GoogleMapsSettings>(configuration.GetSection(GoogleMapsSettings.SectionName));
+        services.Configure<StripeSettings>(configuration.GetSection(StripeSettings.SectionName));
+        services.Configure<WebPushSettings>(configuration.GetSection(WebPushSettings.SectionName));
 
         return services;
     }
