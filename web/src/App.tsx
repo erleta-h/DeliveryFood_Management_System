@@ -48,6 +48,8 @@ const DriverNotificationsPage = lazy(() => import('./pages/DriverNotificationsPa
 const DriverPerformancePage = lazy(() => import('./pages/DriverPerformancePage'))
 const DriverProfilePage = lazy(() => import('./pages/DriverProfilePage'))
 const DriverSupportPage = lazy(() => import('./pages/DriverSupportPage'))
+const AdminCmsPage = lazy(() => import('./pages/AdminCmsPage'))
+
 
 const lazyFallback = <PageSpinner />
 
@@ -258,6 +260,14 @@ function App() {
                 </Suspense>
               }
             />
+            <Route
+               path="cms"
+                 element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminCmsPage />
+                </Suspense>
+               }
+               />
           </Route>
         </Route>
         <Route element={<KitchenStaffRoute />}>

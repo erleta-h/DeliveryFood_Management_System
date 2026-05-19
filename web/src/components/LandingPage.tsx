@@ -5,6 +5,7 @@ import { hasAdminRole, hasCustomerRole, hasDriverRole, hasRestaurantStaffRole } 
 import { customerBtnGhost, customerBtnPrimary, customerShellBg } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
 
+
 function primaryEntryForToken(token: string): { to: string; label: string } {
   if (hasAdminRole(token)) return { to: '/admin', label: 'Hap panelin admin' }
   if (hasDriverRole(token)) return { to: '/driver', label: 'Hap panelin e kalorësit' }
