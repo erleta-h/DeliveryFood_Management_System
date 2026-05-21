@@ -54,6 +54,20 @@ npm run dev
 
 
 
+MongoDB (NoSQL)
+
+Mesazhet e chat-it te dergeses (klient / korrier) ruhen ne MongoDB, jo ne SQL Server.
+
+1. Instalo MongoDB lokalisht ose me Docker: docker run -d -p 27017:27017 --name mongo mongo:7
+2. Ne .env (kopjo nga .env.example):
+
+Mongo__ConnectionString=mongodb://localhost:27017
+Mongo__DatabaseName=FoodDelivery
+
+3. Koleksioni: delivery_chat_messages (krijohet automatikisht kur dergohet mesazhi i pare)
+
+SQL Server mbetet per porosi, perdorues, pagesa, etj.
+
 Git
 
 node\_modules, bin, obj dhe .vs jane te injoruara.
