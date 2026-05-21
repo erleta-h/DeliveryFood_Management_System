@@ -12,11 +12,16 @@ public sealed class DeliveryChatService : IDeliveryChatService
     private const int MaxBodyLength = 2000;
 
     private readonly IUnitOfWork _uow;
+    private readonly IDeliveryChatStore _chatStore;
     private readonly IHubContext<OrderTrackingHub> _hub;
 
-    public DeliveryChatService(IUnitOfWork uow, IHubContext<OrderTrackingHub> hub)
+    public DeliveryChatService(
+        IUnitOfWork uow,
+        IDeliveryChatStore chatStore,
+        IHubContext<OrderTrackingHub> hub)
     {
         _uow = uow;
+        _chatStore = chatStore;
         _hub = hub;
     }
 
@@ -29,11 +34,7 @@ public sealed class DeliveryChatService : IDeliveryChatService
         if (ctx.Error is { } err)
             return (null, err);
 
-        var list = await _uow.Repository<OrderDeliveryChatMessage, long>().Query.AsNoTracking()
-            .Where(m => m.OrderId == orderId)
-            .OrderBy(m => m.CreatedAtUtc)
-            .ToListAsync(cancellationToken);
-
+        var list = await _chatStore.GetByOrderIdAsync(orderId, cancellationToken);
         var customerId = ctx.Order!.UserId;
         var dtos = list.Select(m => MapDto(m, customerId)).ToList();
 
@@ -56,18 +57,8 @@ public sealed class DeliveryChatService : IDeliveryChatService
         if (ctx.Error is { } err)
             return (null, err);
 
-        var now = DateTime.UtcNow;
-        var entity = new OrderDeliveryChatMessage
-        {
-            OrderId = orderId,
-            SenderUserId = userId,
-            Body = trimmed,
-            CreatedAtUtc = now,
-        };
-        _uow.Repository<OrderDeliveryChatMessage, long>().Add(entity);
-        await _uow.SaveChangesAsync(cancellationToken);
-
-        var dto = MapDto(entity, ctx.Order!.UserId);
+        var record = await _chatStore.InsertAsync(orderId, userId, trimmed, cancellationToken);
+        var dto = MapDto(record, ctx.Order!.UserId);
 
         await _hub.Clients
             .Group($"order-{orderId}")
@@ -111,10 +102,9 @@ public sealed class DeliveryChatService : IDeliveryChatService
         return (order, null);
     }
 
-    private static DeliveryChatMessageDto MapDto(OrderDeliveryChatMessage m, long customerUserId)
+    private static DeliveryChatMessageDto MapDto(DeliveryChatMessageRecord m, long customerUserId)
     {
         var role = m.SenderUserId == customerUserId ? "customer" : "driver";
         return new DeliveryChatMessageDto(m.Id, m.OrderId, m.SenderUserId, role, m.Body, m.CreatedAtUtc);
     }
-
 }

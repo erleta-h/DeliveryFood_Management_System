@@ -33,6 +33,7 @@
 	  <PackageReference Include="ClosedXML" />
 	  <PackageReference Include="Stripe.net" />
     <PackageReference Include="WebPush" />
+    <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
 
 

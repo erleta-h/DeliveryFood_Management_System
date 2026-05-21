@@ -15,7 +15,10 @@ using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.SiteContent;
 using FoodDelivery.Infrastructure.Admin;
 using FoodDelivery.Infrastructure.SiteContent;
+using FoodDelivery.Application.Orders;
 using FoodDelivery.Infrastructure.Maps;     
+using FoodDelivery.Infrastructure.Mongo;
+using FoodDelivery.Infrastructure.Orders;
 using FoodDelivery.Infrastructure.Payments;
 
 namespace FoodDelivery.Infrastructure;
@@ -41,6 +44,10 @@ public static class DependencyInjection
         services.Configure<GoogleMapsSettings>(configuration.GetSection(GoogleMapsSettings.SectionName));
         services.Configure<StripeSettings>(configuration.GetSection(StripeSettings.SectionName));
         services.Configure<WebPushSettings>(configuration.GetSection(WebPushSettings.SectionName));
+
+        services.AddDistributedMemoryCache();
+        services.AddMongoDb(configuration);
+        services.AddScoped<IDeliveryChatService, DeliveryChatService>();
 
         return services;
     }

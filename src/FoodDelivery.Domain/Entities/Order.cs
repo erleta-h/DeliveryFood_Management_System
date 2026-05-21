@@ -41,5 +41,4 @@ public class Order
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
     public ICollection<Review> Reviews { get; set; } = new List<Review>();
     public ICollection<OrderStatusHistory> StatusHistory { get; set; } = new List<OrderStatusHistory>();
-    public ICollection<OrderDeliveryChatMessage> DeliveryChatMessages { get; set; } = new List<OrderDeliveryChatMessage>();
 }
