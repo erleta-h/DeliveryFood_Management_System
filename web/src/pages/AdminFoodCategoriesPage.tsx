@@ -6,7 +6,7 @@ import {
   fetchAdminFoodCategories,
   type AdminFoodCategoryRow,
 } from '../lib/adminApi'
-import { customerBtnGhost, customerBtnPrimary, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnGhost, customerBtnPrimary, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminFoodCategoriesPage() {
@@ -150,43 +150,43 @@ export default function AdminFoodCategoriesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Kategoritë e ushqimit</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-2xl font-semibold text-gray-900">Kategoritë e ushqimit</h1>
+        <p className="mt-1 text-sm text-gray-500">
           Këto kategori përdoren nga restorantet dhe lista publike; pas ruajtjes cache-i i kategorive
           pastrohet automatikisht.
         </p>
       </div>
 
       <form onSubmit={onCreate} className={`${customerCardMuted} max-w-xl space-y-3 p-4`}>
-        <p className="text-sm font-medium text-violet-200/90">Kategori e re</p>
+        <p className="text-sm font-medium text-violet-700/90">Kategori e re</p>
         <div className="flex flex-wrap gap-3">
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Emri
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="mt-1 block w-56 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 block w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
               placeholder="Pizza"
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Renditja (opsionale)
             <input
               value={newSort}
               onChange={(e) => setNewSort(e.target.value)}
               type="number"
-              className="mt-1 block w-28 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 block w-28 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
               placeholder="auto"
             />
           </label>
         </div>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Përshkrim (opsional)
           <textarea
             value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)}
             rows={2}
-            className="mt-1 block w-full max-w-lg rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block w-full max-w-lg rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
           />
         </label>
         <button type="submit" className={customerBtnPrimary}>
@@ -196,33 +196,33 @@ export default function AdminFoodCategoriesPage() {
 
       {editing ? (
         <form onSubmit={onSaveEdit} className={`${customerCardMuted} max-w-xl space-y-3 p-4`}>
-          <p className="text-sm font-medium text-amber-200/90">Përditëso: {editing.name}</p>
+          <p className="text-sm font-medium text-amber-700/90">Përditëso: {editing.name}</p>
           <div className="flex flex-wrap gap-3">
-            <label className="block text-xs text-zinc-500">
+            <label className="block text-xs text-gray-500">
               Emri
               <input
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
-                className="mt-1 block w-56 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 block w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
               />
             </label>
-            <label className="block text-xs text-zinc-500">
+            <label className="block text-xs text-gray-500">
               Renditja
               <input
                 value={editSort}
                 onChange={(e) => setEditSort(e.target.value)}
                 type="number"
-                className="mt-1 block w-28 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+                className="mt-1 block w-28 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
               />
             </label>
           </div>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Përshkrim
             <textarea
               value={editDesc}
               onChange={(e) => setEditDesc(e.target.value)}
               rows={2}
-              className="mt-1 block w-full max-w-lg rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+              className="mt-1 block w-full max-w-lg rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -236,14 +236,14 @@ export default function AdminFoodCategoriesPage() {
         </form>
       ) : null}
 
-      {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
+      {msg ? <p className="text-sm text-amber-700">{msg}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {rows && !loading ? (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="min-w-full text-left text-sm text-zinc-300">
-            <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full text-left text-sm text-gray-700">
+            <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2">Emri</th>
                 <th className="px-3 py-2">Renditja</th>
@@ -254,11 +254,11 @@ export default function AdminFoodCategoriesPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b border-white/5">
-                  <td className="px-3 py-2 font-medium text-zinc-100">{r.name}</td>
+                <tr key={r.id} className="border-b border-gray-100">
+                  <td className="px-3 py-2 font-medium text-gray-900">{r.name}</td>
                   <td className="px-3 py-2">{r.sortOrder}</td>
                   <td className="px-3 py-2">{r.restaurantCount}</td>
-                  <td className="max-w-xs truncate px-3 py-2 text-zinc-400">{r.description ?? '—'}</td>
+                  <td className="max-w-xs truncate px-3 py-2 text-gray-500">{r.description ?? '—'}</td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-2">
                       <button type="button" className={customerBtnGhost} onClick={() => startEdit(r)}>

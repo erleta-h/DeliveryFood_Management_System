@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { AdminEmptyState } from '../components/admin/AdminEmptyState'
+import { AdminTableSkeleton } from '../components/admin/AdminSkeleton'
 import {
   approvePartnerApplication,
   fetchPartnerApplications,
@@ -9,18 +11,21 @@ import {
   type ResetPartnerStaffPasswordResult,
 } from '../lib/adminApi'
 import {
+  adminFilterBtn,
+  adminSuccessBanner,
   customerBtnGhost,
   customerBtnPrimary,
-  customerCard,
   customerCardMuted,
-  customerPanelSubtitle,
-} from '../lib/customerTheme'
+  customerField,
+} from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 const S_PENDING = 0
 const S_CONTACTED = 1
 const S_APPROVED = 2
 const S_REJECTED = 9
+
+type PartnerFilter = 'all' | 'pending' | 'contacted' | 'approved' | 'rejected'
 
 function statusLabel(s: number): string {
   switch (s) {
@@ -37,8 +42,42 @@ function statusLabel(s: number): string {
   }
 }
 
+function statusBadgeClass(s: number): string {
+  switch (s) {
+    case S_PENDING:
+      return 'bg-amber-100 text-amber-800'
+    case S_CONTACTED:
+      return 'bg-sky-100 text-sky-800'
+    case S_APPROVED:
+      return 'bg-emerald-100 text-emerald-800'
+    case S_REJECTED:
+      return 'bg-red-100 text-red-700'
+    default:
+      return 'bg-gray-100 text-gray-700'
+  }
+}
+
+function matchesFilter(r: PartnerApplicationRow, filter: PartnerFilter) {
+  switch (filter) {
+    case 'pending':
+      return r.status === S_PENDING
+    case 'contacted':
+      return r.status === S_CONTACTED
+    case 'approved':
+      return r.status === S_APPROVED
+    case 'rejected':
+      return r.status === S_REJECTED
+    default:
+      return true
+  }
+}
+
 export default function AdminPartnerApplicationsPage() {
   const token = useAuthStore((s) => s.token)
+  const [search, setSearch] = useState('')
+  const [searchDebounced, setSearchDebounced] = useState('')
+  const [filter, setFilter] = useState<PartnerFilter>('all')
+  const [page, setPage] = useState(1)
   const [rows, setRows] = useState<PartnerApplicationRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -47,19 +86,34 @@ export default function AdminPartnerApplicationsPage() {
   const [lastApprove, setLastApprove] = useState<ApprovePartnerResult | null>(null)
   const [lastReset, setLastReset] = useState<ResetPartnerStaffPasswordResult | null>(null)
   const [resetPwDraft, setResetPwDraft] = useState<Record<number, string>>({})
-  /** Panel i rivendosjes i hapur vetëm për rast mbështetjeje (harresë fjalëkalimi). */
-  const [resetPanelOpen, setResetPanelOpen] = useState<Record<number, boolean>>({})
+  const [expandedId, setExpandedId] = useState<number | null>(null)
   const [resetAcknowledged, setResetAcknowledged] = useState<Record<number, boolean>>({})
+
+  const pageSize = 20
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setSearchDebounced(search), 300)
+    return () => window.clearTimeout(t)
+  }, [search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchDebounced, filter])
 
   const load = useCallback(async () => {
     if (!token) return
     setError(null)
-    const list = await fetchPartnerApplications(token)
+    const list = await fetchPartnerApplications(token, {
+      search: searchDebounced || undefined,
+    })
     setRows(list)
-  }, [token])
+  }, [token, searchDebounced])
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      setLoading(false)
+      return
+    }
     let c = false
     setLoading(true)
     void load()
@@ -74,6 +128,13 @@ export default function AdminPartnerApplicationsPage() {
     }
   }, [token, load])
 
+  const filtered = useMemo(() => rows.filter((r) => matchesFilter(r, filter)), [rows, filter])
+  const total = filtered.length
+  const pageItems = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filtered.slice(start, start + pageSize)
+  }, [filtered, page])
+
   async function onApprove(id: number) {
     if (!token) return
     setActionMsg(null)
@@ -85,7 +146,7 @@ export default function AdminPartnerApplicationsPage() {
     if (r.ok) {
       setLastApprove(r.data)
       setActionMsg(
-        `U krijua restoranti «${r.data.restaurantName}». Dërgo partnerit kredencialet një herë në mënyrë të sigurt. Rivendosja bëhet vetëm nëse partneri e humb aksesin dhe e kërkon zyrtarisht.`,
+        'Restoranti u krijua. Dërgo kredencialet partnerit përmes kanalit të sigurt (jo chat publik).',
       )
       await load()
     } else setActionMsg(r.message)
@@ -107,18 +168,14 @@ export default function AdminPartnerApplicationsPage() {
         delete next[id]
         return next
       })
-      setResetPanelOpen((p) => {
-        const next = { ...p }
-        delete next[id]
-        return next
-      })
       setResetAcknowledged((a) => {
         const next = { ...a }
         delete next[id]
         return next
       })
+      setExpandedId(null)
       setActionMsg(
-        'Fjalëkalimi u rivendos (rast mbështetjeje). Dërgo vlerën e kopjuar partnerit në mënyrë të sigurt. Të gjitha sesionet e vjetra u anuluan.',
+        'Fjalëkalimi u rivendos. Dërgo vlerën e re te partneri — sesionet e vjetra u anuluan.',
       )
     } else setActionMsg(r.message)
   }
@@ -138,212 +195,276 @@ export default function AdminPartnerApplicationsPage() {
 
   return (
     <div className="space-y-6">
-      <section className={customerCard}>
-        <h1 className="text-2xl font-bold text-zinc-100">Aplikimet e partnerëve</h1>
-        <p className={customerPanelSubtitle}>
-          Pas kontratës fizike / juridike, kliko <strong className="text-zinc-300">Mirato</strong> për të
-          krijuar restorantin, përdoruesin me rol <code className="rounded bg-white/5 px-1">RestaurantStaff</code>,
-          menunë minimale demo dhe fjalëkalim të përkohshëm — dërgoje partnerit vetëm përmes kanalit të sigurt.
-          Rivendosja e fjalëkalimit nga admin është{' '}
-          <strong className="text-zinc-300">veprim mbështetjeje</strong>: përdore vetëm kur restoranti nuk mund të
-          kyçet dhe e konfirmon se e ka harruar fjalëkalimin; të gjitha sesionet ekzistuese çaktivizohen.
+      <div>
+        <h1 className="text-2xl font-semibold text-gray-900">Aplikimet partner</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Mirato aplikimet pas kontratës; krijohen restoranti dhe kredencialet e stafit.
         </p>
-      </section>
+      </div>
 
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <label className="min-w-[200px] flex-1">
+          <span className="mb-1 block text-xs text-gray-500">Kërko sipas emrit, qytetit ose emailit</span>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Venue, qytet, email…"
+            className={customerField}
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ['all', 'Të gjithë'],
+              ['pending', 'Në pritje'],
+              ['contacted', 'Kontaktuar'],
+              ['approved', 'Miratuar'],
+              ['rejected', 'Refuzuar'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setFilter(key)}
+              className={adminFilterBtn(filter === key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {actionMsg ? <p className={adminSuccessBanner}>{actionMsg}</p> : null}
       {error ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </p>
       ) : null}
-      {actionMsg ? (
-        <p className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-sm text-violet-100">
-          {actionMsg}
-        </p>
-      ) : null}
+
       {lastApprove ? (
-        <div
-          className={`${customerCardMuted} space-y-2 border border-emerald-500/25 font-mono text-sm text-zinc-200`}
-        >
-          <p className="text-xs font-sans uppercase tracking-wide text-emerald-400/90">
-            Të dhënat për partnerin (kopjo një herë)
+        <div className={`${customerCardMuted} space-y-2 border-emerald-200 font-mono text-sm`}>
+          <p className="text-xs font-sans font-semibold uppercase tracking-wide text-emerald-700">
+            Kredencialet e krijuara (kopjo një herë)
           </p>
           <p>
-            <span className="text-zinc-500">Email:</span> {lastApprove.staffEmail}
+            <span className="text-gray-500">Email:</span> {lastApprove.staffEmail}
           </p>
           <p>
-            <span className="text-zinc-500">Fjalëkalim i përkohshëm:</span> {lastApprove.temporaryPassword}
+            <span className="text-gray-500">Fjalëkalim:</span> {lastApprove.temporaryPassword}
           </p>
           <p>
-            <span className="text-zinc-500">Restoranti:</span> {lastApprove.restaurantName} (slug:{' '}
-            {lastApprove.restaurantSlug})
+            <span className="text-gray-500">Restoranti:</span> {lastApprove.restaurantName} ({lastApprove.restaurantSlug})
           </p>
         </div>
       ) : null}
+
       {lastReset ? (
-        <div
-          className={`${customerCardMuted} space-y-2 border border-sky-500/25 font-mono text-sm text-zinc-200`}
-        >
-          <p className="text-xs font-sans uppercase tracking-wide text-sky-400/90">
+        <div className={`${customerCardMuted} space-y-2 border-sky-200 font-mono text-sm`}>
+          <p className="text-xs font-sans font-semibold uppercase tracking-wide text-sky-700">
             Fjalëkalimi i ri (kopjo dhe dërgo te partneri)
           </p>
           <p>
-            <span className="text-zinc-500">Email:</span> {lastReset.staffEmail}
+            <span className="text-gray-500">Email:</span> {lastReset.staffEmail}
           </p>
           <p>
-            <span className="text-zinc-500">Fjalëkalim:</span> {lastReset.newPassword}
+            <span className="text-gray-500">Fjalëkalim:</span> {lastReset.newPassword}
           </p>
         </div>
       ) : null}
 
-      {!loading && !error && rows.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nuk ka aplikime ende.</p>
+      {loading ? (
+        <>
+          <p className="text-sm text-gray-500">Duke ngarkuar aplikimet…</p>
+          <AdminTableSkeleton rows={6} />
+        </>
       ) : null}
 
-      <ul className="space-y-3">
-        {rows.map((r) => {
-          const canAct = r.status !== S_APPROVED && r.status !== S_REJECTED
-          const busy = busyId === r.id
-          return (
-            <li key={r.id} className={customerCardMuted}>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-semibold text-zinc-100">{r.venueName}</p>
-                  <p className="text-xs text-zinc-500">
-                    {r.city} · {r.contactFirstName} {r.contactLastName} · {r.email}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-400">
-                    {new Date(r.createdAtUtc).toLocaleString('sq-AL')} ·{' '}
-                    <span className="text-amber-200/90">{statusLabel(r.status)}</span>
-                  </p>
-                </div>
-                {canAct ? (
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => onApprove(r.id)}
-                      className={`${customerBtnPrimary} px-3 py-1.5 text-xs`}
-                    >
-                      {busy ? '…' : 'Mirato'}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => onReject(r.id)}
-                      className={`${customerBtnGhost} px-3 py-1.5 text-xs text-red-200 hover:border-red-400/30`}
-                    >
-                      Refuzo
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {r.status === S_APPROVED ? (
-                <div className="mt-3 border-t border-white/[0.06] pt-3">
-                  {!resetPanelOpen[r.id] ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setResetPanelOpen((p) => ({
-                          ...p,
-                          [r.id]: true,
-                        }))
-                      }
-                      className={`${customerBtnGhost} flex w-full items-center justify-center px-3 py-2 text-xs text-zinc-400 hover:text-amber-100/95 sm:inline-flex sm:w-auto sm:justify-start`}
-                    >
-                      Mbështetje: partneri nuk mund të kyçet (harresë fjalëkalimi)…
-                    </button>
-                  ) : (
-                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-3 sm:p-4">
-                      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-amber-200/90">
-                            Rivendosje për humbje aksesi
-                          </p>
-                          <p className="mt-1 max-w-prose text-xs leading-relaxed text-zinc-400">
-                            Përdore kur ka kërkesë të dokumentuar nga restoranti (email, tiketë ose telefonatë) dhe
-                            nuk ka rrugë tjetër të sigurt. Pas rivendosjes, partneri duhet të marrë fjalëkalimin e ri
-                            përmes jush — mos e lër në chat publik.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setResetPanelOpen((p) => {
-                              const next = { ...p }
-                              delete next[r.id]
-                              return next
-                            })
-                            setResetAcknowledged((a) => {
-                              const next = { ...a }
-                              delete next[r.id]
-                              return next
-                            })
-                          }}
-                          className={`${customerBtnGhost} shrink-0 px-2 py-1 text-[11px] text-zinc-500`}
-                        >
-                          Mbyll
-                        </button>
-                      </div>
-                      <label className="flex cursor-pointer items-start gap-2 rounded-md border border-white/[0.06] bg-black/15 px-3 py-2.5">
-                        <input
-                          type="checkbox"
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-600 text-amber-500 focus:ring-amber-500/40"
-                          checked={resetAcknowledged[r.id] ?? false}
-                          onChange={(e) =>
-                            setResetAcknowledged((a) => ({
-                              ...a,
-                              [r.id]: e.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="text-xs text-zinc-300">
-                          Konfirmoj se restoranti ka kërkuar rivendosje sepse{' '}
-                          <strong className="font-medium text-zinc-200">nuk arrin të kyçet</strong> (harresë ose
-                          problem aksesi), jo për preferencë të përgjithshme.
-                        </span>
-                      </label>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                        <div className="min-w-0 flex-1">
-                          <label
-                            htmlFor={`rpw-${r.id}`}
-                            className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-zinc-500"
+      {!loading && total === 0 ? (
+        <AdminEmptyState
+          icon="📝"
+          title="Nuk ka aplikime për këtë filtër"
+          description="Kur një restorant aplikon nga faqja publike, shfaqet këtu për miratim."
+        />
+      ) : null}
+
+      {!loading && total > 0 ? (
+        <>
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-3">Restoranti</th>
+                  <th className="px-4 py-3">Kontakti</th>
+                  <th className="px-4 py-3">Statusi</th>
+                  <th className="px-4 py-3">Data</th>
+                  <th className="px-4 py-3 text-right">Veprime</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((r) => {
+                  const canAct = r.status !== S_APPROVED && r.status !== S_REJECTED
+                  const busy = busyId === r.id
+                  const expanded = expandedId === r.id
+                  return (
+                    <Fragment key={r.id}>
+                      <tr className="border-b border-gray-100 transition hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
+                              {(r.venueName[0] ?? '?').toUpperCase()}
+                            </span>
+                            <div>
+                              <div className="font-medium text-gray-900">{r.venueName}</div>
+                              <div className="text-xs text-gray-500">{r.city}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-gray-800">
+                            {r.contactFirstName} {r.contactLastName}
+                          </div>
+                          <div className="text-xs text-gray-500">{r.email}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(r.status)}`}
                           >
-                            Fjalëkalim i ri (opsional — bosh = gjenero automatikisht)
-                          </label>
-                          <input
-                            id={`rpw-${r.id}`}
-                            type="password"
-                            autoComplete="new-password"
-                            value={resetPwDraft[r.id] ?? ''}
-                            onChange={(e) =>
-                              setResetPwDraft((d) => ({
-                                ...d,
-                                [r.id]: e.target.value,
-                              }))
-                            }
-                            disabled={!resetAcknowledged[r.id]}
-                            className="w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 disabled:cursor-not-allowed disabled:opacity-45"
-                            placeholder="Min. 6 karaktere ose bosh"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          disabled={busy || !resetAcknowledged[r.id]}
-                          onClick={() => void onResetStaffPassword(r.id)}
-                          className={`${customerBtnGhost} shrink-0 px-3 py-2 text-xs text-amber-100 hover:border-amber-400/35 disabled:opacity-40`}
-                        >
-                          {busy ? '…' : 'Rivendos dhe shfaq fjalëkalimin'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </li>
-          )
-        })}
-      </ul>
+                            {statusLabel(r.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                          {new Date(r.createdAtUtc).toLocaleString('sq-AL')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {canAct ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void onApprove(r.id)}
+                                  className={`${customerBtnPrimary} px-3 py-1.5 text-xs`}
+                                >
+                                  {busy ? '…' : 'Mirato'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => void onReject(r.id)}
+                                  className={`${customerBtnGhost} px-3 py-1.5 text-xs text-red-600`}
+                                >
+                                  Refuzo
+                                </button>
+                              </>
+                            ) : null}
+                            {r.status === S_APPROVED ? (
+                              <button
+                                type="button"
+                                className={customerBtnGhost}
+                                onClick={() => setExpandedId(expanded ? null : r.id)}
+                              >
+                                {expanded ? 'Mbyll' : 'Mbështetje'}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded && r.status === S_APPROVED ? (
+                        <tr key={`${r.id}-detail`} className="border-b border-gray-100 bg-gray-50">
+                          <td colSpan={5} className="px-4 py-4">
+                            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
+                                Rivendosje fjalëkalimi (mbështetje)
+                              </p>
+                              <p className="mt-1 max-w-prose text-xs leading-relaxed text-gray-600">
+                                Vetëm kur partneri nuk arrin të kyçet dhe ka kërkuar zyrtarisht rivendosje.
+                              </p>
+                              <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-md border border-amber-200 bg-white px-3 py-2.5">
+                                <input
+                                  type="checkbox"
+                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                                  checked={resetAcknowledged[r.id] ?? false}
+                                  onChange={(e) =>
+                                    setResetAcknowledged((a) => ({
+                                      ...a,
+                                      [r.id]: e.target.checked,
+                                    }))
+                                  }
+                                />
+                                <span className="text-xs text-gray-700">
+                                  Konfirmoj kërkesën e dokumentuar për humbje aksesi.
+                                </span>
+                              </label>
+                              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                                <div className="min-w-0 flex-1">
+                                  <label
+                                    htmlFor={`rpw-${r.id}`}
+                                    className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
+                                  >
+                                    Fjalëkalim i ri (opsional)
+                                  </label>
+                                  <input
+                                    id={`rpw-${r.id}`}
+                                    type="password"
+                                    autoComplete="new-password"
+                                    value={resetPwDraft[r.id] ?? ''}
+                                    onChange={(e) =>
+                                      setResetPwDraft((d) => ({
+                                        ...d,
+                                        [r.id]: e.target.value,
+                                      }))
+                                    }
+                                    disabled={!resetAcknowledged[r.id]}
+                                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-45"
+                                    placeholder="Bosh = gjenero automatikisht"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={busy || !resetAcknowledged[r.id]}
+                                  onClick={() => void onResetStaffPassword(r.id)}
+                                  className={`${customerBtnPrimary} shrink-0 px-3 py-2 text-xs disabled:opacity-40`}
+                                >
+                                  {busy ? '…' : 'Rivendos'}
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>
+              Faqja {page} · {total} total
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className={customerBtnGhost}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Mëparshme
+              </button>
+              <button
+                type="button"
+                className={customerBtnGhost}
+                disabled={page * pageSize >= total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Tjetër →
+              </button>
+            </div>
+          </div>
+        </>
+      ) : null}
     </div>
   )
 }
