@@ -1,4 +1,5 @@
 using FoodDelivery.Application.Drivers;
+using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Partners;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
@@ -9,11 +10,15 @@ namespace FoodDelivery.Infrastructure.Partners;
 
 public sealed class DriverApplicationService : IDriverApplicationService
 {
-    private readonly IUnitOfWork _uow;
+    private static readonly string[] AdminNotifyRoles = ["Admin", "Support"];
 
-    public DriverApplicationService(IUnitOfWork uow)
+    private readonly IUnitOfWork _uow;
+    private readonly INotificationPublisher _notifications;
+
+    public DriverApplicationService(IUnitOfWork uow, INotificationPublisher notifications)
     {
         _uow = uow;
+        _notifications = notifications;
     }
 
     public async Task<string?> SubmitAsync(
@@ -66,6 +71,14 @@ public sealed class DriverApplicationService : IDriverApplicationService
 
         _uow.Repository<DriverApplication, long>().Add(entity);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _notifications.NotifyUsersInRolesAsync(
+            AdminNotifyRoles,
+            "Aplikim i ri deliver",
+            $"{first} {last} ({vehicle})",
+            NotificationTypes.DriverApplication,
+            cancellationToken);
+
         return null;
     }
 }

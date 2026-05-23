@@ -1,3 +1,4 @@
+using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Partners;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Auth;
@@ -8,11 +9,15 @@ namespace FoodDelivery.Infrastructure.Partners;
 
 public sealed class PartnerApplicationService : IPartnerApplicationService
 {
-    private readonly FoodDeliveryDbContext _db;
+    private static readonly string[] AdminNotifyRoles = ["Admin", "Support"];
 
-    public PartnerApplicationService(FoodDeliveryDbContext db)
+    private readonly FoodDeliveryDbContext _db;
+    private readonly INotificationPublisher _notifications;
+
+    public PartnerApplicationService(FoodDeliveryDbContext db, INotificationPublisher notifications)
     {
         _db = db;
+        _notifications = notifications;
     }
 
     public async Task<string?> SubmitAsync(
@@ -67,6 +72,14 @@ public sealed class PartnerApplicationService : IPartnerApplicationService
 
         _db.RestaurantPartnerApplications.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
+
+        await _notifications.NotifyUsersInRolesAsync(
+            AdminNotifyRoles,
+            "Aplikim i ri partner",
+            $"{venue} ({city}) — {first} {last}",
+            NotificationTypes.PartnerApplication,
+            cancellationToken);
+
         return null;
     }
 

@@ -1,4 +1,5 @@
-﻿using FoodDelivery.Application.Persistence;
+﻿using FoodDelivery.Application.Notifications;
+using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Support;
 using FoodDelivery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -7,11 +8,15 @@ namespace FoodDelivery.Infrastructure.Support;
 
 public sealed class SupportTicketService : ISupportTicketService
 {
-    private readonly IUnitOfWork _uow;
+    private static readonly string[] AdminNotifyRoles = ["Admin", "Support"];
 
-    public SupportTicketService(IUnitOfWork uow)
+    private readonly IUnitOfWork _uow;
+    private readonly INotificationPublisher _notifications;
+
+    public SupportTicketService(IUnitOfWork uow, INotificationPublisher notifications)
     {
         _uow = uow;
+        _notifications = notifications;
     }
 
     public async Task<(long? Id, string? Error)> CreateAsync(
@@ -66,6 +71,14 @@ public sealed class SupportTicketService : ISupportTicketService
         };
         _uow.Repository<SupportTicket, long>().Add(t);
         await _uow.SaveChangesAsync(cancellationToken);
+
+        await _notifications.NotifyUsersInRolesAsync(
+            AdminNotifyRoles,
+            "Tiketë support e re",
+            subject,
+            NotificationTypes.SupportTicketNew,
+            cancellationToken);
+
         return (t.Id, null);
     }
 

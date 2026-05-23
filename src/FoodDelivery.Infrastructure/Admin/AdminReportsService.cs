@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
 using FoodDelivery.Application.Admin;
-using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -12,41 +11,49 @@ namespace FoodDelivery.Infrastructure.Admin;
 
 public sealed class AdminReportsService : IAdminReportsService
 {
-    private readonly IUnitOfWork _uow;
+    private readonly FoodDeliveryDbContext _db;
 
-    public AdminReportsService(IUnitOfWork uow) => _uow = uow;
+    public AdminReportsService(FoodDeliveryDbContext db) => _db = db;
 
     public async Task<OperationsReportDto> GetOperationsReportAsync(
         DateTime? fromUtc,
         DateTime? toUtc,
         CancellationToken cancellationToken = default)
     {
-        var oq = _uow.Repository<Order, long>().Query.AsNoTracking();
+        var oq = _db.Orders.AsNoTracking();
         if (fromUtc is { } f)
             oq = oq.Where(x => x.PlacedAt >= f);
         if (toUtc is { } t)
             oq = oq.Where(x => x.PlacedAt <= t);
 
         var orderCount = await oq.CountAsync(cancellationToken);
-        var orderSum = await oq.SumAsync(x => x.Total, cancellationToken);
+        var orderSum = await oq.SumAsync(x => (decimal?)x.Total, cancellationToken) ?? 0m;
 
-        var activeRestaurants = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
+        var activeRestaurants = await _db.Restaurants.AsNoTracking()
             .CountAsync(r => r.IsActive && r.IsApproved, cancellationToken);
 
-        var customerRoleId = await _uow.Repository<Role, long>().Query.AsNoTracking()
+        var customerRoleId = await _db.Roles.AsNoTracking()
             .Where(r => r.Name == DbSeeder.CustomerRoleName)
             .Select(r => r.Id)
             .FirstOrDefaultAsync(cancellationToken);
         var customerUsers = customerRoleId == 0
             ? 0
-            : await _uow.Repository<UserRole, long>().Query.AsNoTracking()
+            : await _db.UserRoles.AsNoTracking()
                 .CountAsync(ur => ur.RoleId == customerRoleId, cancellationToken);
 
-        const int openTicket = 0;
-        var openTickets = await _uow.Repository<SupportTicket, long>().Query.AsNoTracking()
-            .CountAsync(t => t.Status == openTicket, cancellationToken);
+        var openTickets = 0;
+        try
+        {
+            const int openTicket = 0;
+            openTickets = await _db.SupportTickets.AsNoTracking()
+                .CountAsync(t => t.Status == openTicket, cancellationToken);
+        }
+        catch
+        {
+            // Tabela SupportTickets mund të mungojë derisa të aplikohen migrimet.
+        }
 
-        var activeCoupons = await _uow.Repository<Coupon, long>().Query.AsNoTracking()
+        var activeCoupons = await _db.Coupons.AsNoTracking()
             .CountAsync(c => c.IsActive, cancellationToken);
 
         return new OperationsReportDto(

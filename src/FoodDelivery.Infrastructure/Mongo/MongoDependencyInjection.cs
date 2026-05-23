@@ -8,6 +8,9 @@ namespace FoodDelivery.Infrastructure.Mongo;
 
 public static class MongoDependencyInjection
 {
+    /// <summary>
+    /// MongoDB (NoSQL) — vetëm për chat dërgese. SQL Server mbetet burimi kryesor për admin/restorante/porosi.
+    /// </summary>
     public static IServiceCollection AddMongoDb(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<MongoSettings>(configuration.GetSection(MongoSettings.SectionName));
@@ -23,9 +26,20 @@ public static class MongoDependencyInjection
             ?? configuration["Mongo__DatabaseName"]
             ?? settings.DatabaseName;
 
-        services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
-        services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(databaseName));
+        var enabled = configuration.GetValue("Mongo:Enabled", defaultValue: true);
 
+        if (!enabled)
+        {
+            services.AddScoped<IDeliveryChatStore, NullDeliveryChatStore>();
+            return services;
+        }
+
+        services.AddSingleton<IMongoClient>(_ => new MongoClient(connectionString));
+        services.AddSingleton(sp =>
+        {
+            var client = sp.GetRequiredService<IMongoClient>();
+            return client.GetDatabase(databaseName);
+        });
         services.AddScoped<IDeliveryChatStore, MongoDeliveryChatStore>();
 
         return services;

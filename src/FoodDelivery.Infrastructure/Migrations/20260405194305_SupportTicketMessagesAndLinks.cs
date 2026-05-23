@@ -1,123 +1,128 @@
 ﻿using System;
+using FoodDelivery.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace FoodDelivery.Infrastructure.Migrations
+namespace FoodDelivery.Infrastructure.Migrations;
+
+/// <summary>Krijon tabelat e tiketave të support-it (PascalCase, si pjesa tjetër e skemës).</summary>
+[DbContext(typeof(FoodDeliveryDbContext))]
+[Migration("20260405194305_SupportTicketMessagesAndLinks")]
+public partial class SupportTicketMessagesAndLinks : Migration
 {
     /// <inheritdoc />
-    public partial class SupportTicketMessagesAndLinks : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.AddColumn<long>(
-                name: "order_id",
-                table: "support_tickets",
-                type: "bigint",
-                nullable: true);
+        migrationBuilder.CreateTable(
+            name: "SupportTickets",
+            columns: table => new
+            {
+                Id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("SqlServer:Identity", "1, 1"),
+                UserId = table.Column<long>(type: "bigint", nullable: false),
+                Subject = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                Body = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
+                Status = table.Column<int>(type: "int", nullable: false),
+                CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                AdminNote = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                OrderId = table.Column<long>(type: "bigint", nullable: true),
+                RestaurantId = table.Column<long>(type: "bigint", nullable: true),
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_SupportTickets", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_SupportTickets_Users_UserId",
+                    column: x => x.UserId,
+                    principalTable: "Users",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Cascade);
+                table.ForeignKey(
+                    name: "FK_SupportTickets_Orders_OrderId",
+                    column: x => x.OrderId,
+                    principalTable: "Orders",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.SetNull);
+                table.ForeignKey(
+                    name: "FK_SupportTickets_Restaurants_RestaurantId",
+                    column: x => x.RestaurantId,
+                    principalTable: "Restaurants",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.SetNull);
+            });
 
-            migrationBuilder.AddColumn<long>(
-                name: "restaurant_id",
-                table: "support_tickets",
-                type: "bigint",
-                nullable: true);
+        migrationBuilder.CreateTable(
+            name: "SupportTicketMessages",
+            columns: table => new
+            {
+                Id = table.Column<long>(type: "bigint", nullable: false)
+                    .Annotation("SqlServer:Identity", "1, 1"),
+                SupportTicketId = table.Column<long>(type: "bigint", nullable: false),
+                AuthorUserId = table.Column<long>(type: "bigint", nullable: false),
+                Body = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
+                IsStaffReply = table.Column<bool>(type: "bit", nullable: false),
+                CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+            },
+            constraints: table =>
+            {
+                table.PrimaryKey("PK_SupportTicketMessages", x => x.Id);
+                table.ForeignKey(
+                    name: "FK_SupportTicketMessages_SupportTickets_SupportTicketId",
+                    column: x => x.SupportTicketId,
+                    principalTable: "SupportTickets",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Cascade);
+                table.ForeignKey(
+                    name: "FK_SupportTicketMessages_Users_AuthorUserId",
+                    column: x => x.AuthorUserId,
+                    principalTable: "Users",
+                    principalColumn: "Id",
+                    onDelete: ReferentialAction.Restrict);
+            });
 
-            migrationBuilder.CreateTable(
-                name: "support_ticket_messages",
-                columns: table => new
-                {
-                    id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    support_ticket_id = table.Column<long>(type: "bigint", nullable: false),
-                    author_user_id = table.Column<long>(type: "bigint", nullable: false),
-                    body = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
-                    is_staff_reply = table.Column<bool>(type: "bit", nullable: false),
-                    created_at = table.Column<DateTime>(type: "datetime2", nullable: false),
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("pk_support_ticket_messages", x => x.id);
-                    table.ForeignKey(
-                        name: "fk_support_ticket_messages_support_tickets_support_ticket_id",
-                        column: x => x.support_ticket_id,
-                        principalTable: "support_tickets",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "fk_support_ticket_messages_users_author_user_id",
-                        column: x => x.author_user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTickets_CreatedAt",
+            table: "SupportTickets",
+            column: "CreatedAt");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_support_ticket_messages_created_at",
-                table: "support_ticket_messages",
-                column: "created_at");
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTickets_OrderId",
+            table: "SupportTickets",
+            column: "OrderId");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_support_ticket_messages_support_ticket_id",
-                table: "support_ticket_messages",
-                column: "support_ticket_id");
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTickets_RestaurantId",
+            table: "SupportTickets",
+            column: "RestaurantId");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_support_tickets_order_id",
-                table: "support_tickets",
-                column: "order_id");
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTickets_UserId",
+            table: "SupportTickets",
+            column: "UserId");
 
-            migrationBuilder.CreateIndex(
-                name: "ix_support_tickets_restaurant_id",
-                table: "support_tickets",
-                column: "restaurant_id");
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTicketMessages_CreatedAt",
+            table: "SupportTicketMessages",
+            column: "CreatedAt");
 
-            migrationBuilder.AddForeignKey(
-                name: "fk_support_tickets_orders_order_id",
-                table: "support_tickets",
-                column: "order_id",
-                principalTable: "orders",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTicketMessages_SupportTicketId",
+            table: "SupportTicketMessages",
+            column: "SupportTicketId");
 
-            migrationBuilder.AddForeignKey(
-                name: "fk_support_tickets_restaurants_restaurant_id",
-                table: "support_tickets",
-                column: "restaurant_id",
-                principalTable: "restaurants",
-                principalColumn: "id",
-                onDelete: ReferentialAction.SetNull);
-        }
+        migrationBuilder.CreateIndex(
+            name: "IX_SupportTicketMessages_AuthorUserId",
+            table: "SupportTicketMessages",
+            column: "AuthorUserId");
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropForeignKey(
-                name: "fk_support_tickets_orders_order_id",
-                table: "support_tickets");
-
-            migrationBuilder.DropForeignKey(
-                name: "fk_support_tickets_restaurants_restaurant_id",
-                table: "support_tickets");
-
-            migrationBuilder.DropTable(
-                name: "support_ticket_messages");
-
-            migrationBuilder.DropIndex(
-                name: "ix_support_tickets_order_id",
-                table: "support_tickets");
-
-            migrationBuilder.DropIndex(
-                name: "ix_support_tickets_restaurant_id",
-                table: "support_tickets");
-
-            migrationBuilder.DropColumn(
-                name: "order_id",
-                table: "support_tickets");
-
-            migrationBuilder.DropColumn(
-                name: "restaurant_id",
-                table: "support_tickets");
-        }
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(name: "SupportTicketMessages");
+        migrationBuilder.DropTable(name: "SupportTickets");
     }
 }

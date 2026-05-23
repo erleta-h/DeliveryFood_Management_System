@@ -6,7 +6,10 @@ public sealed record AdminBusyHourDto(int HourUtc, int OrderCount);
 
 public sealed record AdminDashboardDto(
     int PendingPartnerApplications,
+    int PendingDriverApplications,
     int ActiveRestaurants,
+    int ActiveDrivers,
+    int TotalOrders,
     int OrdersToday,
     int OrdersThisWeek,
     int OrdersThisMonth,

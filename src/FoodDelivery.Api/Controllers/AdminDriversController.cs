@@ -22,9 +22,11 @@ public sealed class AdminDriversController : ControllerBase
     public async Task<ActionResult<AdminDriverListResultDto>> List(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _svc.ListAsync(page, pageSize, cancellationToken);
+        var result = await _svc.ListAsync(page, pageSize, search, status, cancellationToken);
         return Ok(result);
     }
 
