@@ -1,7 +1,9 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminStatCard } from '../components/admin/AdminStatCard'
+import { AdminStatCardsSkeleton } from '../components/admin/AdminSkeleton'
 import { fetchAdminDashboard, type AdminDashboardData } from '../lib/adminApi'
-import { customerCard, customerCardMuted } from '../lib/customerTheme'
+import { customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 function formatMoney(n: number) {
@@ -18,10 +20,10 @@ function StatCard({
   sub?: ReactNode
 }) {
   return (
-    <div className={`${customerCard} p-4`}>
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100">{value}</p>
-      {sub ? <p className="mt-1 text-xs text-zinc-500">{sub}</p> : null}
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tabular-nums text-gray-900">{value}</p>
+      {sub ? <p className="mt-1 text-xs text-gray-500">{sub}</p> : null}
     </div>
   )
 }
@@ -60,13 +62,16 @@ export default function AdminDashboardPage() {
 
   if (!token) return null
 
+  const pendingApps =
+    (data?.pendingPartnerApplications ?? 0) + (data?.pendingDriverApplications ?? 0)
+
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Dashboard</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Përmbledhje operacionale (UTC për kufijtë e ditës / javës / muajit). Raporte të plota në{' '}
-          <Link to="/admin/reports" className="text-violet-300 hover:underline">
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Përmbledhje operacionale (UTC). Raporte të plota në{' '}
+          <Link to="/admin/reports" className="text-violet-600 hover:underline">
             Raporte
           </Link>
           .
@@ -75,7 +80,7 @@ export default function AdminDashboardPage() {
 
       {error ? (
         <div
-          className="rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200"
+          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
           role="alert"
         >
           {error}
@@ -83,37 +88,47 @@ export default function AdminDashboardPage() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-zinc-500">Duke ngarkuar statistikat…</p>
+        <AdminStatCardsSkeleton count={4} />
       ) : data ? (
         <>
           <section>
-            <h2 className="mb-3 text-sm font-semibold text-violet-200/90">Porosi & të ardhura</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <StatCard label="Porosi sot" value={data.ordersToday} />
-              <StatCard label="Porosi këtë javë (hënë–sot)" value={data.ordersThisWeek} />
-              <StatCard label="Porosi këtë muaj" value={data.ordersThisMonth} />
-              <StatCard label="Të ardhura sot" value={formatMoney(data.revenueToday)} />
-              <StatCard label="Të ardhura këtë javë" value={formatMoney(data.revenueThisWeek)} />
-              <StatCard label="Të ardhura këtë muaj" value={formatMoney(data.revenueThisMonth)} />
-            </div>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-sm font-semibold text-violet-200/90">Platforma</h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <StatCard
-                label="Restorante aktive"
-                value={data.activeRestaurants}
-                sub="Të aprovuara dhe aktive"
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
+              Sot — përmbledhje
+            </h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <AdminStatCard
+                label="Porosi totale"
+                value={data.totalOrders}
+                icon="📦"
+                accent="violet"
+                href="/admin/orders"
               />
-              <StatCard
-                label="Aplikime partner në pritje"
-                value={data.pendingPartnerApplications}
-                sub={
-                  data.pendingPartnerApplications > 0 ? (
-                    <Link to="/admin/partner-applications" className="text-violet-300 hover:underline">
-                      Shiko listën
-                    </Link>
+              <AdminStatCard
+                label="Delivera aktivë"
+                value={data.activeDrivers}
+                icon="🛵"
+                accent="emerald"
+                href="/admin/riders"
+                hint={`${data.ordersToday} porosi sot`}
+              />
+              <AdminStatCard
+                label="Të ardhura sot"
+                value={formatMoney(data.revenueToday)}
+                icon="💰"
+                accent="amber"
+                href="/admin/finance"
+              />
+              <AdminStatCard
+                label="Aplikime në pritje"
+                value={pendingApps}
+                icon="📝"
+                accent="sky"
+                href="/admin/partner-applications"
+                hint={
+                  pendingApps > 0 ? (
+                    <span>
+                      {data.pendingPartnerApplications} partner · {data.pendingDriverApplications} deliver
+                    </span>
                   ) : (
                     'Asnjë në pritje'
                   )
@@ -122,21 +137,32 @@ export default function AdminDashboardPage() {
             </div>
           </section>
 
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-violet-700">Porosi & të ardhura</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <StatCard label="Porosi sot" value={data.ordersToday} />
+              <StatCard label="Porosi këtë javë" value={data.ordersThisWeek} />
+              <StatCard label="Porosi këtë muaj" value={data.ordersThisMonth} />
+              <StatCard label="Të ardhura këtë javë" value={formatMoney(data.revenueThisWeek)} />
+              <StatCard label="Të ardhura këtë muaj" value={formatMoney(data.revenueThisMonth)} />
+              <StatCard label="Restorante aktive" value={data.activeRestaurants} />
+            </div>
+          </section>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <section className={`${customerCardMuted} p-4`}>
-              <h2 className="text-sm font-semibold text-zinc-200">Restorantet më aktive (muaji)</h2>
-              <p className="mt-1 text-xs text-zinc-500">Sipas numrit të porosive (jo të anuluara).</p>
+              <h2 className="text-sm font-semibold text-gray-800">Restorantet më aktive (muaji)</h2>
               <ul className="mt-4 space-y-2">
                 {data.topRestaurantsThisMonth.length === 0 ? (
-                  <li className="text-sm text-zinc-500">Nuk ka ende të dhëna për këtë muaj.</li>
+                  <li className="text-sm text-gray-500">Nuk ka ende të dhëna për këtë muaj.</li>
                 ) : (
                   data.topRestaurantsThisMonth.map((r) => (
                     <li
                       key={r.name}
-                      className="flex items-center justify-between border-b border-white/5 py-2 text-sm last:border-0"
+                      className="flex items-center justify-between border-b border-gray-100 py-2 text-sm last:border-0"
                     >
-                      <span className="text-zinc-200">{r.name}</span>
-                      <span className="tabular-nums text-zinc-400">{r.orderCount} porosi</span>
+                      <span className="text-gray-800">{r.name}</span>
+                      <span className="tabular-nums text-gray-500">{r.orderCount} porosi</span>
                     </li>
                   ))
                 )}
@@ -144,33 +170,26 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className={`${customerCardMuted} p-4`}>
-              <h2 className="text-sm font-semibold text-zinc-200">Orët më të ngarkuara (sot, UTC)</h2>
-              <p className="mt-1 text-xs text-zinc-500">Top orët sipas numrit të porosive.</p>
+              <h2 className="text-sm font-semibold text-gray-800">Orët më të ngarkuara (sot, UTC)</h2>
               <ul className="mt-4 space-y-2">
                 {data.busiestHoursToday.length === 0 ? (
-                  <li className="text-sm text-zinc-500">Nuk ka porosi sot (UTC).</li>
+                  <li className="text-sm text-gray-500">Nuk ka porosi sot (UTC).</li>
                 ) : (
                   data.busiestHoursToday.map((h) => (
                     <li
                       key={h.hourUtc}
-                      className="flex items-center justify-between border-b border-white/5 py-2 text-sm last:border-0"
+                      className="flex items-center justify-between border-b border-gray-100 py-2 text-sm last:border-0"
                     >
-                      <span className="text-zinc-200">
-                        Ora {String(h.hourUtc).padStart(2, '0')}:00–{String(h.hourUtc).padStart(2, '0')}:59
-                        (UTC)
+                      <span className="text-gray-800">
+                        {String(h.hourUtc).padStart(2, '0')}:00–{String(h.hourUtc).padStart(2, '0')}:59 (UTC)
                       </span>
-                      <span className="tabular-nums text-zinc-400">{h.orderCount} porosi</span>
+                      <span className="tabular-nums text-gray-500">{h.orderCount}</span>
                     </li>
                   ))
                 )}
               </ul>
             </section>
           </div>
-
-          <p className="text-xs text-zinc-600">
-            Performanca e deliverave, eksport PDF/Excel, log aktivitetesh dhe konfigurime — nga menuja e majtë
-            (seksionet me etiketë &quot;Në zhvillim&quot;).
-          </p>
         </>
       ) : null}
     </div>

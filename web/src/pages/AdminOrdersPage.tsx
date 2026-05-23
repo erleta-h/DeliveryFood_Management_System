@@ -9,11 +9,15 @@ import {
   type AdminOrderRow,
 } from '../lib/adminApi'
 import {
+  adminFieldInline,
+  adminSuccessBanner,
   customerBtnGhost,
   customerBtnPrimary,
   customerCard,
   customerCardMuted,
-} from '../lib/customerTheme'
+  customerField,
+  customerSelect,
+} from '../lib/adminTheme'
 import { formatOrderStatus } from '../lib/orderStatusLabels'
 import { useAuthStore } from '../store/authStore'
 
@@ -130,16 +134,16 @@ export default function AdminOrdersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Porositë (platformë)</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-2xl font-semibold text-gray-900">Porositë (platformë)</h1>
+        <p className="mt-1 text-sm text-gray-500">
           Filtro sipas datës (UTC), statusit, restorantit ose ID-së së klientit. Rimbursimi vlen për pagesa{' '}
-          <strong className="text-zinc-300">në pritje / të kapura</strong> dhe nuk lejohet për porosi të dorëzuara.
+          <strong className="text-gray-700">në pritje / të kapura</strong> dhe nuk lejohet për porosi të dorëzuara.
         </p>
       </div>
 
       <section className={`${customerCard} space-y-4 p-4`}>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Nga data (UTC)
             <input
               type="date"
@@ -148,10 +152,10 @@ export default function AdminOrdersPage() {
                 setFromDate(e.target.value)
                 setPage(1)
               }}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f0d12] px-3 py-2 text-sm text-zinc-200"
+              className={customerField}
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Deri data (UTC)
             <input
               type="date"
@@ -160,10 +164,10 @@ export default function AdminOrdersPage() {
                 setToDate(e.target.value)
                 setPage(1)
               }}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f0d12] px-3 py-2 text-sm text-zinc-200"
+              className={customerField}
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             Statusi
             <select
               value={status}
@@ -171,7 +175,7 @@ export default function AdminOrdersPage() {
                 setStatus(e.target.value)
                 setPage(1)
               }}
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f0d12] px-3 py-2 text-sm text-zinc-200"
+              className={customerSelect}
             >
               {STATUS_OPTIONS.map((o) => (
                 <option key={o.value || 'all'} value={o.value}>
@@ -180,7 +184,7 @@ export default function AdminOrdersPage() {
               ))}
             </select>
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             ID restoranti
             <input
               type="number"
@@ -191,10 +195,10 @@ export default function AdminOrdersPage() {
                 setPage(1)
               }}
               placeholder="p.sh. 1"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f0d12] px-3 py-2 text-sm text-zinc-200"
+              className={customerField}
             />
           </label>
-          <label className="block text-xs text-zinc-500">
+          <label className="block text-xs text-gray-500">
             ID klienti (User)
             <input
               type="number"
@@ -205,30 +209,26 @@ export default function AdminOrdersPage() {
                 setPage(1)
               }}
               placeholder="p.sh. 2"
-              className="mt-1 w-full rounded-lg border border-white/10 bg-[#0f0d12] px-3 py-2 text-sm text-zinc-200"
+              className={customerField}
             />
           </label>
         </div>
-        <p className="text-xs text-zinc-600">
-          Porositë e vjetra mund të mos kenë rresht në <code className="rounded bg-white/5 px-1">Payments</code> — ato
+        <p className="text-xs text-gray-500">
+          Porositë e vjetra mund të mos kenë rresht në <code className="rounded bg-gray-100 px-1 text-gray-700">Payments</code> — ato
           nuk rimbursohen nga ky modul.
         </p>
       </section>
 
-      {message ? (
-        <p className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-sm text-violet-100">
-          {message}
-        </p>
-      ) : null}
+      {message ? <p className={adminSuccessBanner}>{message}</p> : null}
 
       {error ? (
-        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {!loading && data && data.items.length === 0 ? (
-        <p className="text-sm text-zinc-500">Nuk u gjet asnjë porosi me këto filtra.</p>
+        <p className="text-sm text-gray-500">Nuk u gjet asnjë porosi me këto filtra.</p>
       ) : null}
 
       {!loading && data && data.items.length > 0 ? (
@@ -239,28 +239,28 @@ export default function AdminOrdersPage() {
               const sel = rowStatus[row.id] ?? row.status
               return (
                 <li key={row.id} className={customerCardMuted}>
-                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/5 pb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 pb-3">
                     <div>
-                      <p className="font-mono text-sm font-medium text-amber-200/90">{row.orderNumber}</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="font-mono text-sm font-medium text-amber-700/90">{row.orderNumber}</p>
+                      <p className="text-xs text-gray-500">
                         {new Date(row.placedAtUtc).toLocaleString('sq-AL')} · ID #{row.id}
                       </p>
-                      <p className="mt-1 text-sm text-zinc-200">{row.restaurantName}</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="mt-1 text-sm text-gray-800">{row.restaurantName}</p>
+                      <p className="text-xs text-gray-500">
                         Klienti: {row.customerEmail} (user #{row.customerUserId})
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold text-zinc-100">{row.total.toFixed(2)} €</p>
-                      <p className="text-xs text-zinc-400">{formatOrderStatus(row.status)}</p>
+                      <p className="text-sm font-semibold text-gray-900">{row.total.toFixed(2)} €</p>
+                      <p className="text-xs text-gray-500">{formatOrderStatus(row.status)}</p>
                     </div>
                   </div>
-                  <div className="mt-3 text-xs text-zinc-500">
+                  <div className="mt-3 text-xs text-gray-500">
                     Pagesat:{' '}
                     {row.payments.length === 0 ? (
                       '—'
                     ) : (
-                      <span className="text-zinc-400">
+                      <span className="text-gray-500">
                         {row.payments.map((p) => (
                           <span key={p.id} className="mr-2 inline-block">
                             {p.amount.toFixed(2)} {p.currency} ({p.provider}) · {paymentStatusLabel(p.status)}
@@ -270,7 +270,7 @@ export default function AdminOrdersPage() {
                     )}
                   </div>
                   <div className="mt-4 flex flex-wrap items-end gap-2">
-                    <label className="text-xs text-zinc-500">
+                    <label className="text-xs text-gray-500">
                       Ndrysho status
                       <select
                         value={sel}
@@ -278,7 +278,7 @@ export default function AdminOrdersPage() {
                         onChange={(e) =>
                           setRowStatus((s) => ({ ...s, [row.id]: Number(e.target.value) }))
                         }
-                        className="ml-2 rounded-lg border border-white/10 bg-[#0f0d12] px-2 py-1.5 text-sm text-zinc-200"
+                        className={`${adminFieldInline} ml-2 min-w-[140px]`}
                       >
                         {STATUS_OPTIONS.filter((o) => o.value !== '').map((o) => (
                           <option key={o.value} value={o.value}>
@@ -299,7 +299,7 @@ export default function AdminOrdersPage() {
                       type="button"
                       disabled={busy || row.status === 9 || row.status === 4}
                       onClick={() => void runAction(row.id, adminCancelOrder)}
-                      className={`${customerBtnGhost} px-3 py-1.5 text-xs text-red-200`}
+                      className={`${customerBtnGhost} px-3 py-1.5 text-xs text-red-700`}
                     >
                       Anulo
                     </button>
@@ -311,7 +311,7 @@ export default function AdminOrdersPage() {
                         !row.payments.some((p) => p.status === 0 || p.status === 1)
                       }
                       onClick={() => void runAction(row.id, adminRefundOrder)}
-                      className={`${customerBtnGhost} px-3 py-1.5 text-xs text-amber-200`}
+                      className={`${customerBtnGhost} px-3 py-1.5 text-xs text-amber-700`}
                     >
                       Rimbursim
                     </button>
@@ -321,7 +321,7 @@ export default function AdminOrdersPage() {
             })}
           </ul>
 
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-zinc-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
             <span>
               {data.totalCount} porosi · faqja {data.page} / {totalPages}
             </span>
