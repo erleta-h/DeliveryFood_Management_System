@@ -33,7 +33,10 @@ export type AdminDashboardBusyHour = { hourUtc: number; orderCount: number }
 
 export type AdminDashboardData = {
   pendingPartnerApplications: number
+  pendingDriverApplications: number
   activeRestaurants: number
+  activeDrivers: number
+  totalOrders: number
   ordersToday: number
   ordersThisWeek: number
   ordersThisMonth: number
@@ -767,11 +770,13 @@ export type AdminDriverListResult = {
 
 export async function fetchAdminDrivers(
   token: string,
-  q: { page?: number; pageSize?: number },
+  q: { page?: number; pageSize?: number; search?: string; status?: string },
 ): Promise<AdminDriverListResult> {
   const p = new URLSearchParams()
   p.set('page', String(q.page ?? 1))
   p.set('pageSize', String(q.pageSize ?? 20))
+  if (q.search?.trim()) p.set('search', q.search.trim())
+  if (q.status?.trim()) p.set('status', q.status.trim())
   const res = await fetch(apiPath(`/api/admin/drivers?${p}`), { headers: { ...authHeader(token) } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<AdminDriverListResult>
