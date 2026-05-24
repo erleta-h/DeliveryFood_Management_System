@@ -4,8 +4,11 @@ namespace FoodDelivery.Application.Restaurants;
 public record RestaurantSummaryDto(
     long Id,
     string Name,
+    string CategoryName,
     decimal DeliveryFee,
     int EstimatedDeliveryMinutes,
+    decimal AverageRating,
+    int ReviewCount,
     string? AddressLine,
     string? City,
     double? Latitude,

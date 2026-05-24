@@ -9,6 +9,7 @@ public record RestaurantListItemDto(
     string CategoryName,
     long CategoryId,
     decimal DeliveryFee,
+    decimal MinOrderAmount,
     decimal AverageRating,
     int ReviewCount,
     int EstimatedDeliveryMinutes,

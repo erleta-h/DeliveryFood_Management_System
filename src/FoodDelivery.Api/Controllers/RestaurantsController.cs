@@ -76,4 +76,19 @@ public class RestaurantsController : ControllerBase
         var list = await _catalog.GetRestaurantMenuAsync(id, cancellationToken);
         return Ok(list);
     }
+
+    [HttpGet("{id:long}/reviews")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(RestaurantReviewsResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RestaurantReviewsResultDto>> Reviews(
+        long id,
+        [FromQuery] int take = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _catalog.GetRestaurantReviewsAsync(id, take, cancellationToken);
+        if (result is null)
+            return NotFound();
+        return Ok(result);
+    }
 }
