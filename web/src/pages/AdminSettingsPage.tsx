@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminUpsertSetting, fetchAdminSettings, type AdminSettingRow } from '../lib/adminApi'
-import { customerBtnPrimary, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnPrimary, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminSettingsPage() {
@@ -62,36 +62,36 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Konfigurime</h1>
-        <p className="mt-1 text-sm text-zinc-400">Çelësa globalë në tabelën Settings (key/value).</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Konfigurime</h1>
+        <p className="mt-1 text-sm text-gray-500">Çelësa globalë në tabelën Settings (key/value).</p>
       </div>
 
       <form onSubmit={save} className={`${customerCardMuted} max-w-xl space-y-3 p-4`}>
-        <p className="text-sm font-medium text-violet-200/90">Shto / përditëso</p>
-        <label className="block text-xs text-zinc-500">
+        <p className="text-sm font-medium text-violet-700/90">Shto / përditëso</p>
+        <label className="block text-xs text-gray-500">
           Çelësi
           <input
             value={key}
             onChange={(e) => setKey(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
             placeholder="platform.support_email"
           />
         </label>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Vlera
           <textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
             rows={2}
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
           />
         </label>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Përshkrim (opsional)
           <input
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
           />
         </label>
         <button type="submit" className={customerBtnPrimary}>
@@ -99,14 +99,14 @@ export default function AdminSettingsPage() {
         </button>
       </form>
 
-      {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
+      {msg ? <p className="text-sm text-amber-700">{msg}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {rows && !loading ? (
-        <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="min-w-full text-left text-sm text-zinc-300">
-            <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="min-w-full text-left text-sm text-gray-700">
+            <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2">Çelësi</th>
                 <th className="px-3 py-2">Vlera</th>
@@ -114,8 +114,8 @@ export default function AdminSettingsPage() {
             </thead>
             <tbody>
               {rows.map((s) => (
-                <tr key={s.id} className="border-b border-white/5">
-                  <td className="px-3 py-2 font-mono text-xs text-violet-200/90">{s.key}</td>
+                <tr key={s.id} className="border-b border-gray-100">
+                  <td className="px-3 py-2 font-mono text-xs text-violet-700/90">{s.key}</td>
                   <td className="max-w-md truncate px-3 py-2">{s.value ?? '—'}</td>
                 </tr>
               ))}

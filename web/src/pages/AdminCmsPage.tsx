@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminCmsUpsert, fetchAdminCms, type AdminCmsEntry } from '../lib/adminApi'
-import { customerBtnPrimary, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnPrimary, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminCmsPage() {
@@ -54,27 +54,27 @@ export default function AdminCmsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">CMS — faqja kryesore</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Tekste statike (çelësat <span className="font-mono text-zinc-500">cms.*</span>) — jo të dhëna biznesi.
+        <h1 className="text-2xl font-semibold text-gray-900">CMS — faqja kryesore</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Tekste statike (çelësat <span className="font-mono text-gray-500">cms.*</span>) — jo të dhëna biznesi.
         </p>
       </div>
 
-      {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
+      {msg ? <p className="text-sm text-amber-700">{msg}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {rows && !loading ? (
         <div className="space-y-4">
           {rows.map((r) => (
             <div key={r.key} className={`${customerCardMuted} space-y-2 p-4`}>
-              <p className="font-mono text-xs text-violet-300/90">{r.key}</p>
-              {r.description ? <p className="text-xs text-zinc-500">{r.description}</p> : null}
+              <p className="font-mono text-xs text-violet-600/90">{r.key}</p>
+              {r.description ? <p className="text-xs text-gray-500">{r.description}</p> : null}
               <textarea
                 value={draft[r.key] ?? ''}
                 onChange={(e) => setDraft((d) => ({ ...d, [r.key]: e.target.value }))}
                 rows={r.key.includes('body') || r.key.includes('subtitle') ? 4 : 2}
-                className="w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
               />
               <button type="button" className={customerBtnPrimary} onClick={() => void save(r.key)}>
                 Ruaj

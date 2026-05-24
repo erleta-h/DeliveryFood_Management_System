@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { adminDeleteReview, fetchAdminReviews, type AdminReviewListResult } from '../lib/adminApi'
-import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnGhost, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 const SUB_SQ: Record<number, string> = {
@@ -56,13 +56,13 @@ export default function AdminReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Vlerësime</h1>
-        <p className="mt-1 text-sm text-zinc-400">Moderim — fshirja është e përhershme.</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Vlerësime</h1>
+        <p className="mt-1 text-sm text-gray-500">Moderim — fshirja është e përhershme.</p>
       </div>
 
-      {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
+      {msg ? <p className="text-sm text-amber-700">{msg}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {data && !loading ? (
         <div className="space-y-3">
@@ -70,14 +70,14 @@ export default function AdminReviewsPage() {
             <div key={r.id} className={`${customerCardMuted} p-4`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-zinc-100">
+                  <p className="text-sm font-medium text-gray-900">
                     {r.rating}★ · {SUB_SQ[r.subject] ?? `Subj. ${r.subject}`}
                   </p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-gray-500">
                     Porosia {r.orderNumber} · {r.authorEmail}
                     {r.restaurantName ? ` · ${r.restaurantName}` : ''}
                   </p>
-                  {r.comment ? <p className="mt-2 text-sm text-zinc-300">{r.comment}</p> : null}
+                  {r.comment ? <p className="mt-2 text-sm text-gray-700">{r.comment}</p> : null}
                 </div>
                 <button
                   type="button"
@@ -90,7 +90,7 @@ export default function AdminReviewsPage() {
               </div>
             </div>
           ))}
-          <div className="flex justify-between text-sm text-zinc-400">
+          <div className="flex justify-between text-sm text-gray-500">
             <span>
               {data.total} vlerësime · faqja {data.page}
             </span>

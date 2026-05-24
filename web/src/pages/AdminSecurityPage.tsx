@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchAdminAudit, type AdminAuditListResult } from '../lib/adminApi'
-import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnGhost, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminSecurityPage() {
@@ -35,18 +35,18 @@ export default function AdminSecurityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Siguria</h1>
-        <p className="mt-1 text-sm text-zinc-400">Regjistri i auditimit (lexim). Shtimi i event-eve bëhet nga shërbimet kur implementohet.</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Siguria</h1>
+        <p className="mt-1 text-sm text-gray-500">Regjistri i auditimit (lexim). Shtimi i event-eve bëhet nga shërbimet kur implementohet.</p>
       </div>
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {data && !loading ? (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="min-w-full text-left text-sm text-zinc-300">
-              <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-left text-sm text-gray-700">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-3 py-2">Koha</th>
                   <th className="px-3 py-2">Veprim</th>
@@ -56,22 +56,22 @@ export default function AdminSecurityPage() {
               </thead>
               <tbody>
                 {data.items.map((a) => (
-                  <tr key={a.id} className="border-b border-white/5">
-                    <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                  <tr key={a.id} className="border-b border-gray-100">
+                    <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-500">
                       {new Date(a.createdAt).toLocaleString('sq-AL')}
                     </td>
-                    <td className="px-3 py-2 text-zinc-100">{a.action}</td>
+                    <td className="px-3 py-2 text-gray-900">{a.action}</td>
                     <td className="px-3 py-2">
                       {a.entity}
                       {a.entityId ? ` #${a.entityId}` : ''}
                     </td>
-                    <td className="px-3 py-2 text-zinc-400">{a.userEmail ?? '—'}</td>
+                    <td className="px-3 py-2 text-gray-500">{a.userEmail ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="flex justify-between text-sm text-zinc-400">
+          <div className="flex justify-between text-sm text-gray-500">
             <span>
               {data.total} hyra · faqja {data.page}
             </span>
@@ -98,7 +98,7 @@ export default function AdminSecurityPage() {
       ) : null}
 
       {data && data.total === 0 && !loading ? (
-        <p className={`${customerCardMuted} p-4 text-sm text-zinc-400`}>Nuk ka rreshta audit ende.</p>
+        <p className={`${customerCardMuted} p-4 text-sm text-gray-500`}>Nuk ka rreshta audit ende.</p>
       ) : null}
     </div>
   )

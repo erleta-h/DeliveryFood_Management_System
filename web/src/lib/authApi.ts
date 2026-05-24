@@ -1,4 +1,5 @@
 import { apiPath } from './apiBase'
+import { networkErrorMessage, readApiErrorMessage } from './apiErrors'
 
 export type AuthUser = {
   email: string
@@ -20,16 +21,6 @@ export type AuthResponse = {
 
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
-}
-
-async function readErrorMessage(res: Response): Promise<string> {
-  try {
-    const j = (await res.json()) as { message?: string }
-    if (typeof j.message === 'string' && j.message) return j.message
-  } catch {
-    /* ignore */
-  }
-  return `HTTP ${res.status}`
 }
 
 export function mapAuthUser(data: AuthUser): AuthUser {
@@ -56,30 +47,36 @@ export async function registerCustomer(body: {
   city: string
   postalCode?: string
 }): Promise<{ ok: true; data: AuthResponse } | { ok: false; error: string }> {
-  const res = await fetch(apiPath('/api/auth/register'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok)
-    return { ok: false, error: await readErrorMessage(res) }
-  const data = (await res.json()) as AuthResponse
-  return { ok: true, data }
+  try {
+    const res = await fetch(apiPath('/api/auth/register'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
+    const data = (await res.json()) as AuthResponse
+    return { ok: true, data }
+  } catch (e) {
+    return { ok: false, error: networkErrorMessage(e) }
+  }
 }
 
 export async function loginCustomer(
   email: string,
   password: string,
 ): Promise<{ ok: true; data: AuthResponse } | { ok: false; error: string }> {
-  const res = await fetch(apiPath('/api/auth/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  if (!res.ok)
-    return { ok: false, error: await readErrorMessage(res) }
-  const data = (await res.json()) as AuthResponse
-  return { ok: true, data }
+  try {
+    const res = await fetch(apiPath('/api/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
+    const data = (await res.json()) as AuthResponse
+    return { ok: true, data }
+  } catch (e) {
+    return { ok: false, error: networkErrorMessage(e) }
+  }
 }
 
 export async function fetchCurrentUser(
@@ -108,8 +105,7 @@ export async function patchCustomerProfile(
       ...(partial.phone !== undefined ? { phone: partial.phone } : {}),
     }),
   })
-  if (!res.ok)
-    return { ok: false, error: await readErrorMessage(res) }
+  if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
   const user = (await res.json()) as AuthUser
   return { ok: true, user: mapAuthUser(user) }
 }
@@ -126,5 +122,5 @@ export async function changePassword(
     body: JSON.stringify({ currentPassword, newPassword }),
   })
   if (res.status === 204) return { ok: true }
-  return { ok: false, error: await readErrorMessage(res) }
+  return { ok: false, error: await readApiErrorMessage(res) }
 }
