@@ -31,7 +31,7 @@ public class OrdersController : ControllerBase
         if (response is null)
             return BadRequest(new { message = error });
 
-        return CreatedAtAction(nameof(GetOne), new { id = response.OrderId }, response);
+        return Created($"/api/orders/my/{response.OrderId}", response);
     }
 
     [HttpGet("my")]

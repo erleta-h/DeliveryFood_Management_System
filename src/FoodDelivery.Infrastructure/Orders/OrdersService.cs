@@ -1,4 +1,5 @@
-﻿using FoodDelivery.Application.Orders;
+﻿using FoodDelivery.Application.Notifications;
+using FoodDelivery.Application.Orders;
 using FoodDelivery.Application.Realtime; // Shtuar për Realtime Notifier
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
@@ -9,14 +10,20 @@ namespace FoodDelivery.Infrastructure.Orders;
 
 public sealed class OrdersService : IOrdersService
 {
-    private readonly IUnitOfWork _uow;
-  
-    private readonly IOrderRealtimeNotifier _realtime; // Shtuar
+    private static readonly string[] AdminNotifyRoles = ["Admin", "Support"];
 
-    public OrdersService(IUnitOfWork uow, IOrderRealtimeNotifier realtime) // Injektuar)
+    private readonly IUnitOfWork _uow;
+    private readonly IOrderRealtimeNotifier _realtime;
+    private readonly INotificationPublisher _notifications;
+
+    public OrdersService(
+        IUnitOfWork uow,
+        IOrderRealtimeNotifier realtime,
+        INotificationPublisher notifications)
     {
         _uow = uow;
-        _realtime = realtime; // Caktuar
+        _realtime = realtime;
+        _notifications = notifications;
     }
 
     public async Task<(PlaceOrderResponse? Response, string? Error)> PlaceOrderAsync(
@@ -155,14 +162,18 @@ public sealed class OrdersService : IOrdersService
 
         if (!useStripe)
         {
-            // --- SHTUAR PËR REALTIME ---
-            // Njofton restorantin që ka ardhur një porosi e re live
-
             await _realtime.NotifyRestaurantNewOrderAsync(
                 order.Id,
                 order.RestaurantId,
                 cancellationToken);
         }
+
+        await _notifications.NotifyUsersInRolesAsync(
+            AdminNotifyRoles,
+            "Porosi e re",
+            $"{order.OrderNumber} — {restaurant.Name} ({total:F2} €)",
+            NotificationTypes.OrderNew,
+            cancellationToken);
 
         return (new PlaceOrderResponse(order.Id, useStripe), null);
     }

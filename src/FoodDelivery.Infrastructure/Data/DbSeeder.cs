@@ -32,7 +32,8 @@ public static class DbSeeder
         {
             await SeedMenusForRestaurantsWithoutMenuAsync(db, logger, cancellationToken);
             await EnsureKitchenStaffUserAsync(db, passwordHasher, logger, cancellationToken, null);
-            logger.LogInformation("DbSeeder: restorantet ekzistojnë — menu/stafi u verifikuan.");
+            await RestaurantReviewsSeeder.EnsureSampleReviewsAsync(db, passwordHasher, logger, cancellationToken);
+            logger.LogInformation("DbSeeder: restorantet ekzistojnë — menu/stafi/vlerësime u verifikuan.");
             return;
         }
 
@@ -79,6 +80,8 @@ public static class DbSeeder
             logger,
             cancellationToken,
             restaurants[0].Id);
+
+        await RestaurantReviewsSeeder.EnsureSampleReviewsAsync(db, passwordHasher, logger, cancellationToken);
 
         logger.LogInformation(
             "DbSeeder: u shtuan kategoritë, {ResCount} restorante, menu dhe artikuj.",
@@ -138,7 +141,7 @@ public static class DbSeeder
         {
             MenuCategoryId = mc.Id,
             Name = "Pjata e veçantë",
-            Description = "Porosi demo — çmim dhe emër nga menuja.",
+            Description = "Specialitet i zgjedhur nga menuja e restorantit.",
             Price = 5.90m,
             IsAvailable = true,
             CreatedAt = now,

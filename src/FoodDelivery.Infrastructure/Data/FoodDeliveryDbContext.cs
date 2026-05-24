@@ -30,11 +30,13 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<RestaurantPartnerApplication> RestaurantPartnerApplications => Set<RestaurantPartnerApplication>();
+    public DbSet<DriverApplication> DriverApplications => Set<DriverApplication>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
 
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
+    public DbSet<FavoriteRestaurant> FavoriteRestaurants => Set<FavoriteRestaurant>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderCoupon> OrderCoupons => Set<OrderCoupon>();
@@ -95,6 +97,21 @@ public class FoodDeliveryDbContext : DbContext
                 .HasForeignKey(x => x.UpdatedById);
         });
 
+        modelBuilder.Entity<DriverApplication>(e =>
+        {
+            e.ToTable("DriverApplications");
+            e.Property(x => x.FirstName).HasMaxLength(80).IsRequired();
+            e.Property(x => x.LastName).HasMaxLength(80).IsRequired();
+            e.Property(x => x.Phone).HasMaxLength(32).IsRequired();
+            e.Property(x => x.Email).HasMaxLength(256).IsRequired();
+            e.Property(x => x.VehicleType).HasMaxLength(64).IsRequired();
+            e.Property(x => x.LicensePlate).HasMaxLength(32);
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.Email);
+            e.HasIndex(x => x.Status);
+        });
+
         modelBuilder.Entity<FoodCategory>(e =>
         {
             e.HasIndex(x => x.Name).IsUnique();
@@ -112,6 +129,19 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.Slug)
                 .IsUnique()
                 .HasFilter("[Slug] IS NOT NULL");
+        });
+
+        modelBuilder.Entity<FavoriteRestaurant>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.RestaurantId }).IsUnique();
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Restaurant)
+                .WithMany(x => x.FavoritedBy)
+                .HasForeignKey(x => x.RestaurantId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MenuCategory>(e =>
@@ -210,6 +240,8 @@ public class FoodDeliveryDbContext : DbContext
             e.Property(x => x.Subtotal).HasPrecision(18, 2);
             e.Property(x => x.DeliveryFee).HasPrecision(18, 2);
             e.Property(x => x.DiscountTotal).HasPrecision(18, 2);
+            e.Property(x => x.PlatformFeeAmount).HasPrecision(18, 2);
+            e.Property(x => x.PlatformFeePercentApplied).HasPrecision(18, 2);
             e.Property(x => x.Total).HasPrecision(18, 2);
             e.HasIndex(x => x.OrderNumber).IsUnique();
         });
@@ -274,6 +306,7 @@ public class FoodDeliveryDbContext : DbContext
 
         modelBuilder.Entity<SupportTicket>(e =>
         {
+            e.ToTable("SupportTickets");
             e.Property(x => x.Subject).HasMaxLength(200).IsRequired();
             e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
             e.Property(x => x.AdminNote).HasMaxLength(2000);
@@ -296,6 +329,7 @@ public class FoodDeliveryDbContext : DbContext
 
         modelBuilder.Entity<SupportTicketMessage>(e =>
         {
+            e.ToTable("SupportTicketMessages");
             e.Property(x => x.Body).HasMaxLength(4000).IsRequired();
             e.HasOne(x => x.SupportTicket)
                 .WithMany(x => x.Messages)
