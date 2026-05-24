@@ -83,7 +83,15 @@ public sealed class StripePaymentService : IStripePaymentService
                 },
         };
 
-        var intent = await service.CreateAsync(options, cancellationToken: cancellationToken);
+        PaymentIntent intent;
+        try
+        {
+            intent = await service.CreateAsync(options, cancellationToken: cancellationToken);
+        }
+        catch (StripeException ex)
+        {
+            return (null, ex.StripeError?.Message ?? ex.Message);
+        }
 
         payment.ExternalId = intent.Id;
         payment.UpdatedAt = DateTime.UtcNow;
