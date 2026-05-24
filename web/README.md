@@ -1,6 +1,29 @@
 # React + TypeScript + Vite
 
-INSTALO  npm install leaflet react-leaflet;
+## Instalimi (për kolegët)
+
+Pas klonimit të projektit, hyr në folderin `web` dhe instalo varësitë:
+
+```bash
+cd web
+npm install
+```
+
+Nëse merr gabim nga Vite që `@microsoft/signalr` nuk mund të zgjidhet (p.sh. në `src/lib/orderHub.ts`), paketa mungon lokalisht. Instaloje eksplicit:
+
+```bash
+npm install @microsoft/signalr
+```
+
+Për hartën (Leaflet), nëse nuk janë tashmë në `node_modules`:
+
+```bash
+npm install leaflet react-leaflet
+```
+
+`@microsoft/signalr` përdoret për lidhjen real-time me API-n (hub i porosive `/hubs/orders`).
+
+---
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

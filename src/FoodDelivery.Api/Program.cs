@@ -17,7 +17,7 @@ using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Text.Json;
 
-Env.TraversePath();
+LoadLocalEnvFile();
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +31,7 @@ var jwtSecret = jwtSettingsSection["Secret"] ?? string.Empty;
 
 if (jwtSecret.Length < 32)
     throw new InvalidOperationException(
-        "Jwt:Secret duhet të jetë së paku 32 karaktere. Vendose në .env si Jwt__Secret ose në User Secrets (mos e commit-o).");
+        "Jwt:Secret duhet tï¿½ jetï¿½ sï¿½ paku 32 karaktere. Vendose nï¿½ .env si Jwt__Secret ose nï¿½ User Secrets (mos e commit-o).");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -182,7 +182,7 @@ if (autoMigrate)
 
         await db.Database.MigrateAsync();
 
-        dbLog.LogInformation("Migrimet EF u aplikuan — skema e databazës përputhet me projektin.");
+        dbLog.LogInformation("Migrimet EF u aplikuan ï¿½ skema e databazï¿½s pï¿½rputhet me projektin.");
 
         await DbSeeder.EnsureRbacAndCmsDefaultsAsync(db, dbLog);
 
@@ -199,11 +199,11 @@ if (autoMigrate)
         if (ex.GetBaseException() is SqlException sql && sql.Number == 2714)
         {
             dbLog.LogCritical(
-                "Migrimi u ndal sepse u përpoq të krijonte një tabelë që ekziston tashmë.");
+                "Migrimi u ndal sepse u pï¿½rpoq tï¿½ krijonte njï¿½ tabelï¿½ qï¿½ ekziston tashmï¿½.");
         }
 
         dbLog.LogCritical(ex,
-            "Dështoi migrimi (ose seed në Development). Kontrollo ConnectionStrings:DefaultConnection dhe SQL Server.");
+            "Dï¿½shtoi migrimi (ose seed nï¿½ Development). Kontrollo ConnectionStrings:DefaultConnection dhe SQL Server.");
 
         throw;
     }
@@ -230,3 +230,34 @@ app.MapHub<OrderTrackingHub>("/hubs/orders");
 app.MapControllers();
 
 app.Run();
+
+static void LoadLocalEnvFile()
+{
+    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var roots = new[]
+    {
+        Directory.GetCurrentDirectory(),
+        AppContext.BaseDirectory,
+    };
+
+    foreach (var root in roots)
+    {
+        if (string.IsNullOrWhiteSpace(root))
+            continue;
+
+        var dir = root;
+        for (var depth = 0; depth < 10 && !string.IsNullOrEmpty(dir); depth++)
+        {
+            var path = Path.Combine(dir, ".env");
+            if (seen.Add(path) && File.Exists(path))
+            {
+                Env.Load(path);
+                return;
+            }
+
+            dir = Directory.GetParent(dir)?.FullName ?? string.Empty;
+        }
+    }
+
+    Env.TraversePath();
+}

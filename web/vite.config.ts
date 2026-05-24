@@ -9,9 +9,20 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget =
     env.VITE_DEV_API_PROXY?.trim() || 'http://localhost:5183'
 
+  /**
+   * HTTPS vetëm nëse e aktivizon me VITE_DEV_HTTPS=true në web/.env.
+   * Parazgjedhja është http:// — shmang ERR_SSL_VERSION_OR_CIPHER_MISMATCH në Windows.
+   */
+  const devHttps = env.VITE_DEV_HTTPS === 'true'
+
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      https: devHttps,
+      host: true,
+      port: 5173,
+      strictPort: true,
+      open: '/',
       proxy: {
         '/api': {
           target: apiProxyTarget,
