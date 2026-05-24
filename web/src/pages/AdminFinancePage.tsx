@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchAdminPayments, type AdminPaymentListResult } from '../lib/adminApi'
-import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnGhost, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 const PAY_SQ: Record<number, string> = {
@@ -55,29 +55,29 @@ export default function AdminFinancePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Financa</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-2xl font-semibold text-gray-900">Financa</h1>
+        <p className="mt-1 text-sm text-gray-500">
           Pagesat e regjistruara (filtër sipas datës UTC). Shuma “e kapur” për të njëjtin interval.
         </p>
       </div>
 
       <div className={`${customerCardMuted} flex flex-wrap items-end gap-3 p-4`}>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Prej
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="mt-1 block rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
           />
         </label>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Deri
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="mt-1 block rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
           />
         </label>
         <button
@@ -93,19 +93,19 @@ export default function AdminFinancePage() {
       </div>
 
       {data && !loading ? (
-        <p className="text-sm text-violet-200/90">
+        <p className="text-sm text-violet-700/90">
           Shuma e pagesave të kapura në interval: <strong>{fmtMoney(data.sumCapturedAmount)}</strong>
         </p>
       ) : null}
 
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {data && !loading ? (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="min-w-full text-left text-sm text-zinc-300">
-              <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-left text-sm text-gray-700">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-3 py-2">Porosia</th>
                   <th className="px-3 py-2">Shuma</th>
@@ -116,14 +116,14 @@ export default function AdminFinancePage() {
               </thead>
               <tbody>
                 {data.items.map((p) => (
-                  <tr key={p.id} className="border-b border-white/5">
-                    <td className="px-3 py-2 font-mono text-zinc-100">{p.orderNumber}</td>
+                  <tr key={p.id} className="border-b border-gray-100">
+                    <td className="px-3 py-2 font-mono text-gray-900">{p.orderNumber}</td>
                     <td className="px-3 py-2">
                       {fmtMoney(p.amount)} {p.currency}
                     </td>
                     <td className="px-3 py-2">{PAY_SQ[p.status] ?? p.status}</td>
-                    <td className="px-3 py-2 text-zinc-400">{p.provider}</td>
-                    <td className="px-3 py-2 text-xs text-zinc-500">
+                    <td className="px-3 py-2 text-gray-500">{p.provider}</td>
+                    <td className="px-3 py-2 text-xs text-gray-500">
                       {new Date(p.createdAt).toLocaleString('sq-AL')}
                     </td>
                   </tr>
@@ -131,7 +131,7 @@ export default function AdminFinancePage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between text-sm text-zinc-400">
+          <div className="flex items-center justify-between text-sm text-gray-500">
             <span>
               {data.total} pagesa · faqja {data.page}
             </span>

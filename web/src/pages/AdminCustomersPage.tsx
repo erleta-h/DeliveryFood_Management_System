@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { adminSetCustomerActive, fetchAdminCustomers, type AdminCustomerListResult } from '../lib/adminApi'
-import { customerBtnGhost, customerCardMuted } from '../lib/customerTheme'
+import { customerBtnGhost, customerCardMuted } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 export default function AdminCustomersPage() {
@@ -54,17 +54,17 @@ export default function AdminCustomersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-100">Klientët</h1>
-        <p className="mt-1 text-sm text-zinc-400">Përdoruesit me rol Customer — adresat dhe porositë.</p>
+        <h1 className="text-2xl font-semibold text-gray-900">Klientët</h1>
+        <p className="mt-1 text-sm text-gray-500">Përdoruesit me rol Customer — adresat dhe porositë.</p>
       </div>
 
       <div className={`${customerCardMuted} flex flex-wrap items-end gap-3 p-4`}>
-        <label className="block text-xs text-zinc-500">
+        <label className="block text-xs text-gray-500">
           Kërko
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="mt-1 block w-56 rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
+            className="mt-1 block w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
             placeholder="Email, emër, telefon"
           />
         </label>
@@ -80,15 +80,15 @@ export default function AdminCustomersPage() {
         </button>
       </div>
 
-      {msg ? <p className="text-sm text-amber-200">{msg}</p> : null}
+      {msg ? <p className="text-sm text-amber-700">{msg}</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
 
       {data && !loading ? (
         <>
-          <div className="overflow-x-auto rounded-xl border border-white/10">
-            <table className="min-w-full text-left text-sm text-zinc-300">
-              <thead className="border-b border-white/10 bg-zinc-900/50 text-xs uppercase text-zinc-500">
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="min-w-full text-left text-sm text-gray-700">
+              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase text-gray-500">
                 <tr>
                   <th className="px-3 py-2">Klienti</th>
                   <th className="px-3 py-2">Adr.</th>
@@ -99,10 +99,10 @@ export default function AdminCustomersPage() {
               </thead>
               <tbody>
                 {data.items.map((u) => (
-                  <tr key={u.id} className="border-b border-white/5">
+                  <tr key={u.id} className="border-b border-gray-100">
                     <td className="px-3 py-2">
-                      <div className="font-medium text-zinc-100">{u.email}</div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="font-medium text-gray-900">{u.email}</div>
+                      <div className="text-xs text-gray-500">
                         {u.firstName} {u.lastName}
                       </div>
                     </td>
@@ -129,7 +129,7 @@ export default function AdminCustomersPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between text-sm text-zinc-400">
+          <div className="flex items-center justify-between text-sm text-gray-500">
             <span>
               {data.total} klientë · faqja {data.page}
             </span>
