@@ -11,7 +11,7 @@ import {
   customerBtnPrimary,
   customerCard,
   customerPanelSubtitle,
-} from '../lib/customerTheme'
+} from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 const S_PENDING = 0
@@ -95,11 +95,11 @@ export default function AdminDriverApplicationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-100">Aplikimet Deliver</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Aplikimet Deliver</h1>
         <p className={customerPanelSubtitle}>Miratimi krijon përdorues me rol Driver dhe profil mjeti.</p>
       </div>
 
-      {loading ? <p className="text-sm text-zinc-500">Duke ngarkuar…</p> : null}
+      {loading ? <p className="text-sm text-gray-500">Duke ngarkuar…</p> : null}
       {error ? <p className="text-sm text-red-300">{error}</p> : null}
       {actionMsg ? (
         <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2 text-sm text-violet-100">
@@ -109,7 +109,7 @@ export default function AdminDriverApplicationsPage() {
       {lastApprove ? (
         <div className={`${customerCard} border-emerald-500/25 bg-emerald-500/5`}>
           <p className="text-xs font-semibold uppercase text-emerald-400/90">Kredencialet (kopjo tani)</p>
-          <p className="mt-2 font-mono text-sm text-zinc-200">
+          <p className="mt-2 font-mono text-sm text-gray-800">
             Email: {lastApprove.email}
             <br />
             Fjalëkalim: {lastApprove.temporaryPassword}
@@ -122,16 +122,16 @@ export default function AdminDriverApplicationsPage() {
           <li key={a.id} className={`${customerCard} border-white/[0.06]`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <p className="font-medium text-zinc-100">
+                <p className="font-medium text-gray-900">
                   {a.firstName} {a.lastName}
                 </p>
-                <p className="text-xs text-zinc-500">{a.email}</p>
-                <p className="mt-1 text-xs text-zinc-400">
+                <p className="text-xs text-gray-500">{a.email}</p>
+                <p className="mt-1 text-xs text-gray-500">
                   {a.vehicleType}
                   {a.licensePlate ? ` · ${a.licensePlate}` : ''} · {a.phone}
                 </p>
               </div>
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-zinc-300">
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-gray-700">
                 {statusLabel(a.status)}
               </span>
             </div>
@@ -149,7 +149,7 @@ export default function AdminDriverApplicationsPage() {
                   <button
                     type="button"
                     disabled={busyId === a.id}
-                    className={customerBtnGhost + ' border-red-400/30 px-3 py-1.5 text-xs text-red-200'}
+                    className={customerBtnGhost + ' border-red-400/30 px-3 py-1.5 text-xs text-red-700'}
                     onClick={() => void onReject(a.id)}
                   >
                     Refuzo
