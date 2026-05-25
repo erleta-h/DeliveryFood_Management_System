@@ -148,7 +148,8 @@ export default function CheckoutPage() {
     })
     setBusy(false)
     if (r.ok) {
-      if (r.requiresStripePayment) {
+      const needsStripe = r.requiresStripePayment || paymentMethod === PAYMENT_STRIPE
+      if (needsStripe) {
         setStripeCheckoutOrderSession(r.orderId)
         navigate(`/app/orders/${r.orderId}/pay`, { replace: true })
       } else {
