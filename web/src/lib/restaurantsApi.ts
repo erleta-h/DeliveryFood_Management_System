@@ -19,11 +19,12 @@ export type RestaurantListItem = {
   categoryName: string
   categoryId: number
   deliveryFee: number
+  minOrderAmount: number
   averageRating: number
   reviewCount: number
   estimatedDeliveryMinutes: number
-  minOrderAmount: number
   previewItems: RestaurantProductPreview[]
+  /** Kur sort=proximity dhe ke dërguar koordinata klienti. */
   distanceKm?: number | null
 }
 
@@ -49,8 +50,11 @@ export async function fetchRestaurantCategories(): Promise<FoodCategoryOption[]>
 export type RestaurantSummary = {
   id: number
   name: string
+  categoryName: string
   deliveryFee: number
   estimatedDeliveryMinutes: number
+  averageRating: number
+  reviewCount: number
   addressLine: string | null
   city: string | null
   latitude: number | null

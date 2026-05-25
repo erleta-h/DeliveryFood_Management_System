@@ -1,56 +1,177 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 import { CartSummaryPanel } from '../components/CartSummaryPanel'
+import { RestaurantCartConflictModal } from '../components/RestaurantCartConflictModal'
+import { RestaurantDetailHero } from '../components/RestaurantDetailHero'
+import { RestaurantDetailInfoBar } from '../components/RestaurantDetailInfoBar'
 import { RestaurantGoogleMap } from '../components/RestaurantGoogleMap'
-import {
-  customerBtnPrimary,
-  customerCard,
-  customerPanelSubtitle,
-} from '../lib/customerTheme'
-import { apiPath } from '../lib/apiBase'
-import { fetchDrivingPreview, type DrivingPreview } from '../lib/customerMapsApi'
+import { RestaurantMenuItemCard } from '../components/RestaurantMenuItemCard'
+import { RestaurantMenuItemModal } from '../components/RestaurantMenuItemModal'
+import { RestaurantStickyCartBar } from '../components/RestaurantStickyCartBar'
 import { fetchClientPublicConfig } from '../lib/publicConfigApi'
+import { rdChipActive, rdChipIdle, rdPanel, rdTabActive, rdTabIdle } from '../lib/restaurantDetailTheme'
+import {
+  coverImageFromMenu,
+  enrichMenuCategories,
+  type EnrichedMenuCategory,
+  type MenuItemWithMeta,
+} from '../lib/restaurantDetailUi'
 import { fetchRestaurantMenu, type RestaurantMenuItem } from '../lib/restaurantMenuApi'
 import {
   fetchRestaurantSummary,
   type RestaurantSummary,
 } from '../lib/restaurantsApi'
+import { RestaurantReviewsPanel } from '../components/RestaurantReviewsPanel'
+import { fetchRestaurantReviews, type RestaurantReviewsResult } from '../lib/restaurantReviewsApi'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
+import { useFavoriteRestaurantsStore } from '../store/favoriteRestaurantsStore'
 
-type LocationState = { name?: string; deliveryFee?: number } | null
+type LocationState = {
+  name?: string
+  deliveryFee?: number
+  averageRating?: number
+  reviewCount?: number
+  categoryName?: string
+  estimatedDeliveryMinutes?: number
+  minOrderAmount?: number
+} | null
+
+type TabId = 'menu' | 'info' | 'reviews'
+type CategoryFilter = 'featured' | number | null
+
+const FEATURED_LIMIT = 8
+const MENU_PAGE_SIZE = 4
+
+function featuredItems(categories: EnrichedMenuCategory[]): MenuItemWithMeta[] {
+  const all = categories.flatMap((c) => c.items.filter((i) => i.isAvailable))
+  const withImg = all.filter((i) => i.imageUrl)
+  const rest = all.filter((i) => !i.imageUrl)
+  return [...withImg, ...rest].slice(0, FEATURED_LIMIT)
+}
 
 export default function RestaurantDetailPage() {
   const { id } = useParams()
   const location = useLocation()
   const navState = location.state as LocationState
-  const stateName = navState?.name
-  const stateDeliveryFee = navState?.deliveryFee
   const restaurantId = Number(id)
+
   const setRestaurant = useCartStore((s) => s.setRestaurant)
   const setDeliveryFee = useCartStore((s) => s.setDeliveryFee)
   const addLine = useCartStore((s) => s.addLine)
   const setQty = useCartStore((s) => s.setQty)
+  const clear = useCartStore((s) => s.clear)
   const lines = useCartStore((s) => s.lines)
   const cartRid = useCartStore((s) => s.restaurantId)
+  const cartRestaurantName = useCartStore((s) => s.restaurantName)
   const token = useAuthStore((s) => s.token)
+  const isFavorite = useFavoriteRestaurantsStore((s) => s.isFavorite(restaurantId))
+  const favoriteBusy = useFavoriteRestaurantsStore((s) => s.togglingId === restaurantId)
+  const toggleFavorite = useFavoriteRestaurantsStore((s) => s.toggle)
+  const loadFavorites = useFavoriteRestaurantsStore((s) => s.load)
+  const favoritesLoaded = useFavoriteRestaurantsStore((s) => s.loaded)
 
+  const [tab, setTab] = useState<TabId>('menu')
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('featured')
+  const [menuSearch, setMenuSearch] = useState('')
+  const [expandedCats, setExpandedCats] = useState<Set<number>>(new Set())
   const [cartPanelOpen, setCartPanelOpen] = useState(false)
-  const [detailItem, setDetailItem] = useState<RestaurantMenuItem | null>(null)
+  const [conflictOpen, setConflictOpen] = useState(false)
+  const [detailItem, setDetailItem] = useState<MenuItemWithMeta | null>(null)
 
-  const [title, setTitle] = useState(stateName ?? '')
+  const [title, setTitle] = useState(navState?.name ?? '')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<RestaurantSummary | null>(null)
   const [mapsBrowserKey, setMapsBrowserKey] = useState<string | null>(null)
-  const [drivePreview, setDrivePreview] = useState<DrivingPreview | null>(null)
-  const [categories, setCategories] = useState<
-    Awaited<ReturnType<typeof fetchRestaurantMenu>>
-  >([])
+  const [rawCategories, setRawCategories] = useState<Awaited<ReturnType<typeof fetchRestaurantMenu>>>([])
+  const [reviewsData, setReviewsData] = useState<RestaurantReviewsResult | null>(null)
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [reviewsError, setReviewsError] = useState<string | null>(null)
+
+  const categories = useMemo(() => enrichMenuCategories(rawCategories), [rawCategories])
+  const categoryName = summary?.categoryName ?? navState?.categoryName ?? 'Restorant'
+  const averageRating = summary?.averageRating ?? navState?.averageRating ?? 0
+  const reviewCount = summary?.reviewCount ?? navState?.reviewCount ?? 0
+  const estimatedMinutes =
+    summary?.estimatedDeliveryMinutes ?? navState?.estimatedDeliveryMinutes ?? 30
+
+  const coverUrl = useMemo(
+    () => coverImageFromMenu(rawCategories, categoryName),
+    [rawCategories, categoryName],
+  )
+
+  const cartForThisRestaurant = cartRid === restaurantId
+  const cartLines = cartForThisRestaurant ? lines : []
+  const cartItemCount = cartLines.reduce((n, l) => n + l.quantity, 0)
+  const cartSubtotal = cartLines.reduce((s, l) => s + l.unitPrice * l.quantity, 0)
+  const deliveryFee =
+    useCartStore((s) => s.deliveryFee) ?? summary?.deliveryFee ?? navState?.deliveryFee ?? null
+
+  const hasCartConflict =
+    cartRid !== null && cartRid !== restaurantId && lines.length > 0
+
+  const searchLower = menuSearch.trim().toLowerCase()
+
+  const filteredCategories = useMemo(() => {
+    if (!searchLower) return categories
+    return categories
+      .map((cat) => ({
+        ...cat,
+        items: cat.items.filter(
+          (i) =>
+            i.name.toLowerCase().includes(searchLower) ||
+            (i.displayDescription?.toLowerCase().includes(searchLower) ?? false),
+        ),
+      }))
+      .filter((c) => c.items.length > 0)
+  }, [categories, searchLower])
+
+  const featured = useMemo(() => featuredItems(categories), [categories])
 
   useEffect(() => {
-    if (stateName) setTitle(stateName)
-  }, [stateName])
+    if (navState?.name) setTitle(navState.name)
+  }, [navState?.name])
+
+  useEffect(() => {
+    if (token && !favoritesLoaded) void loadFavorites(token)
+  }, [token, favoritesLoaded, loadFavorites])
+
+  useEffect(() => {
+    if (tab !== 'reviews' || !Number.isFinite(restaurantId) || restaurantId <= 0) return
+    let cancelled = false
+    setReviewsLoading(true)
+    setReviewsError(null)
+    fetchRestaurantReviews(restaurantId)
+      .then((d) => {
+        if (!cancelled) setReviewsData(d)
+      })
+      .catch((e: unknown) => {
+        if (!cancelled)
+          setReviewsError(e instanceof Error ? e.message : 'Vlerësimet nuk u ngarkuan.')
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tab, restaurantId])
+
+  const displayReviewCount = reviewsData?.totalCount ?? reviewCount
+  const displayAverageRating = reviewsData?.averageRating ?? averageRating
+
+  async function handleToggleFavorite() {
+    if (!token) {
+      setError('Hyni në llogari për të ruajtur restorantin te të preferuarat.')
+      return
+    }
+    try {
+      await toggleFavorite(token, restaurantId)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Gabim te të preferuarat.')
+    }
+  }
 
   useEffect(() => {
     if (!Number.isFinite(restaurantId) || restaurantId <= 0) {
@@ -64,8 +185,8 @@ export default function RestaurantDetailPage() {
     fetchRestaurantMenu(restaurantId)
       .then((cats) => {
         if (cancelled) return
-        setCategories(cats)
-        if (!stateName) setTitle(`Restoranti #${restaurantId}`)
+        setRawCategories(cats)
+        if (!navState?.name) setTitle(`Restoranti #${restaurantId}`)
       })
       .catch((e: unknown) => {
         if (!cancelled)
@@ -77,15 +198,15 @@ export default function RestaurantDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [restaurantId, stateName])
+  }, [restaurantId, navState?.name])
 
   useEffect(() => {
     if (!Number.isFinite(restaurantId) || restaurantId <= 0) return
     const st = useCartStore.getState()
     if (st.restaurantId !== restaurantId) return
-    if (stateDeliveryFee !== undefined && Number.isFinite(stateDeliveryFee))
-      setDeliveryFee(stateDeliveryFee)
-  }, [restaurantId, stateDeliveryFee, setDeliveryFee])
+    if (navState?.deliveryFee !== undefined && Number.isFinite(navState.deliveryFee))
+      setDeliveryFee(navState.deliveryFee)
+  }, [restaurantId, navState?.deliveryFee, setDeliveryFee])
 
   useEffect(() => {
     if (!Number.isFinite(restaurantId) || restaurantId <= 0) return
@@ -93,8 +214,13 @@ export default function RestaurantDetailPage() {
     fetchRestaurantSummary(restaurantId)
       .then((s) => {
         if (cancelled || !s) return
-        setSummary(s)
-        if (!stateName) setTitle(s.name)
+        setSummary({
+          ...s,
+          categoryName: s.categoryName ?? navState?.categoryName ?? 'Restorant',
+          averageRating: s.averageRating ?? navState?.averageRating ?? 0,
+          reviewCount: s.reviewCount ?? navState?.reviewCount ?? 0,
+        })
+        if (!navState?.name) setTitle(s.name)
         const st = useCartStore.getState()
         if (st.restaurantId === restaurantId && st.deliveryFee == null) setDeliveryFee(s.deliveryFee)
       })
@@ -102,7 +228,7 @@ export default function RestaurantDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [restaurantId, stateName, setDeliveryFee])
+  }, [restaurantId, navState, setDeliveryFee])
 
   useEffect(() => {
     let cancelled = false
@@ -118,364 +244,295 @@ export default function RestaurantDetailPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!token || !Number.isFinite(restaurantId) || restaurantId <= 0) {
-      setDrivePreview(null)
-      return
+  function ensureRestaurantContext(): boolean {
+    if (hasCartConflict) {
+      setConflictOpen(true)
+      return false
     }
-    let cancelled = false
-    fetchDrivingPreview(token, restaurantId)
-      .then((p) => {
-        if (!cancelled) setDrivePreview(p)
-      })
-      .catch(() => {
-        if (!cancelled) setDrivePreview(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [token, restaurantId])
-
-  function ensureRestaurantContext() {
-    const name = title || `Restoranti ${restaurantId}`
+    const name = title || summary?.name || `Restoranti ${restaurantId}`
     const fee =
-      stateDeliveryFee !== undefined && Number.isFinite(stateDeliveryFee)
-        ? stateDeliveryFee
-        : undefined
+      navState?.deliveryFee !== undefined && Number.isFinite(navState.deliveryFee)
+        ? navState.deliveryFee
+        : summary?.deliveryFee
     setRestaurant(restaurantId, name, fee)
+    return true
+  }
+
+  function handleClearCartForNewRestaurant() {
+    clear()
+    setConflictOpen(false)
+    const name = title || summary?.name || `Restoranti ${restaurantId}`
+    setRestaurant(restaurantId, name, summary?.deliveryFee ?? navState?.deliveryFee)
   }
 
   function qtyInCartForItem(menuItemId: number): number {
-    if (cartRid !== restaurantId) return 0
+    if (!cartForThisRestaurant) return 0
     return lines.find((l) => l.menuItemId === menuItemId)?.quantity ?? 0
   }
 
-  useEffect(() => {
-    if (!detailItem) return
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setDetailItem(null)
-    }
-    window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
-    }
-  }, [detailItem])
-
-  function openItemModal(item: RestaurantMenuItem) {
-    if (!item.isAvailable) return
-    setDetailItem(item)
-  }
-
-  function addFromModal() {
-    if (!detailItem) return
-    ensureRestaurantContext()
+  function addItem(
+    item: RestaurantMenuItem,
+    opts?: { quantity?: number; unitPrice?: number; lineName?: string },
+  ) {
+    if (!ensureRestaurantContext()) return
     addLine({
-      menuItemId: detailItem.id,
-      name: detailItem.name,
-      unitPrice: detailItem.price,
+      menuItemId: item.id,
+      name: opts?.lineName ?? item.name,
+      unitPrice: opts?.unitPrice ?? item.price,
+      quantity: opts?.quantity ?? 1,
+      imageUrl: item.imageUrl ?? null,
     })
-    setDetailItem(null)
-    setCartPanelOpen(true)
   }
+
+  function renderItemGrid(items: MenuItemWithMeta[], catName: string, catId: number) {
+    const expanded = expandedCats.has(catId)
+    const visible = expanded ? items : items.slice(0, MENU_PAGE_SIZE)
+    const hasMore = items.length > MENU_PAGE_SIZE
+
+    return (
+      <>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {visible.map((item) => (
+            <RestaurantMenuItemCard
+              key={item.id}
+              item={item}
+              categoryName={catName}
+              qty={qtyInCartForItem(item.id)}
+              onOpen={() => setDetailItem(item)}
+              onAdd={() => addItem(item)}
+              onQtyChange={(q) => {
+                if (q <= 0) {
+                  setQty(item.id, 0)
+                  return
+                }
+                if (!ensureRestaurantContext()) return
+                if (qtyInCartForItem(item.id) === 0) addItem(item)
+                else setQty(item.id, q)
+              }}
+            />
+          ))}
+        </ul>
+        {hasMore && !expanded ? (
+          <button
+            type="button"
+            onClick={() => setExpandedCats((s) => new Set(s).add(catId))}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#141a28] py-3 text-sm font-medium text-zinc-400 transition hover:text-zinc-200"
+          >
+            Shfaq më shumë
+            <span aria-hidden>▾</span>
+          </button>
+        ) : null}
+      </>
+    )
+  }
+
+  const displayName = title || summary?.name || 'Restoranti'
 
   return (
-    <section className={customerCard}>
-      <Link
-        to="/app/restaurants"
-        className="mb-4 inline-block text-sm text-amber-400/90 hover:text-amber-300"
-      >
-        ← Restorantet
-      </Link>
-      <h1 className="text-2xl font-bold text-zinc-100">
-        {title || (loading ? 'Duke ngarkuar…' : `Restoranti #${id}`)}
-      </h1>
-      <p className={customerPanelSubtitle}>Zgjidh artikuj dhe shto në shportë.</p>
+    <div className="-mx-4 -mt-6 bg-[#0c0e14] sm:-mx-0 sm:-mt-8">
+      <RestaurantDetailHero
+        title={displayName}
+        coverUrl={coverUrl}
+        summary={summary}
+        categoryName={categoryName}
+        averageRating={displayAverageRating}
+        reviewCount={displayReviewCount}
+        estimatedMinutes={estimatedMinutes}
+        isFavorite={isFavorite}
+        favoriteBusy={favoriteBusy}
+        onToggleFavorite={() => void handleToggleFavorite()}
+      />
 
-      {summary ? (
-        <div className="mt-4 space-y-3 rounded-xl border border-white/[0.08] bg-[#1a1d28]/60 p-4 text-sm text-zinc-300">
-          {summary.addressLine || summary.city ? (
-            <p>
-              <span className="text-zinc-500">Adresa: </span>
-              {[summary.addressLine, summary.city].filter(Boolean).join(', ')}
-            </p>
-          ) : null}
-          <p>
-            <span className="text-zinc-500">Dërgesa ~ </span>
-            {summary.estimatedDeliveryMinutes} min (vlerësim restoranti) ·{' '}
-            <span className="tabular-nums text-amber-200/90">
-              {summary.deliveryFee.toFixed(2)} €
-            </span>{' '}
-            tarifë
-          </p>
-          {mapsBrowserKey && summary.latitude != null && summary.longitude != null ? (
-            <RestaurantGoogleMap
-              apiKey={mapsBrowserKey}
-              lat={summary.latitude}
-              lng={summary.longitude}
-            />
-          ) : summary.latitude == null || summary.longitude == null ? (
-            <p className="text-xs text-zinc-500">
-              Harta: mungojnë koordinatat e restorantit (partneri i shton në panel).
-            </p>
-          ) : (
-            <p className="text-xs text-zinc-500">
-              Harta: konfiguro <span className="font-mono text-zinc-400">GoogleMaps:BrowserApiKey</span> në
-              API.
-            </p>
-          )}
-          {token && drivePreview ? (
-            drivePreview.coordinatesAvailable && drivePreview.durationSeconds != null ? (
-              <p className="text-sky-200/90">
-                Rrugë me makinë (Google): ~{Math.round(drivePreview.durationSeconds / 60)} min
-                {drivePreview.distanceMeters != null
-                  ? ` · ~${(drivePreview.distanceMeters / 1000).toFixed(1)} km`
-                  : null}
-              </p>
-            ) : drivePreview.message ? (
-              <p className="text-xs text-zinc-500">{drivePreview.message}</p>
-            ) : null
-          ) : null}
+      <RestaurantDetailInfoBar
+        summary={summary}
+        categoryName={categoryName}
+        restaurantId={restaurantId}
+        onShowMap={
+          summary?.latitude != null && summary?.longitude != null && mapsBrowserKey
+            ? () => setTab('info')
+            : undefined
+        }
+      />
+
+      <div className={`mx-4 sm:mx-6 ${rdPanel} overflow-hidden`}>
+        <div className="flex gap-8 border-b border-white/[0.08] px-4 pt-3 sm:px-6">
+          <button
+            type="button"
+            className={`inline-flex items-center gap-2 ${tab === 'menu' ? rdTabActive : rdTabIdle}`}
+            onClick={() => setTab('menu')}
+          >
+            <span className={tab === 'menu' ? 'text-[#F5B800]' : 'text-zinc-600'} aria-hidden>
+              🍴
+            </span>
+            Menu
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-2 ${tab === 'info' ? rdTabActive : rdTabIdle}`}
+            onClick={() => setTab('info')}
+          >
+            <span className={tab === 'info' ? 'text-[#F5B800]' : 'text-zinc-600'} aria-hidden>
+              ℹ
+            </span>
+            Info
+          </button>
+          <button
+            type="button"
+            className={`inline-flex items-center gap-2 ${tab === 'reviews' ? rdTabActive : rdTabIdle}`}
+            onClick={() => setTab('reviews')}
+          >
+            <span className={tab === 'reviews' ? 'text-[#F5B800]' : 'text-zinc-600'} aria-hidden>
+              ⭐
+            </span>
+            Vlerësime{displayReviewCount > 0 ? ` (${displayReviewCount})` : ''}
+          </button>
         </div>
-      ) : null}
 
-      {cartRid !== null && cartRid !== restaurantId ? (
-        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100/90">
-          Shporta përmban artikuj nga një restorant tjetër. Hap{' '}
-          <Link to="/app/cart" className="font-semibold underline">
-            shportën
-          </Link>{' '}
-          për t’i pastruar ose për të përfunduar porosinë atje.
-        </p>
-      ) : null}
+        <div className={`px-4 py-5 sm:px-6 ${cartItemCount > 0 ? 'pb-28' : 'pb-6'}`}>
+          {error ? <p className="mb-4 text-sm text-red-300">{error}</p> : null}
 
-      {error ? (
-        <p className="mt-4 text-sm text-red-300">{error}</p>
-      ) : loading ? (
-        <p className="mt-6 text-sm text-zinc-500">Duke ngarkuar menujen…</p>
-      ) : categories.length === 0 ? (
-        <p className="mt-6 text-sm text-zinc-500">Nuk ka artikuj në menu për këtë restorant.</p>
-      ) : (
-        <div className="mt-6 space-y-6">
-          {categories.map((cat) => (
-            <div key={cat.id}>
-              <h2 className="text-lg font-semibold text-zinc-200">{cat.name}</h2>
-              <ul className="mt-3 grid gap-3 sm:grid-cols-1 lg:grid-cols-2">
-                {cat.items.map((item) => {
-                  const qty = qtyInCartForItem(item.id)
-                  const img = item.imageUrl ? apiPath(item.imageUrl) : null
-                  return (
-                    <li
-                      key={item.id}
-                      role={item.isAvailable ? 'button' : undefined}
-                      tabIndex={item.isAvailable ? 0 : undefined}
-                      onClick={() => openItemModal(item)}
-                      onKeyDown={(e) => {
-                        if (!item.isAvailable) return
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          openItemModal(item)
-                        }
-                      }}
-                      className={`flex overflow-hidden rounded-2xl border border-white/[0.08] bg-[#12151c] shadow-md shadow-black/25 transition ${
-                        item.isAvailable
-                          ? 'cursor-pointer hover:border-white/[0.14] hover:bg-[#161a22]'
-                          : 'opacity-90'
+          {tab === 'menu' ? (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
+                  <button
+                    type="button"
+                    onClick={() => setCategoryFilter('featured')}
+                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                      categoryFilter === 'featured' ? rdChipActive : rdChipIdle
+                    }`}
+                  >
+                    Të preferuarat
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat.id)}
+                      className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                        categoryFilter === cat.id ? rdChipActive : rdChipIdle
                       }`}
                     >
-                      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-4 text-left">
-                        <p className="font-semibold leading-snug text-zinc-100">{item.name}</p>
-                        {item.description ? (
-                          <p className="line-clamp-2 text-xs leading-relaxed text-zinc-500">
-                            {item.description}
-                          </p>
-                        ) : null}
-                        <p className="text-base font-semibold tabular-nums text-sky-300/95">
-                          {item.price.toFixed(2)} €
-                        </p>
-                      </div>
-                      <div className="relative h-[6.75rem] w-[6.75rem] shrink-0 sm:h-[7.25rem] sm:w-[7.25rem]">
-                        {img ? (
-                          <img
-                            src={img}
-                            alt=""
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div
-                            className="flex h-full w-full items-center justify-center bg-gradient-to-br from-zinc-700/35 to-zinc-900/90 text-2xl text-zinc-600"
-                            aria-hidden
-                          >
-                            🍽
-                          </div>
-                        )}
-                        {!item.isAvailable ? (
-                          <span className="absolute inset-0 flex items-center justify-center bg-black/65 text-center text-[11px] font-medium leading-tight text-zinc-200">
-                            Jo gati
-                          </span>
-                        ) : qty > 0 ? (
-                          <div
-                            className="absolute bottom-0 left-0 right-0 flex items-stretch border-t border-white/10 bg-black/75 backdrop-blur-sm"
-                            role="group"
-                            aria-label={`Sasia për ${item.name}`}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              className="flex-1 py-2 text-lg leading-none text-zinc-100 hover:bg-white/10"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setQty(item.id, qty - 1)
-                              }}
-                            >
-                              −
-                            </button>
-                            <span className="flex min-w-[2rem] items-center justify-center border-x border-white/10 text-sm font-bold tabular-nums text-white">
-                              {qty}
-                            </span>
-                            <button
-                              type="button"
-                              className="flex-1 py-2 text-lg leading-none text-zinc-100 hover:bg-white/10"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setQty(item.id, qty + 1)
-                              }}
-                            >
-                              +
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            aria-label={`Shto ${item.name}`}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              ensureRestaurantContext()
-                              addLine({
-                                menuItemId: item.id,
-                                name: item.name,
-                                unitPrice: item.price,
-                              })
-                            }}
-                            className="absolute right-1.5 top-1.5 flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500 text-xl font-bold leading-none text-white shadow-lg transition hover:bg-sky-400 active:scale-95"
-                          >
-                            +
-                          </button>
-                        )}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-8">
-        <button
-          type="button"
-          onClick={() => setCartPanelOpen(true)}
-          className={`${customerBtnPrimary} inline-block w-full text-center sm:w-auto`}
-        >
-          Shiko shportën
-        </button>
-      </div>
-
-      {detailItem ? (
-        <div
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-          role="presentation"
-          onClick={() => setDetailItem(null)}
-        >
-          <div
-            role="dialog"
-            aria-modal
-            aria-labelledby="product-detail-title"
-            className="flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/[0.08] bg-[#1a1d24] shadow-2xl sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="relative flex w-full shrink-0 justify-center bg-[#0f1115] px-4 py-4 sm:py-5">
-              <div className="relative h-32 w-full max-w-[13rem] overflow-hidden rounded-2xl border border-white/[0.06] sm:h-36 sm:max-w-[15rem]">
-                {detailItem.imageUrl ? (
-                  <img
-                    src={apiPath(detailItem.imageUrl)}
-                    alt=""
-                    className="h-full w-full object-cover"
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-full sm:max-w-[220px]">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">
+                    🔍
+                  </span>
+                  <input
+                    type="search"
+                    value={menuSearch}
+                    onChange={(e) => setMenuSearch(e.target.value)}
+                    placeholder="Kërko në menu"
+                    className="h-9 w-full rounded-xl border border-white/10 bg-[#0c0e14] py-2 pl-9 pr-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#F5B800]/40"
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-4xl text-zinc-700 sm:text-5xl">
-                    🍽
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setDetailItem(null)}
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-lg text-white ring-1 ring-white/20 backdrop-blur-sm transition hover:bg-black/65 sm:h-10 sm:w-10 sm:text-xl"
-                aria-label="Mbyll"
-              >
-                ×
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-5 pt-4 sm:px-5">
-              <h2 id="product-detail-title" className="text-xl font-bold leading-tight text-white sm:text-2xl">
-                {detailItem.name}
-              </h2>
-              <p className="mt-2 text-2xl font-semibold tabular-nums text-[#009fe3] sm:text-[1.65rem]">
-                {detailItem.price.toFixed(2)} €
-              </p>
-              {detailItem.description ? (
-                <p className="mt-3 text-sm leading-relaxed text-zinc-400">{detailItem.description}</p>
-              ) : null}
-
-              <div className="mt-5 rounded-2xl border border-white/[0.06] bg-[#14161c] p-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">Porosit nga</p>
-                <div className="mt-2 flex items-start gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-zinc-800 text-xl text-zinc-400">
-                    🏪
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-zinc-100">{title || summary?.name || 'Restoranti'}</p>
-                    {summary ? (
-                      <p className="mt-1 text-xs text-zinc-500">
-                        <span className="tabular-nums text-amber-200/90">{summary.deliveryFee.toFixed(2)} €</span>
-                        {' · '}
-                        ~{summary.estimatedDeliveryMinutes} min
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs text-zinc-500">Duke ngarkuar detajet…</p>
-                    )}
-                  </div>
                 </div>
               </div>
 
-              {qtyInCartForItem(detailItem.id) > 0 ? (
-                <p className="mt-3 text-center text-sm text-zinc-500">
-                  Në shportë: <span className="font-semibold text-zinc-300">{qtyInCartForItem(detailItem.id)}</span>
+              {loading ? (
+                <p className="mt-8 text-sm text-zinc-500">Duke ngarkuar menujen…</p>
+              ) : categories.length === 0 ? (
+                <p className="mt-8 text-sm text-zinc-500">Nuk ka artikuj në menu.</p>
+              ) : categoryFilter === 'featured' ? (
+                <div className="mt-6">
+                  <h2 className="text-lg font-bold text-white">
+                    Të preferuarat <span aria-hidden>🔥</span>
+                  </h2>
+                  <p className="mt-0.5 text-sm text-zinc-500">
+                    Zgjedhjet më të preferuara nga klientët tanë
+                  </p>
+                  <div className="mt-4">
+                    {renderItemGrid(featured, categoryName, -1)}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-8">
+                  {(categoryFilter == null
+                    ? filteredCategories
+                    : filteredCategories.filter((c) => c.id === categoryFilter)
+                  ).map((cat) => (
+                    <div key={cat.id}>
+                      <h2 className="text-lg font-bold text-white">{cat.name}</h2>
+                      <div className="mt-4">{renderItemGrid(cat.items, cat.name, cat.id)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : null}
+
+          {tab === 'info' && summary ? (
+            <div className="mt-2 space-y-4 text-sm text-zinc-300">
+              <p>
+                <span className="text-zinc-500">Dërgesa: </span>
+                {summary.estimatedDeliveryMinutes} min · Tarifa:{' '}
+                <span className="font-semibold text-[#F5B800]">
+                  {summary.deliveryFee.toFixed(2)} €
+                </span>
+              </p>
+              {summary.minOrderAmount > 0 ? (
+                <p>
+                  <span className="text-zinc-500">Porosia minimale: </span>
+                  {summary.minOrderAmount.toFixed(2)} €
                 </p>
               ) : null}
-
-              <button
-                type="button"
-                onClick={addFromModal}
-                className="mt-5 w-full rounded-2xl bg-[#009fe3] py-3.5 text-center text-base font-semibold text-white shadow-[0_4px_24px_rgba(0,159,227,0.35)] transition hover:bg-[#1aacf0] active:scale-[0.99]"
-              >
-                {qtyInCartForItem(detailItem.id) > 0 ? 'Shto një tjetër në shportë' : 'Fillo porosinë'}
-              </button>
+              {mapsBrowserKey &&
+              summary.latitude != null &&
+              summary.longitude != null ? (
+                <RestaurantGoogleMap
+                  apiKey={mapsBrowserKey}
+                  lat={summary.latitude}
+                  lng={summary.longitude}
+                />
+              ) : null}
             </div>
-          </div>
+          ) : tab === 'info' ? (
+            <p className="mt-4 text-sm text-zinc-500">Duke ngarkuar…</p>
+          ) : null}
+
+          {tab === 'reviews' ? (
+            <RestaurantReviewsPanel
+              data={reviewsData}
+              loading={reviewsLoading}
+              error={reviewsError}
+            />
+          ) : null}
         </div>
-      ) : null}
+      </div>
+
+      <RestaurantStickyCartBar
+        itemCount={cartItemCount}
+        subtotal={cartSubtotal}
+        deliveryFee={deliveryFee}
+        restaurantName={cartForThisRestaurant ? cartRestaurantName || displayName : displayName}
+        onOpenCart={() => setCartPanelOpen(true)}
+      />
+
+      <RestaurantCartConflictModal
+        open={conflictOpen}
+        restaurantName={displayName}
+        onCancel={() => setConflictOpen(false)}
+        onClearCart={handleClearCartForNewRestaurant}
+      />
+
+      <RestaurantMenuItemModal
+        item={detailItem}
+        categoryName={categoryName}
+        averageRating={displayAverageRating}
+        reviewCount={displayReviewCount}
+        onClose={() => setDetailItem(null)}
+        onAdd={({ quantity, unitPrice, lineName }) =>
+          addItem(detailItem!, { quantity, unitPrice, lineName })
+        }
+      />
 
       <CartSummaryPanel
         open={cartPanelOpen}
         onClose={() => setCartPanelOpen(false)}
         pageRestaurantId={restaurantId}
       />
-    </section>
+    </div>
   )
 }
