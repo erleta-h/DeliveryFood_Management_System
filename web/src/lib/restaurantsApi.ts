@@ -22,8 +22,8 @@ export type RestaurantListItem = {
   averageRating: number
   reviewCount: number
   estimatedDeliveryMinutes: number
+  minOrderAmount: number
   previewItems: RestaurantProductPreview[]
-  /** Kur sort=proximity dhe ke dërguar koordinata klienti. */
   distanceKm?: number | null
 }
 
