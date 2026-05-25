@@ -13,8 +13,12 @@ const PATTERNS: { test: RegExp; url: string }[] = [
     url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=280&h=280&fit=crop&q=80',
   },
   {
-    test: /sushi|aziatik|asian|wok|bamboo/i,
+    test: /sushi/i,
     url: 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=280&h=280&fit=crop&q=80',
+  },
+  {
+    test: /aziatik|asian|wok|bamboo|thai|ramen/i,
+    url: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=280&h=280&fit=crop&q=80',
   },
   {
     test: /kafe|coffee|mëngjes|breakfast|croissant/i,

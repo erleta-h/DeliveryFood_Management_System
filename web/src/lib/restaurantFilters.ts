@@ -2,6 +2,7 @@ import type { RestaurantListItem } from './restaurantsApi'
 
 export type SortOption = 'rating' | 'eta' | 'name' | 'fee' | 'proximity'
 export type PriceTierOption = 'all' | 'low' | 'medium' | 'high'
+export type QuickFilterId = 'rating45' | 'freeDelivery' | 'popular' | 'fast30'
 
 /** Restorantët me ETA ≤ këtë vlerë konsiderohen “të arritshëm shpejt” (hapur për dërgesë). */
 export const OPEN_NOW_MAX_MINUTES = 40
@@ -48,5 +49,24 @@ export function applyClientRestaurantFilters(
     out = out.filter((r) => r.estimatedDeliveryMinutes <= OPEN_NOW_MAX_MINUTES)
   }
 
+  return out
+}
+
+/** Filtra të shpejtë me ikona (chip) — mbi listën nga API. */
+export function applyQuickFilters(
+  list: RestaurantListItem[],
+  active: Set<QuickFilterId>,
+): RestaurantListItem[] {
+  if (active.size === 0) return list
+  let out = [...list]
+  if (active.has('rating45')) out = out.filter((r) => r.averageRating >= 4.5)
+  if (active.has('freeDelivery')) out = out.filter((r) => r.deliveryFee <= 0.01)
+  if (active.has('popular')) {
+    const minReviews = Math.max(1, Math.ceil(out.length * 0.35))
+    out = [...out]
+      .sort((a, b) => b.reviewCount - a.reviewCount)
+      .slice(0, Math.max(minReviews, Math.min(8, out.length)))
+  }
+  if (active.has('fast30')) out = out.filter((r) => r.estimatedDeliveryMinutes <= 30)
   return out
 }
