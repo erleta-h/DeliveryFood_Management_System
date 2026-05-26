@@ -1,13 +1,19 @@
-import { NavLink, Navigate, Outlet } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
+import { CustomerOrderFloatWidget } from '../components/CustomerOrderFloatWidget'
 import { hasAdminRole, hasCustomerRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
+import { createOrdersHubConnection } from '../lib/orderHub'
 import { customerShellBg } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
+import { useCartStore } from '../store/cartStore'
+import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
+import { useFavoriteRestaurantsStore } from '../store/favoriteRestaurantsStore'
+import { useEffect, useRef } from 'react'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `rounded-lg px-3 py-2 text-sm font-medium transition ${
     isActive
-      ? 'bg-white/10 text-amber-100'
+      ? 'bg-[#F5B800]/15 text-[#F5B800] ring-1 ring-[#F5B800]/25'
       : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-200'
   }`
 
@@ -15,31 +21,100 @@ export default function CustomerLayout() {
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
+  const navigate = useNavigate()
+  const cartCount = useCartStore((s) =>
+    s.lines.reduce((n, line) => n + line.quantity, 0),
+  )
+  const loadFavorites = useFavoriteRestaurantsStore((s) => s.load)
+  const resetFavorites = useFavoriteRestaurantsStore((s) => s.reset)
+  const favoritesLoaded = useFavoriteRestaurantsStore((s) => s.loaded)
+  const supportToast = useCustomerNotificationsStore((s) => s.supportToast)
+  const clearSupportToast = useCustomerNotificationsStore((s) => s.clearSupportToast)
+
+  const hubRef = useRef<ReturnType<typeof createOrdersHubConnection> | null>(null)
+
+  useEffect(() => {
+    if (!token) {
+      resetFavorites()
+      return
+    }
+    if (!favoritesLoaded) void loadFavorites(token)
+  }, [token, favoritesLoaded, loadFavorites, resetFavorites])
+
+  useEffect(() => {
+    if (!token) return
+    const hub = createOrdersHubConnection(token)
+    hubRef.current = hub
+
+    hub.on('customerNotification', (data: { title?: string; message?: string; type?: string }) => {
+      useCustomerNotificationsStore.getState().bumpUnread()
+      if (data.type === 'support_reply') {
+        useCustomerNotificationsStore.getState().showSupportToast({ title: data.title ?? 'Mbështetja', message: data.message ?? 'Përgjigje e re nga stafi.' })
+      }
+    })
+
+    hub.on('supportTicketMessageReceived', (data: {
+      ticketId: number; messageId: number; authorUserId: number;
+      authorEmail: string; isStaffReply: boolean; body: string; createdAtUtc: string
+    }) => {
+      useCustomerNotificationsStore.getState().pushSupportMessage(data)
+    })
+
+    hub.start()
+      .then(() => hub.invoke('JoinCustomer'))
+      .catch((err) => console.warn('[CustomerHub] connection/join failed', err))
+    return () => { hub.stop().catch(() => {}) }
+  }, [token])
+
+  useEffect(() => {
+    if (!supportToast) return
+    const t = setTimeout(() => clearSupportToast(), 6000)
+    return () => clearTimeout(t)
+  }, [supportToast, clearSupportToast])
 
   if (token && hasAdminRole(token)) return <Navigate to="/admin" replace />
 
-  /** Vetëm stafi i restorantit (pa rol klienti) — jo thjesht «jo Customer», që të mos përzihet me JWT të palexueshëm. */
   if (token && hasRestaurantStaffRole(token) && !hasCustomerRole(token))
     return <Navigate to="/kitchen" replace />
 
+  const initials = user
+    ? `${user.firstName?.charAt(0) ?? ''}${user.lastName?.charAt(0) ?? user.firstName?.charAt(1) ?? ''}`.toUpperCase() || 'KL'
+    : 'KL'
+
+  const locationLabel = user
+    ? `DËRGESA NË ${user.city}${user.postalCode ? `, ${user.postalCode}` : ''}`
+    : 'Zgjidh adresën'
+
   return (
     <div className={customerShellBg}>
-      <header className="border-b border-white/[0.08] bg-[#1a1f2e]/40 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0f121c]/90 backdrop-blur-lg">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <BrandLogo to="/app/restaurants" compact className="shrink-0" />
-            {user ? (
-              <span className="text-xs text-zinc-500 sm:text-sm">
-                {user.firstName} · {user.city}
+            <button
+              type="button"
+              onClick={() => navigate('/app/addresses')}
+              className="hidden min-w-0 items-center gap-1 rounded-lg border border-white/10 bg-[#141a28] px-2.5 py-1.5 text-left transition hover:border-[#F5B800]/30 sm:flex"
+            >
+              <span className="truncate text-xs font-medium text-zinc-300">{locationLabel}</span>
+              <span className="text-zinc-500" aria-hidden>
+                ▾
               </span>
-            ) : null}
+            </button>
           </div>
           <nav className="flex flex-wrap items-center gap-1">
             <NavLink to="/app/restaurants" className={linkClass}>
               Restorantet
             </NavLink>
             <NavLink to="/app/cart" className={linkClass}>
-              Shporta
+              <span className="relative inline-flex items-center gap-1.5">
+                Shporta
+                {cartCount > 0 ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {cartCount > 99 ? '99+' : cartCount}
+                  </span>
+                ) : null}
+              </span>
             </NavLink>
             <NavLink to="/app/addresses" className={linkClass}>
               Adresat
@@ -47,20 +122,41 @@ export default function CustomerLayout() {
             <NavLink to="/app/orders" className={linkClass}>
               Porositë
             </NavLink>
+            <NavLink to="/app/support" className={linkClass}>
+              Mbështetja
+            </NavLink>
             <NavLink to="/app/account" className={linkClass}>
-              Llogaria
+              <span className="inline-flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#141a28] text-xs font-bold text-[#F5B800] ring-1 ring-white/10">
+                  {initials}
+                </span>
+                <span className="hidden sm:inline">Llogaria</span>
+              </span>
             </NavLink>
             <button
               type="button"
               onClick={() => logout()}
-              className="ml-1 rounded-lg border border-white/15 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"
+              className="ml-1 rounded-lg border border-white/15 px-3 py-2 text-sm text-zinc-400 transition hover:text-zinc-200"
             >
               Dil
             </button>
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <CustomerOrderFloatWidget />
+      {supportToast && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm">💬</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-violet-200">{supportToast.title}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{supportToast.message}</p>
+            </div>
+            <button type="button" onClick={clearSupportToast} className="shrink-0 text-zinc-500 hover:text-zinc-300">✕</button>
+          </div>
+        </div>
+      )}
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
         <Outlet />
       </main>
     </div>

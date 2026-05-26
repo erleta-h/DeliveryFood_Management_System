@@ -119,6 +119,8 @@ export default function AddressesPage() {
       line1: line1.trim(),
       city: city.trim(),
       postalCode: postalCode.trim() || undefined,
+      latitude: mapMarker[0],
+      longitude: mapMarker[1],
     })
     if (!r.ok) {
       setError(r.error ?? 'Ruajtja dështoi.')

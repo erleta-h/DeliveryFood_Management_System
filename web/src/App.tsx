@@ -1,12 +1,14 @@
+
 import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AdminRoute } from './components/AdminRoute'
+import { DriverRoute } from './components/DriverRoute'
 import { GuestRoute } from './components/GuestRoute'
 import { KitchenStaffRoute } from './components/KitchenStaffRoute'
 import { LandingPage } from './components/LandingPage'
 import { PageSpinner } from './components/PageSpinner'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { KitchenAccountPage, KitchenMenuPage } from './lazy/kitchen'
+import { KitchenAccountPage, KitchenHistoryPage, KitchenMenuPage } from './lazy/kitchen'
 import { useAuthStore } from './store/authStore'
 
 const CustomerLayout = lazy(() => import('./layouts/CustomerLayout'))
@@ -17,9 +19,9 @@ const AddressesPage = lazy(() => import('./pages/AddressesPage'))
 const CheckoutPage = lazy(() => import('./pages/CheckoutPage'))
 const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
+const OrderPaymentPage = lazy(() => import('./pages/OrderPaymentPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const SupportPage = lazy(() => import('./pages/SupportPage'))
-const CustomerNotificationsPage = lazy(() => import('./pages/CustomerNotificationsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
 const KitchenLayout = lazy(() => import('./layouts/KitchenLayout'))
@@ -31,6 +33,9 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
 const AdminPartnerApplicationsPage = lazy(() => import('./pages/AdminPartnerApplicationsPage'))
 const AdminOrdersPage = lazy(() => import('./pages/AdminOrdersPage'))
 const AdminRestaurantsPage = lazy(() => import('./pages/AdminRestaurantsPage'))
+const AdminFoodCategoriesPage = lazy(() => import('./pages/AdminFoodCategoriesPage'))
+const AdminDriverApplicationsPage = lazy(() => import('./pages/AdminDriverApplicationsPage'))
+const AdminDataPortPage = lazy(() => import('./pages/AdminDataPortPage'))
 const AdminCustomersPage = lazy(() => import('./pages/AdminCustomersPage'))
 const AdminFinancePage = lazy(() => import('./pages/AdminFinancePage'))
 const AdminPromotionsPage = lazy(() => import('./pages/AdminPromotionsPage'))
@@ -41,15 +46,11 @@ const AdminReportsPage = lazy(() => import('./pages/AdminReportsPage'))
 const AdminSecurityPage = lazy(() => import('./pages/AdminSecurityPage'))
 const AdminSettingsPage = lazy(() => import('./pages/AdminSettingsPage'))
 const AdminSupportPage = lazy(() => import('./pages/AdminSupportPage'))
+const DriverLayout = lazy(() => import('./layouts/DriverLayout'))
+const DriverDeliveriesPage = lazy(() => import('./pages/DriverDeliveriesPage'))
 const DriverEarningsPage = lazy(() => import('./pages/DriverEarningsPage'))
 const DriverHistoryPage = lazy(() => import('./pages/DriverHistoryPage'))
-const DriverApplyPage = lazy(() => import('./pages/DriverApplyPage'))
-const DriverNotificationsPage = lazy(() => import('./pages/DriverNotificationsPage'))
-const DriverPerformancePage = lazy(() => import('./pages/DriverPerformancePage'))
 const DriverProfilePage = lazy(() => import('./pages/DriverProfilePage'))
-const DriverSupportPage = lazy(() => import('./pages/DriverSupportPage'))
-const AdminCmsPage = lazy(() => import('./pages/AdminCmsPage'))
-
 
 const lazyFallback = <PageSpinner />
 
@@ -75,15 +76,40 @@ function App() {
             </Suspense>
           }
         />
-        <Route
-          path="/driver/apply"
-          element={
-            <Suspense fallback={lazyFallback}>
-              <DriverApplyPage />
-            </Suspense>
-          }
-        />
-        <Route
+        <Route element={<DriverRoute />}>
+          <Route
+            path="/driver"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <DriverLayout />
+              </Suspense>
+            }
+          >
+            <Route
+              index
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverDeliveriesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="earnings"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverEarningsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="history"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <DriverHistoryPage />
+                </Suspense>
+              }
+            />
+            <Route
               path="profile"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -91,6 +117,8 @@ function App() {
                 </Suspense>
               }
             />
+          </Route>
+        </Route>
         <Route element={<AdminRoute />}>
           <Route
             path="/admin"
@@ -117,54 +145,6 @@ function App() {
               }
             />
             <Route
-              path="earnings"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverEarningsPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="earnings"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverEarningsPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="history"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverHistoryPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="notifications"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverNotificationsPage />
-                </Suspense>
-              }
-            />
-             <Route
-              path="stats"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverPerformancePage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="support"
-              element={
-                <Suspense fallback={lazyFallback}>
-                  <DriverSupportPage />
-                </Suspense>
-              }
-            />
-            <Route
               path="orders"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -177,6 +157,22 @@ function App() {
               element={
                 <Suspense fallback={lazyFallback}>
                   <AdminRestaurantsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="food-categories"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminFoodCategoriesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="driver-applications"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminDriverApplicationsPage />
                 </Suspense>
               }
             />
@@ -237,6 +233,14 @@ function App() {
               }
             />
             <Route
+              path="data-port"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <AdminDataPortPage />
+                </Suspense>
+              }
+            />
+            <Route
               path="security"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -260,14 +264,6 @@ function App() {
                 </Suspense>
               }
             />
-            <Route
-               path="cms"
-                 element={
-                <Suspense fallback={lazyFallback}>
-                  <AdminCmsPage />
-                </Suspense>
-               }
-               />
           </Route>
         </Route>
         <Route element={<KitchenStaffRoute />}>
@@ -288,6 +284,14 @@ function App() {
               }
             />
             <Route
+              path="orders"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenOrdersPage />
+                </Suspense>
+              }
+            />
+            <Route
               path="account"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -300,6 +304,14 @@ function App() {
               element={
                 <Suspense fallback={lazyFallback}>
                   <KitchenMenuPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="history"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenHistoryPage />
                 </Suspense>
               }
             />
@@ -390,6 +402,14 @@ function App() {
               }
             />
             <Route
+              path="orders/:id/pay"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <OrderPaymentPage />
+                </Suspense>
+              }
+            />
+            <Route
               path="orders/:id"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -397,7 +417,6 @@ function App() {
                 </Suspense>
               }
             />
-            
             <Route
               path="account"
               element={
@@ -406,7 +425,7 @@ function App() {
                 </Suspense>
               }
             />
-                <Route
+            <Route
               path="support"
               element={
                 <Suspense fallback={lazyFallback}>
@@ -414,16 +433,7 @@ function App() {
                 </Suspense>
               }
             />
-            <Route
-  path="notifications"
-  element={
-    <Suspense fallback={lazyFallback}>
-      <CustomerNotificationsPage />
-    </Suspense>
-  }
-/>
           </Route>
-
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
