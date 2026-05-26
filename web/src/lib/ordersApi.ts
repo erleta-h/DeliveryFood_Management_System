@@ -1,4 +1,4 @@
-import { apiPath } from './apiBase'
+import { fetchWithAuth } from './apiClient'
 
 /** Përputhet me backend `OrderFulfillmentType`. */
 export const FULFILLMENT_DELIVERY = 0
@@ -30,6 +30,14 @@ export type CustomerOrderItem = {
   lineTotal: number
 }
 
+export type CustomerOrderDriver = {
+  displayName: string
+  phone: string | null
+  vehicleType: string | null
+  licensePlate: string | null
+  rating: number | null
+}
+
 export type CustomerOrderDetail = {
   id: number
   orderNumber: string
@@ -59,6 +67,8 @@ export type CustomerOrderDetail = {
   pendingStripePayment?: boolean
   /** Faza Deliver (0–4); null për pickup / pa dërgesë — përputhet me `DeliveryDriverLeg` në API. */
   deliveryLegStatus?: number | null
+  /** Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende. */
+  driver?: CustomerOrderDriver | null
 }
 
 const STRIPE_CHECKOUT_ORDER_KEY = 'fdStripeCheckoutOrderId'
@@ -106,7 +116,7 @@ export async function placeOrder(
   | { ok: true; orderId: number; requiresStripePayment: boolean }
   | { ok: false; message: string }
 > {
-  const res = await fetch(apiPath('/api/orders'), {
+  const res = await fetchWithAuth('/api/orders', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({
@@ -122,13 +132,40 @@ export async function placeOrder(
     }),
   })
   if (res.status === 201) {
-    const data = (await res.json()) as { orderId: number; requiresStripePayment: boolean }
-    return { ok: true, orderId: data.orderId, requiresStripePayment: data.requiresStripePayment }
+    const data = (await res.json()) as {
+      orderId?: number
+      OrderId?: number
+      requiresStripePayment?: boolean
+      RequiresStripePayment?: boolean
+    }
+    const orderId = data.orderId ?? data.OrderId
+    const requiresStripePayment =
+      data.requiresStripePayment ?? data.RequiresStripePayment ?? false
+    if (orderId == null || !Number.isFinite(orderId)) {
+      return { ok: false, message: 'Përgjigje e papritur nga serveri (mungon ID e porosisë).' }
+    }
+    return { ok: true, orderId, requiresStripePayment }
   }
   try {
-    const j = (await res.json()) as { message?: string }
-    return { ok: false, message: j.message ?? `HTTP ${res.status}` }
+    const j = (await res.json()) as { message?: string; title?: string }
+    const msg = j.message?.trim()
+    if (msg) return { ok: false, message: msg }
+    if (res.status >= 500) {
+      return {
+        ok: false,
+        message:
+          'Gabim në server gjatë ruajtjes së porosisë. Rinisni API-në (Visual Studio → Stop → Start) që të aplikohen migrimet e databazës, pastaj provoni përsëri.',
+      }
+    }
+    return { ok: false, message: j.title ?? `HTTP ${res.status}` }
   } catch {
+    if (res.status >= 500) {
+      return {
+        ok: false,
+        message:
+          'Gabim në server (HTTP 500). Rinisni API-në që të aplikohen migrimet, pastaj provoni përsëri.',
+      }
+    }
     return { ok: false, message: `HTTP ${res.status}` }
   }
 }
@@ -138,7 +175,7 @@ export async function cancelUnpaidStripeOrder(
   token: string,
   orderId: number,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const res = await fetch(apiPath(`/api/orders/my/${orderId}/cancel-unpaid-stripe`), {
+  const res = await fetchWithAuth(`/api/orders/my/${orderId}/cancel-unpaid-stripe`, {
     method: 'POST',
     headers: { ...authHeader(token) },
   })
@@ -152,7 +189,7 @@ export async function cancelUnpaidStripeOrder(
 }
 
 export async function fetchMyOrders(token: string): Promise<CustomerOrderSummary[]> {
-  const res = await fetch(apiPath('/api/orders/my'), {
+  const res = await fetchWithAuth('/api/orders/my', {
     headers: { ...authHeader(token) },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -163,7 +200,7 @@ export async function fetchMyOrder(
   token: string,
   orderId: number,
 ): Promise<CustomerOrderDetail | null> {
-  const res = await fetch(apiPath(`/api/orders/my/${orderId}`), {
+  const res = await fetchWithAuth(`/api/orders/my/${orderId}`, {
     headers: { ...authHeader(token) },
   })
   if (res.status === 404) return null
@@ -176,7 +213,7 @@ export async function hideMyOrderFromHistory(
   token: string,
   orderId: number,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const res = await fetch(apiPath(`/api/orders/my/${orderId}`), {
+  const res = await fetchWithAuth(`/api/orders/my/${orderId}`, {
     method: 'DELETE',
     headers: { ...authHeader(token) },
   })
