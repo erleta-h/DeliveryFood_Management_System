@@ -19,6 +19,7 @@ export type RestaurantListItem = {
   categoryName: string
   categoryId: number
   deliveryFee: number
+  minOrderAmount: number
   averageRating: number
   reviewCount: number
   estimatedDeliveryMinutes: number
@@ -49,8 +50,11 @@ export async function fetchRestaurantCategories(): Promise<FoodCategoryOption[]>
 export type RestaurantSummary = {
   id: number
   name: string
+  categoryName: string
   deliveryFee: number
   estimatedDeliveryMinutes: number
+  averageRating: number
+  reviewCount: number
   addressLine: string | null
   city: string | null
   latitude: number | null

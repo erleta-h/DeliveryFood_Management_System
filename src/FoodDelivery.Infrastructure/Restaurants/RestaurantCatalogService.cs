@@ -109,6 +109,7 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                 CategoryName = r.FoodCategory.Name,
                 r.FoodCategoryId,
                 r.DeliveryFee,
+                r.MinOrderAmount,
                 r.AverageRating,
                 r.ReviewCount,
                 r.EstimatedDeliveryMinutes,
@@ -143,6 +144,7 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                     r.CategoryName,
                     r.FoodCategoryId,
                     r.DeliveryFee,
+                    r.MinOrderAmount,
                     r.AverageRating,
                     r.ReviewCount,
                     r.EstimatedDeliveryMinutes,
@@ -220,8 +222,11 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             .Select(r => new RestaurantSummaryDto(
                 r.Id,
                 r.Name,
+                r.FoodCategory.Name,
                 r.DeliveryFee,
                 r.EstimatedDeliveryMinutes,
+                r.AverageRating,
+                r.ReviewCount,
                 r.AddressLine,
                 r.City,
                 r.Latitude,
@@ -288,5 +293,76 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             .SetAsync(_cache, key, menu, MenuTtl, cancellationToken)
             .ConfigureAwait(false);
         return menu;
+    }
+
+    public async Task<RestaurantReviewsResultDto?> GetRestaurantReviewsAsync(
+        long restaurantId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        const int restaurantSubject = 0;
+        var limit = Math.Clamp(take, 1, 100);
+
+        var exists = await _uow.Repository<Restaurant, long>().Query
+            .AsNoTracking()
+            .AnyAsync(r => r.Id == restaurantId && r.IsActive && r.IsApproved, cancellationToken)
+            .ConfigureAwait(false);
+        if (!exists)
+            return null;
+
+        var rows = await _uow.Repository<Review, long>().Query
+            .AsNoTracking()
+            .Where(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(limit)
+            .Select(r => new
+            {
+                r.Id,
+                r.Rating,
+                r.Comment,
+                r.CreatedAt,
+                r.Author.FirstName,
+                r.Author.LastName,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = rows
+            .Select(r => new RestaurantReviewDto(
+                r.Id,
+                r.Rating,
+                string.IsNullOrWhiteSpace(r.Comment) ? null : r.Comment.Trim(),
+                r.CreatedAt,
+                FormatAuthorName(r.FirstName, r.LastName)))
+            .ToList();
+
+        var total = await _uow.Repository<Review, long>().Query
+            .AsNoTracking()
+            .CountAsync(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject, cancellationToken)
+            .ConfigureAwait(false);
+
+        var avg = total > 0
+            ? await _uow.Repository<Review, long>().Query
+                .AsNoTracking()
+                .Where(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject)
+                .AverageAsync(r => (double)r.Rating, cancellationToken)
+                .ConfigureAwait(false)
+            : 0;
+
+        return new RestaurantReviewsResultDto(
+            total > 0 ? (decimal)Math.Round(avg, 1) : 0,
+            total,
+            items);
+    }
+
+    private static string FormatAuthorName(string firstName, string lastName)
+    {
+        var f = firstName.Trim();
+        var l = lastName.Trim();
+        if (string.IsNullOrEmpty(f) && string.IsNullOrEmpty(l))
+            return "Klient";
+        if (string.IsNullOrEmpty(l))
+            return f;
+        return $"{f} {l[0]}.";
     }
 }

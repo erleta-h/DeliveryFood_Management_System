@@ -2,10 +2,10 @@ namespace FoodDelivery.Application.Restaurants;
 
 public interface IRestaurantCatalogService
 {
-   
+
     // Kërkim sipas tekstit (emër, qytet, adresë, emër kategorie) dhe opsionalisht kategori.
     // Fjalët e ndara me hapësirë duhet të përputhen të gjitha (dhe).
-    
+
     Task<IReadOnlyList<RestaurantListItemDto>> SearchAsync(
         string? search,
         long? categoryId,
@@ -22,5 +22,10 @@ public interface IRestaurantCatalogService
 
     Task<RestaurantSummaryDto?> GetSummaryAsync(
         long restaurantId,
+        CancellationToken cancellationToken = default);
+
+    Task<RestaurantReviewsResultDto?> GetRestaurantReviewsAsync(
+        long restaurantId,
+        int take,
         CancellationToken cancellationToken = default);
 }

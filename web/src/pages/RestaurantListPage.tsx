@@ -2,23 +2,31 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CategoryBrowseCarousel } from '../components/CategoryBrowseCarousel'
 import { DeliveryLocationMapDialog } from '../components/DeliveryLocationMapDialog'
-import { RestaurantDiscoveryRow } from '../components/RestaurantDiscoveryRow'
-import { RestaurantBrowseToolbar } from '../components/RestaurantBrowseToolbar'
+import { RestaurantCardSkeleton } from '../components/RestaurantCardSkeleton'
+import { RestaurantFilterChips } from '../components/RestaurantFilterChips'
+import { RestaurantHero } from '../components/RestaurantHero'
 import { RestaurantSearchBar } from '../components/RestaurantSearchBar'
-import { customerCard } from '../lib/customerTheme'
+import { RestaurantSection } from '../components/RestaurantSection'
 import {
   applyClientRestaurantFilters,
+  applyQuickFilters,
   OPEN_NOW_MAX_MINUTES,
   sortSummaryLabel,
   type PriceTierOption,
+  type QuickFilterId,
   type SortOption,
 } from '../lib/restaurantFilters'
+import {
+  buildBrowseSections,
+  computeHeroStats,
+} from '../lib/restaurantBrowseSections'
 import {
   fetchRestaurantCategories,
   searchRestaurants,
   type FoodCategoryOption,
   type RestaurantListItem,
 } from '../lib/restaurantsApi'
+import { useAuthStore } from '../store/authStore'
 
 function useDebounced<T>(value: T, ms: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -33,7 +41,9 @@ export default function RestaurantListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [entryDeliveryMapOpen, setEntryDeliveryMapOpen] = useState(false)
   const openedFromDeliveryQuery = useRef(false)
+  const filtersRef = useRef<HTMLDivElement>(null)
 
+  const user = useAuthStore((s) => s.user)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounced(search, 320)
   const [categoryId, setCategoryId] = useState<number | null>(null)
@@ -46,11 +56,36 @@ export default function RestaurantListPage() {
   const [customerGeo, setCustomerGeo] = useState<{ lat: number; lng: number } | null>(null)
   const [priceTier, setPriceTier] = useState<PriceTierOption>('all')
   const [openNow, setOpenNow] = useState(false)
+  const [quickFilters, setQuickFilters] = useState<Set<QuickFilterId>>(new Set())
 
-  const displayedItems = useMemo(
-    () => applyClientRestaurantFilters(items, priceTier, openNow),
-    [items, priceTier, openNow],
-  )
+  const displayedItems = useMemo(() => {
+    let list = applyClientRestaurantFilters(items, priceTier, openNow)
+    list = applyQuickFilters(list, quickFilters)
+    return list
+  }, [items, priceTier, openNow, quickFilters])
+
+  const heroStats = useMemo(() => computeHeroStats(items), [items])
+  const sections = useMemo(() => buildBrowseSections(displayedItems), [displayedItems])
+
+  const searchSuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (q.length < 2) return []
+    return items.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.categoryName.toLowerCase().includes(q) ||
+        (r.city?.toLowerCase().includes(q) ?? false),
+    )
+  }, [search, items])
+
+  function toggleQuick(id: QuickFilterId) {
+    setQuickFilters((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -114,6 +149,7 @@ export default function RestaurantListPage() {
           list.map((x) => ({
             ...x,
             previewItems: x.previewItems ?? [],
+            minOrderAmount: x.minOrderAmount ?? 0,
           })),
         )
       })
@@ -122,7 +158,7 @@ export default function RestaurantListPage() {
         setError(
           e instanceof Error
             ? e.message
-            : 'Nuk u ngarkuan restorantet. Sigurohu që API po punon (dotnet run) dhe rifresko.',
+            : 'Nuk u ngarkuan restorantet. Sigurohu që API po punon dhe rifresko.',
         )
         setItems([])
       })
@@ -136,83 +172,98 @@ export default function RestaurantListPage() {
   }, [debouncedSearch, categoryId, sortBy, customerGeo])
 
   return (
-    <section className={customerCard}>
-      <div className="flex flex-col gap-5 sm:gap-6">
-        <div className="flex flex-col gap-3 sm:gap-3.5">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-100 sm:text-3xl">
-            Të gjitha restorantet
-          </h1>
+    <div className="flex flex-col gap-6 sm:gap-8">
+      <RestaurantHero
+        stats={heroStats}
+        cityLabel={user?.city ?? undefined}
+        onOpenDeliveryMap={() => setEntryDeliveryMapOpen(true)}
+        searchSlot={
           <RestaurantSearchBar
             value={search}
             onChange={setSearch}
-            placeholder="Kërko sipas emrit të restorantit, qytetit / adresës ose kategorisë së ushqimit."
+            suggestions={searchSuggestions}
+            onPickSuggestion={setSearch}
+            onOpenFilters={() =>
+              filtersRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }
           />
-        </div>
+        }
+      />
 
-        <div className="rounded-xl border border-white/[0.08] bg-[#252b3d]/90 p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm sm:rounded-2xl sm:p-3">
-          <RestaurantBrowseToolbar
-            categories={categories}
-            categoryId={categoryId}
-            onCategoryChange={setCategoryId}
-            sortBy={sortBy}
-            onSortChange={setSortBy}
-            priceTier={priceTier}
-            onPriceTierChange={setPriceTier}
-            openNow={openNow}
-            onOpenNowChange={setOpenNow}
-          />
+      <div ref={filtersRef} className="space-y-4">
+        <RestaurantFilterChips
+          quickFilters={quickFilters}
+          onToggleQuick={toggleQuick}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          priceTier={priceTier}
+          onPriceTierChange={setPriceTier}
+          openNow={openNow}
+          onOpenNowChange={setOpenNow}
+          categories={categories}
+          categoryId={categoryId}
+          onCategoryChange={setCategoryId}
+        />
+        <div className="rounded-2xl border border-white/[0.08] bg-[#1a1f2e]/50 p-3 backdrop-blur-sm sm:p-4">
           <CategoryBrowseCarousel
             categories={categories}
             categoryId={categoryId}
             onSelectCategory={setCategoryId}
           />
         </div>
-
-        {error ? (
-          <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
-            {error}
-          </p>
-        ) : null}
-
-        {!loading && !error ? (
-          <p className="text-xs leading-relaxed text-zinc-500">
-            {sortSummaryLabel(sortBy)}
-            {priceTier !== 'all' || openNow
-              ? ` Filtrat lokalë: ${[
-                  openNow ? `hapur tani (≤${OPEN_NOW_MAX_MINUTES} min)` : null,
-                  priceTier !== 'all'
-                    ? priceTier === 'low'
-                      ? 'dërgesë e ulët'
-                      : priceTier === 'medium'
-                        ? 'dërgesë mesatare'
-                        : 'dërgesë më e lartë'
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}.`
-              : ''}{' '}
-            <span className="text-zinc-400">
-              {displayedItems.length === items.length
-                ? `${displayedItems.length} restorant${displayedItems.length === 1 ? '' : 'e'}.`
-                : `${displayedItems.length} nga ${items.length} restorante (pas filtrave).`}
-            </span>
-          </p>
-        ) : null}
-
-        {loading ? (
-          <p className="text-sm text-zinc-500">Duke ngarkuar…</p>
-        ) : displayedItems.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            Nuk u gjet asnjë restorant për këtë kërkim ose filtra.
-          </p>
-        ) : (
-          <div className="rounded-2xl border border-white/[0.08] bg-[#1a1f2e]/70 px-2 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm sm:px-4">
-            {displayedItems.map((r) => (
-              <RestaurantDiscoveryRow key={r.id} restaurant={r} />
-            ))}
-          </div>
-        )}
       </div>
+
+      {error ? (
+        <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+          {error}
+        </p>
+      ) : null}
+
+      {!loading && !error ? (
+        <p className="text-xs text-zinc-500">
+          {sortSummaryLabel(sortBy)}
+          {priceTier !== 'all' || openNow || quickFilters.size > 0
+            ? ` · ${[
+                openNow ? `hapët (≤${OPEN_NOW_MAX_MINUTES} min)` : null,
+                quickFilters.size > 0 ? `${quickFilters.size} filtër të shpejtë` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}`
+            : ''}{' '}
+          <span className="text-zinc-400">
+            {displayedItems.length} restorant{displayedItems.length === 1 ? '' : 'e'}
+          </span>
+        </p>
+      ) : null}
+
+      {loading ? (
+        <div className="space-y-8">
+          <div className="flex gap-3 overflow-hidden">
+            <RestaurantCardSkeleton />
+            <RestaurantCardSkeleton />
+            <RestaurantCardSkeleton compact />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <RestaurantCardSkeleton />
+            <RestaurantCardSkeleton />
+            <RestaurantCardSkeleton />
+            <RestaurantCardSkeleton />
+          </div>
+        </div>
+      ) : displayedItems.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-16 text-center">
+          <p className="text-lg font-semibold text-zinc-300">Asnjë restorant</p>
+          <p className="mt-2 text-sm text-zinc-500">
+            Provo kërkim tjetër ose hiq disa filtra.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-10 sm:space-y-12">
+          {sections.map((section) => (
+            <RestaurantSection key={section.id} section={section} />
+          ))}
+        </div>
+      )}
 
       <DeliveryLocationMapDialog
         open={entryDeliveryMapOpen}
@@ -220,6 +271,6 @@ export default function RestaurantListPage() {
         title="Ku të dorozohet porosia?"
         description="Zgjedh vendin në hartë ose zhvendos pin-in. Ruaj — adresa përdoret për dërgesë dhe renditje «afër meje»."
       />
-    </section>
+    </div>
   )
 }
