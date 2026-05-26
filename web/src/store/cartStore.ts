@@ -6,6 +6,8 @@ export type CartLine = {
   name: string
   unitPrice: number
   quantity: number
+  /** Rrugë relative `/api/files/public/...` për thumbnail në shportë. */
+  imageUrl?: string | null
 }
 
 type CartState = {
@@ -45,16 +47,22 @@ export const useCartStore = create<CartState>()(
           }
         }),
       setDeliveryFee: (fee) => set({ deliveryFee: fee }),
-      addLine: ({ menuItemId, name, unitPrice, quantity = 1 }) => {
+      addLine: ({ menuItemId, name, unitPrice, quantity = 1, imageUrl }) => {
         const { lines } = get()
         const i = lines.findIndex((l) => l.menuItemId === menuItemId)
         if (i >= 0) {
           const next = [...lines]
-          next[i] = { ...next[i], quantity: next[i].quantity + quantity }
+          next[i] = {
+            ...next[i],
+            quantity: next[i].quantity + quantity,
+            ...(imageUrl !== undefined && imageUrl !== null ? { imageUrl } : {}),
+          }
           set({ lines: next })
           return
         }
-        set({ lines: [...lines, { menuItemId, name, unitPrice, quantity }] })
+        set({
+          lines: [...lines, { menuItemId, name, unitPrice, quantity, imageUrl: imageUrl ?? null }],
+        })
       },
       setQty: (menuItemId, quantity) => {
         if (quantity <= 0) {
