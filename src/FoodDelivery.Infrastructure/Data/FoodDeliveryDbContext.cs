@@ -26,6 +26,8 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
     public DbSet<SupportTicketMessage> SupportTicketMessages => Set<SupportTicketMessage>();
 
+    public DbSet<SupportTicketAudit> SupportTicketAudits => Set<SupportTicketAudit>();
+
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
@@ -44,7 +46,12 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
+
+  
+
     public DbSet<Setting> Settings => Set<Setting>();
+
+
 
     public DbSet<WebPushSubscription> WebPushSubscriptions => Set<WebPushSubscription>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -325,6 +332,15 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.CreatedAt);
             e.HasIndex(x => x.OrderId);
             e.HasIndex(x => x.RestaurantId);
+
+           e.HasOne(x => x.Driver)
+           .WithMany()
+           .HasForeignKey(x => x.DriverId)
+           .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.AssignedTo)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedToUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<SupportTicketMessage>(e =>
