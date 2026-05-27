@@ -7,7 +7,7 @@ namespace FoodDelivery.Api.Controllers;
 
 [ApiController]
 [Route("api/support/tickets")]
-[Authorize(Roles = "Customer")]
+[Authorize(Roles = "Customer,Driver,RestaurantStaff")]
 public sealed class SupportTicketsController : ControllerBase
 {
     private readonly ISupportTicketService _svc;

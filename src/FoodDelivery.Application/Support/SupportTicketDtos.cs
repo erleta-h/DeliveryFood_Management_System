@@ -6,13 +6,17 @@ public sealed record SupportTicketMineItemDto(
     long Id,
     string Subject,
     int Status,
+    int Category,
+    int Priority,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
+    DateTime? ResolvedAtUtc,
     int MessageCount);
 
 public sealed record CreateSupportTicketRequest(
     string Subject,
     string Body,
+    int Category,
     long? OrderId = null,
     long? RestaurantId = null);
 
@@ -26,7 +30,6 @@ public sealed record SupportTicketMessageDto(
     string Body,
     DateTime CreatedAtUtc);
 
-/// <summary>Thread: <see cref="InitialBody"/> = mesazhi fillestar; <see cref="Messages"/> = përgjigjet.</summary>
 public sealed record SupportTicketThreadDto(
     long Id,
     long UserId,
@@ -34,13 +37,20 @@ public sealed record SupportTicketThreadDto(
     string Subject,
     string InitialBody,
     int Status,
+    int Category,
+    int Priority,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
+    DateTime? ResolvedAtUtc,
     string? AdminNote,
     long? OrderId,
     string? OrderNumber,
     long? RestaurantId,
     string? RestaurantName,
+    long? DriverId,
+    string? DriverName,
+    long? AssignedToUserId,
+    string? AssignedToEmail,
     IReadOnlyList<SupportTicketMessageDto> Messages);
 
 public sealed record AdminSupportTicketItemDto(
@@ -50,13 +60,20 @@ public sealed record AdminSupportTicketItemDto(
     string Subject,
     string Body,
     int Status,
+    int Category,
+    int Priority,
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
+    DateTime? ResolvedAtUtc,
     string? AdminNote,
     long? OrderId,
     string? OrderNumber,
     long? RestaurantId,
     string? RestaurantName,
+    long? DriverId,
+    string? DriverName,
+    long? AssignedToUserId,
+    string? AssignedToEmail,
     int MessageCount);
 
 public sealed record AdminSupportTicketListResultDto(
@@ -66,3 +83,14 @@ public sealed record AdminSupportTicketListResultDto(
     int PageSize);
 
 public sealed record AdminUpdateSupportTicketRequest(int Status, string? AdminNote);
+
+public sealed record AssignTicketRequest(long AgentUserId);
+public sealed record ChangePriorityRequest(int Priority);
+public sealed record ChangeStatusRequest(int Status);
+
+public sealed record SupportTicketAuditDto(
+    long Id,
+    long ActorUserId,
+    string ActorEmail,
+    string Action,
+    DateTime CreatedAtUtc);

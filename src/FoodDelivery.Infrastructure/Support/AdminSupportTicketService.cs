@@ -19,10 +19,8 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
     private readonly ILogger<AdminSupportTicketService> _log;
 
     public AdminSupportTicketService(
-        IUnitOfWork uow,
-        IPushNotificationSender push,
-        IHubContext<OrderTrackingHub> hub,
-        ILogger<AdminSupportTicketService> log)
+        IUnitOfWork uow, IPushNotificationSender push,
+        IHubContext<OrderTrackingHub> hub, ILogger<AdminSupportTicketService> log)
     {
         _uow = uow;
         _push = push;
@@ -31,16 +29,15 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
     }
 
     public async Task<AdminSupportTicketListResultDto> ListAsync(
-        int page,
-        int pageSize,
-        string? search,
-        string? sort,
+        int page, int pageSize, string? search, string? sort,
+        int? filterStatus, int? filterCategory, int? filterPriority, long? filterAssignedTo,
         CancellationToken cancellationToken = default)
     {
         var p = Math.Max(1, page);
         var ps = Math.Clamp(pageSize, 1, MaxPageSize);
 
         var q = _uow.Repository<SupportTicket, long>().Query.AsNoTracking();
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
@@ -49,32 +46,32 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
                 || t.Body.Contains(s)
                 || _uow.Repository<User, long>().Query.Any(u => u.Id == t.UserId && u.Email.Contains(s)));
         }
+        if (filterStatus.HasValue) q = q.Where(t => t.Status == filterStatus.Value);
+        if (filterCategory.HasValue) q = q.Where(t => t.Category == filterCategory.Value);
+        if (filterPriority.HasValue) q = q.Where(t => t.Priority == filterPriority.Value);
+        if (filterAssignedTo.HasValue) q = q.Where(t => t.AssignedToUserId == filterAssignedTo.Value);
 
         var total = await q.CountAsync(cancellationToken);
         var ordered = (sort ?? "created_desc").Trim().ToLowerInvariant() switch
         {
             "created_asc" => q.OrderBy(x => x.CreatedAt),
-            "subject_asc" => q.OrderBy(x => x.Subject),
+            "priority_desc" => q.OrderByDescending(x => x.Priority).ThenByDescending(x => x.CreatedAt),
             "status_asc" => q.OrderBy(x => x.Status).ThenByDescending(x => x.CreatedAt),
             _ => q.OrderByDescending(x => x.CreatedAt),
         };
+
         var items = await ordered
-            .Skip((p - 1) * ps)
-            .Take(ps)
+            .Skip((p - 1) * ps).Take(ps)
             .Select(t => new AdminSupportTicketItemDto(
-                t.Id,
-                t.UserId,
-                t.User.Email,
-                t.Subject,
-                t.Body,
-                t.Status,
-                t.CreatedAt,
-                t.UpdatedAt,
-                t.AdminNote,
-                t.OrderId,
-                t.Order != null ? t.Order.OrderNumber : null,
-                t.RestaurantId,
-                t.Restaurant != null ? t.Restaurant.Name : null,
+                t.Id, t.UserId, t.User.Email, t.Subject, t.Body,
+                t.Status, t.Category, t.Priority,
+                t.CreatedAt, t.UpdatedAt, t.ResolvedAt, t.AdminNote,
+                t.OrderId, t.Order != null ? t.Order.OrderNumber : null,
+                t.RestaurantId, t.Restaurant != null ? t.Restaurant.Name : null,
+                t.DriverId,
+                t.Driver != null ? (t.Driver.FirstName + " " + t.Driver.LastName) : null,
+                t.AssignedToUserId,
+                t.AssignedTo != null ? t.AssignedTo.Email : null,
                 1 + t.Messages.Count))
             .ToListAsync(cancellationToken);
 
@@ -82,34 +79,24 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
     }
 
     public async Task<string?> UpdateAsync(
-        long ticketId,
-        AdminUpdateSupportTicketRequest request,
+        long ticketId, AdminUpdateSupportTicketRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (request.Status is not (SupportTicketStatus.Open or SupportTicketStatus.Closed))
-            return "Status i pavlefshëm.";
-
-        var t = await _uow.Repository<SupportTicket, long>().Query.FirstOrDefaultAsync(
-            x => x.Id == ticketId,
-            cancellationToken);
-        if (t is null)
-            return "Tiketa nuk u gjet.";
+        var t = await _uow.Repository<SupportTicket, long>().Query
+            .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
+        if (t is null) return "Tiketa nuk u gjet.";
 
         var note = string.IsNullOrWhiteSpace(request.AdminNote) ? null : request.AdminNote.Trim();
-        if (note is { Length: > 2000 })
-            return "Shënimi i adminit: maks. 2000 karaktere.";
+        if (note is { Length: > 2000 }) return "Shënimi i adminit: maks. 2000 karaktere.";
 
-        var now = DateTime.UtcNow;
-        t.Status = request.Status;
         t.AdminNote = note;
-        t.UpdatedAt = now;
+        t.UpdatedAt = DateTime.UtcNow;
         await _uow.SaveChangesAsync(cancellationToken);
         return null;
     }
 
     public async Task<SupportTicketThreadDto?> GetThreadAsync(
-        long ticketId,
-        CancellationToken cancellationToken = default)
+        long ticketId, CancellationToken cancellationToken = default)
     {
         var t = await _uow.Repository<SupportTicket, long>().Query
             .AsNoTracking()
@@ -117,27 +104,25 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
             .Include(x => x.Messages).ThenInclude(m => m.Author)
             .Include(x => x.Order)
             .Include(x => x.Restaurant)
+            .Include(x => x.Driver)
+            .Include(x => x.AssignedTo)
             .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
-        return t is null ? null : MapThread(t);
+        return t is null ? null : SupportTicketService.MapThread(t);
     }
 
     public async Task<string?> PostStaffReplyAsync(
-        long staffUserId,
-        long ticketId,
-        string body,
+        long staffUserId, long ticketId, string body,
         CancellationToken cancellationToken = default)
     {
         var trimmed = body.Trim();
-        if (trimmed.Length is < 1 or > 4000)
-            return "Mesazhi: 1–4000 karaktere.";
+        if (trimmed.Length is < 1 or > 4000) return "Mesazhi: 1–4000 karaktere.";
 
         var t = await _uow.Repository<SupportTicket, long>().Query
             .Include(x => x.User)
+            .Include(x => x.Messages)
             .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
-        if (t is null)
-            return "Tiketa nuk u gjet.";
-        if (t.Status == SupportTicketStatus.Closed)
-            return "Tiketa është e mbyllur.";
+        if (t is null) return "Tiketa nuk u gjet.";
+        if (t.Status == SupportTicketStatus.Closed) return "Tiketa është e mbyllur.";
 
         var now = DateTime.UtcNow;
         var pushTitle = "Përgjigje nga supporti";
@@ -166,69 +151,148 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
         _uow.Repository<Notification, long>().Add(notif);
         t.UpdatedAt = now;
 
+        if (t.Status == SupportTicketStatus.Open)
+            t.Status = SupportTicketStatus.InReview;
+
         await _uow.SaveChangesAsync(cancellationToken);
 
-        try
-        {
-            await _push.SendToUserAsync(t.UserId, pushTitle, pushBody, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Web Push për tiketën {TicketId} (përdoruesi {UserId}) dështoi.", ticketId, t.UserId);
-        }
+        try { await _push.SendToUserAsync(t.UserId, pushTitle, pushBody, cancellationToken); }
+        catch (Exception ex) { _log.LogWarning(ex, "Push për tiketën {TicketId} dështoi.", ticketId); }
 
         try
         {
-            await _hub.Clients
-                .Group($"user-{t.UserId}")
-                .SendAsync(
-                    "customerNotification",
-                    new
+            var staffUser = await _uow.Repository<User, long>().Query.AsNoTracking()
+                .Where(u => u.Id == staffUserId).Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
+
+            var customerGroup = _hub.Clients.Group($"user-{t.UserId}");
+            await customerGroup.SendAsync("customerNotification", new { id = notif.Id, title = pushTitle, message = pushBody, type = "support_reply", ticketId, createdAtUtc = now }, cancellationToken);
+            await customerGroup.SendAsync("supportTicketMessageReceived", new
+            {
+                ticketId,
+                messageId = 0L,
+                authorUserId = staffUserId,
+                authorEmail = staffUser ?? "support",
+                isStaffReply = true,
+                body = trimmed,
+                createdAtUtc = now,
+            }, cancellationToken);
+
+            if (t.RestaurantId is { } restId)
+            {
+                var staffIds = await _uow.Repository<RestaurantStaff, long>().Query.AsNoTracking()
+                    .Where(s => s.RestaurantId == restId).Select(s => s.UserId).ToListAsync(cancellationToken);
+                foreach (var sid in staffIds)
+                {
+                    try
                     {
-                        id = notif.Id,
-                        title = pushTitle,
-                        message = pushBody,
-                        type = "support_reply",
-                        ticketId,
-                        createdAtUtc = now,
-                    },
-                    cancellationToken);
+                        await _hub.Clients.Group($"kitchen-user-{sid}")
+                            .SendAsync("kitchenNotification", new { title = pushTitle, message = pushBody, type = "support_reply", ticketId, createdAtUtc = now }, cancellationToken);
+                    }
+                    catch { /* best effort */ }
+                }
+            }
         }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "SignalR customerNotification për përdoruesin {UserId} dështoi.", t.UserId);
-        }
+        catch (Exception ex) { _log.LogWarning(ex, "SignalR për {UserId} dështoi.", t.UserId); }
 
         return null;
     }
 
-    private static SupportTicketThreadDto MapThread(SupportTicket t)
+    public async Task<string?> AssignAsync(
+        long ticketId, long agentUserId, long actorUserId,
+        CancellationToken cancellationToken = default)
     {
-        var messages = t.Messages
-            .OrderBy(m => m.CreatedAt)
-            .Select(m => new SupportTicketMessageDto(
-                m.Id,
-                m.AuthorUserId,
-                m.Author.Email,
-                m.IsStaffReply,
-                m.Body,
-                m.CreatedAt))
-            .ToList();
+        var t = await _uow.Repository<SupportTicket, long>().Query
+            .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
+        if (t is null) return "Tiketa nuk u gjet.";
 
-        return new SupportTicketThreadDto(
-            t.Id,
-            t.UserId,
-            t.User.Email,
-            t.Subject,
-            t.Body,
-            t.Status,
-            t.CreatedAt,
-            t.UpdatedAt,
-            t.AdminNote,
-            t.OrderId,
-            t.Order?.OrderNumber,
-            t.RestaurantId,
-            t.Restaurant?.Name,
-            messages);
+        var agent = await _uow.Repository<User, long>().Query.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == agentUserId, cancellationToken);
+        if (agent is null) return "Agjenti nuk u gjet.";
+
+        t.AssignedToUserId = agentUserId;
+        t.UpdatedAt = DateTime.UtcNow;
+
+        _uow.Repository<SupportTicketAudit, long>().Add(new SupportTicketAudit
+        {
+            SupportTicketId = ticketId,
+            ActorUserId = actorUserId,
+            Action = $"Caktuar te {agent.Email}",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    public async Task<string?> ChangeStatusAsync(
+        long ticketId, int newStatus, long actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SupportTicketStatus.Labels.ContainsKey(newStatus))
+            return "Status i pavlefshëm.";
+
+        var t = await _uow.Repository<SupportTicket, long>().Query
+            .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
+        if (t is null) return "Tiketa nuk u gjet.";
+
+        var oldLabel = SupportTicketStatus.Labels.GetValueOrDefault(t.Status, "?");
+        var newLabel = SupportTicketStatus.Labels.GetValueOrDefault(newStatus, "?");
+
+        t.Status = newStatus;
+        t.UpdatedAt = DateTime.UtcNow;
+
+        if (newStatus is SupportTicketStatus.Resolved or SupportTicketStatus.Closed)
+            t.ResolvedAt ??= DateTime.UtcNow;
+
+        _uow.Repository<SupportTicketAudit, long>().Add(new SupportTicketAudit
+        {
+            SupportTicketId = ticketId,
+            ActorUserId = actorUserId,
+            Action = $"Statusi: {oldLabel} → {newLabel}",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    public async Task<string?> ChangePriorityAsync(
+        long ticketId, int newPriority, long actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SupportTicketPriority.Labels.ContainsKey(newPriority))
+            return "Prioritet i pavlefshëm.";
+
+        var t = await _uow.Repository<SupportTicket, long>().Query
+            .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
+        if (t is null) return "Tiketa nuk u gjet.";
+
+        var oldLabel = SupportTicketPriority.Labels.GetValueOrDefault(t.Priority, "?");
+        var newLabel = SupportTicketPriority.Labels.GetValueOrDefault(newPriority, "?");
+
+        t.Priority = newPriority;
+        t.UpdatedAt = DateTime.UtcNow;
+
+        _uow.Repository<SupportTicketAudit, long>().Add(new SupportTicketAudit
+        {
+            SupportTicketId = ticketId,
+            ActorUserId = actorUserId,
+            Action = $"Prioriteti: {oldLabel} → {newLabel}",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    public async Task<IReadOnlyList<SupportTicketAuditDto>> GetAuditTrailAsync(
+        long ticketId, CancellationToken cancellationToken = default)
+    {
+        return await _uow.Repository<SupportTicketAudit, long>().Query.AsNoTracking()
+            .Where(a => a.SupportTicketId == ticketId)
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => new SupportTicketAuditDto(
+                a.Id, a.ActorUserId, a.Actor.Email, a.Action, a.CreatedAt))
+            .ToListAsync(cancellationToken);
     }
 }
