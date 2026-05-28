@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   createSupportTicket,
   fetchMySupportTickets,
   fetchSupportTicketThread,
   postSupportTicketMessage,
+  CATEGORY_OPTIONS,
+  CATEGORY_LABELS,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  PRIORITY_LABELS,
+  PRIORITY_COLORS,
   type MySupportTicketRow,
   type SupportTicketThread,
-} from '../lib/supportApi.ts'
-import { customerBtnPrimary, customerCard, customerCardMuted, customerPanelSubtitle } from '../lib/customerTheme'
+  type SupportTicketMessageRow,
+} from '../lib/supportApi'
+import { customerBtnPrimary, customerCard, customerCardMuted } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
+import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
 
-const STATUS_SQ: Record<number, string> = {
-  0: 'Hapur',
-  1: 'Mbyllur',
+function timeLabel(iso: string) {
+  return new Date(iso).toLocaleString('sq-AL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function SupportPage() {
@@ -21,27 +28,30 @@ export default function SupportPage() {
   const [searchParams] = useSearchParams()
   const orderIdParam = searchParams.get('orderId')
   const restaurantIdParam = searchParams.get('restaurantId')
-  const initialOrderId =
-    orderIdParam && /^\d+$/.test(orderIdParam) ? Number(orderIdParam) : undefined
-  const initialRestaurantId =
-    restaurantIdParam && /^\d+$/.test(restaurantIdParam)
-      ? Number(restaurantIdParam)
-      : undefined
+  const initialOrderId = orderIdParam && /^\d+$/.test(orderIdParam) ? Number(orderIdParam) : undefined
+  const initialRestaurantId = restaurantIdParam && /^\d+$/.test(restaurantIdParam) ? Number(restaurantIdParam) : undefined
 
   const [list, setList] = useState<MySupportTicketRow[] | null>(null)
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-  const [linkOrderId, setLinkOrderId] = useState<string>(initialOrderId != null ? String(initialOrderId) : '')
-  const [linkRestaurantId, setLinkRestaurantId] = useState<string>(
-    initialRestaurantId != null ? String(initialRestaurantId) : '',
-  )
-  const [msg, setMsg] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [activeId, setActiveId] = useState<number | null>(null)
   const [thread, setThread] = useState<SupportTicketThread | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyBusy, setReplyBusy] = useState(false)
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [category, setCategory] = useState(6)
+  const [linkOrderId, setLinkOrderId] = useState(initialOrderId != null ? String(initialOrderId) : '')
+  const [linkRestaurantId, setLinkRestaurantId] = useState(initialRestaurantId != null ? String(initialRestaurantId) : '')
+  const [formMsg, setFormMsg] = useState<string | null>(null)
+  const [formBusy, setFormBusy] = useState(false)
+  const [chatMsg, setChatMsg] = useState<string | null>(null)
+
+  const setUnreadCount = useCustomerNotificationsStore((s) => s.setUnreadCount)
+  const lastSupportMessage = useCustomerNotificationsStore((s) => s.lastSupportMessage)
+  const clearLastSupportMessage = useCustomerNotificationsStore((s) => s.clearLastSupportMessage)
+
+  const chatEndRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async () => {
     if (!token) return
@@ -51,69 +61,88 @@ export default function SupportPage() {
 
   useEffect(() => {
     if (!token) return
+    setUnreadCount(0)
     void load().catch(() => setList([]))
-  }, [token, load])
+  }, [token, load, setUnreadCount])
 
   useEffect(() => {
-    if (!token || expandedId == null) {
-      setThread(null)
-      return
-    }
+    if (!token || activeId == null) { setThread(null); return }
     setThreadLoading(true)
-    void fetchSupportTicketThread(token, expandedId)
+    void fetchSupportTicketThread(token, activeId)
       .then((t) => setThread(t))
       .catch(() => setThread(null))
       .finally(() => setThreadLoading(false))
-  }, [token, expandedId])
+  }, [token, activeId])
 
-  async function submit(e: React.FormEvent) {
+  useEffect(() => {
+    if (lastSupportMessage && thread && lastSupportMessage.ticketId === thread.id) {
+      const exists = thread.messages.some((m) => m.body === lastSupportMessage.body && m.authorEmail === lastSupportMessage.authorEmail)
+      if (!exists) {
+        const newMsg: SupportTicketMessageRow = {
+          id: lastSupportMessage.messageId || Date.now(),
+          authorUserId: lastSupportMessage.authorUserId,
+          authorEmail: lastSupportMessage.authorEmail,
+          isStaffReply: lastSupportMessage.isStaffReply,
+          body: lastSupportMessage.body,
+          createdAtUtc: lastSupportMessage.createdAtUtc,
+        }
+        setThread((prev) => prev ? { ...prev, messages: [...prev.messages, newMsg] } : prev)
+      }
+      clearLastSupportMessage()
+    } else if (lastSupportMessage) {
+      void load().catch(() => {})
+      clearLastSupportMessage()
+    }
+  }, [lastSupportMessage, thread, clearLastSupportMessage, load])
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [thread?.messages.length])
+
+  async function submitNew(e: React.FormEvent) {
     e.preventDefault()
     if (!token) return
-    setMsg(null)
-    setBusy(true)
+    setFormMsg(null)
+    setFormBusy(true)
     try {
       const oid = linkOrderId.trim() ? Number(linkOrderId.trim()) : undefined
       const rid = linkRestaurantId.trim() ? Number(linkRestaurantId.trim()) : undefined
       const r = await createSupportTicket(token, {
-        subject,
-        body,
+        subject, body, category,
         orderId: Number.isFinite(oid) ? oid : undefined,
         restaurantId: Number.isFinite(rid) ? rid : undefined,
       })
-      if (!r.ok) {
-        setMsg(r.message)
-        return
-      }
-      setSubject('')
-      setBody('')
-      setMsg(`Tiketa #${r.id} u dërgua.`)
+      if (!r.ok) { setFormMsg(r.message); return }
+      setSubject(''); setBody(''); setCategory(6); setLinkOrderId(''); setLinkRestaurantId('')
+      setShowNewForm(false)
       await load()
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : 'Gabim.')
-    } finally {
-      setBusy(false)
-    }
+      setActiveId(r.id)
+    } catch (err: unknown) {
+      setFormMsg(err instanceof Error ? err.message : 'Gabim.')
+    } finally { setFormBusy(false) }
   }
 
   async function sendReply(e: React.FormEvent) {
     e.preventDefault()
-    if (!token || expandedId == null) return
+    if (!token || activeId == null || !replyDraft.trim()) return
     setReplyBusy(true)
-    setMsg(null)
+    setChatMsg(null)
     try {
-      const r = await postSupportTicketMessage(token, expandedId, replyDraft)
-      if (!r.ok) {
-        setMsg(r.message)
-        return
-      }
+      const r = await postSupportTicketMessage(token, activeId, replyDraft.trim())
+      if (!r.ok) { setChatMsg(r.message); return }
       setReplyDraft('')
-      const t = await fetchSupportTicketThread(token, expandedId)
+      const t = await fetchSupportTicketThread(token, activeId)
       setThread(t)
       await load()
-    } catch (e: unknown) {
-      setMsg(e instanceof Error ? e.message : 'Gabim.')
-    } finally {
-      setReplyBusy(false)
+    } catch (err: unknown) {
+      setChatMsg(err instanceof Error ? err.message : 'Gabim.')
+    } finally { setReplyBusy(false) }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      void sendReply(e as unknown as React.FormEvent)
     }
   }
 
@@ -125,159 +154,189 @@ export default function SupportPage() {
     )
   }
 
+  const activeRow = list?.find((t) => t.id === activeId)
+
   return (
-    <section className={customerCard}>
-      <h1 className="text-2xl font-bold text-zinc-100">Support & ankesa</h1>
-      <p className={customerPanelSubtitle}>
-        Hap një tiketë për probleme me porosi ose aplikacionin. Stafi i supportit përgjigjet në të njëjtin thread.
-      </p>
-
-      <form onSubmit={(e) => void submit(e)} className={`${customerCardMuted} mt-6 max-w-xl space-y-3 p-4`}>
-        <label className="block text-xs text-zinc-500">
-          Titulli
-          <input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            maxLength={200}
-            required
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
-          />
-        </label>
-        <label className="block text-xs text-zinc-500">
-          Mesazhi
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            required
-            minLength={1}
-            maxLength={4000}
-            rows={5}
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
-          />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-xs text-zinc-500">
-            ID porosie (opsional)
-            <input
-              value={linkOrderId}
-              onChange={(e) => setLinkOrderId(e.target.value)}
-              inputMode="numeric"
-              placeholder="p.sh. nga «Porositë e mia»"
-              className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
-            />
-          </label>
-          <label className="block text-xs text-zinc-500">
-            ID restoranti (opsional)
-            <input
-              value={linkRestaurantId}
-              onChange={(e) => setLinkRestaurantId(e.target.value)}
-              inputMode="numeric"
-              className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
-            />
-          </label>
+    <div className="flex h-[calc(100vh-90px)] gap-4 overflow-hidden">
+      {/* ── Left: Ticket list ── */}
+      <div className={`${activeId != null ? 'hidden md:flex' : 'flex'} w-full flex-col md:w-72 lg:w-80 shrink-0`}>
+        <div className="flex items-center justify-between px-1 pb-3">
+          <h1 className="text-lg font-bold text-zinc-100">Mbështetja</h1>
+          <button type="button" onClick={() => { setShowNewForm(true); setActiveId(null) }}
+            className="rounded-lg bg-violet-600/80 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-500">
+            + Tiketë e re
+          </button>
         </div>
-        {msg ? <p className="text-sm text-amber-200/90">{msg}</p> : null}
-        <button type="submit" disabled={busy} className={customerBtnPrimary}>
-          {busy ? 'Duke dërguar…' : 'Dërgo tiketën'}
-        </button>
-      </form>
 
-      <div className="mt-8">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Tiketat e mia</h2>
-        {!list ? (
-          <p className="mt-3 text-sm text-zinc-500">Duke ngarkuar…</p>
-        ) : list.length === 0 ? (
-          <p className="mt-3 text-sm text-zinc-500">Ende nuk ke tiketa.</p>
+        <div className="flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
+          {!list ? (
+            <p className="py-8 text-center text-sm text-zinc-500">Duke ngarkuar…</p>
+          ) : list.length === 0 ? (
+            <p className="py-8 text-center text-sm text-zinc-500">Nuk ka tiketa ende.</p>
+          ) : list.map((t) => (
+            <button key={t.id} type="button"
+              onClick={() => { setActiveId(t.id); setShowNewForm(false) }}
+              className={`w-full rounded-xl border p-3 text-left transition ${
+                activeId === t.id
+                  ? 'border-violet-500/40 bg-violet-500/10'
+                  : 'border-white/[0.06] bg-[#1a1f2e]/50 hover:border-white/[0.12] hover:bg-[#1e2438]/60'
+              }`}
+            >
+              <p className="truncate text-sm font-medium text-zinc-100">{t.subject}</p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className={`rounded-full border px-1.5 py-px text-[9px] font-semibold ${STATUS_COLORS[t.status] ?? ''}`}>
+                  {STATUS_LABELS[t.status] ?? '?'}
+                </span>
+                <span className={`rounded-full border px-1.5 py-px text-[9px] font-semibold ${PRIORITY_COLORS[t.priority] ?? ''}`}>
+                  {PRIORITY_LABELS[t.priority] ?? '?'}
+                </span>
+                <span className="text-[9px] text-zinc-500">{CATEGORY_LABELS[t.category] ?? 'Tjetër'}</span>
+              </div>
+              <p className="mt-1 text-[10px] text-zinc-600">
+                #{t.id} · {t.messageCount} mesazhe · {timeLabel(t.createdAtUtc)}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Right: Chat / New form / Empty ── */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {showNewForm ? (
+          /* ── New ticket form ── */
+          <div className={`${customerCardMuted} flex flex-col gap-4 overflow-y-auto`}>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setShowNewForm(false)} className="text-zinc-500 hover:text-zinc-300 md:hidden">&larr;</button>
+              <h2 className="text-base font-semibold text-zinc-100">Tiketë e re</h2>
+            </div>
+            <form onSubmit={(e) => void submitNew(e)} className="space-y-3">
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} required maxLength={200}
+                placeholder="Titulli i problemit"
+                className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/50" />
+              <select value={category} onChange={(e) => setCategory(Number(e.target.value))}
+                className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 outline-none">
+                {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <textarea value={body} onChange={(e) => setBody(e.target.value)} required minLength={1} maxLength={4000} rows={4}
+                placeholder="Përshkruaj problemin…"
+                className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/50" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <input value={linkOrderId} onChange={(e) => setLinkOrderId(e.target.value)} inputMode="numeric"
+                  placeholder="ID porosie (opsional)"
+                  className="rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none" />
+                <input value={linkRestaurantId} onChange={(e) => setLinkRestaurantId(e.target.value)} inputMode="numeric"
+                  placeholder="ID restoranti (opsional)"
+                  className="rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none" />
+              </div>
+              {formMsg && <p className="text-sm text-amber-200/90">{formMsg}</p>}
+              <button type="submit" disabled={formBusy} className={customerBtnPrimary}>
+                {formBusy ? 'Duke dërguar…' : 'Dërgo tiketën'}
+              </button>
+            </form>
+          </div>
+        ) : activeId == null ? (
+          /* ── Empty state ── */
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-500/10 text-2xl">💬</div>
+            <p className="text-sm text-zinc-400">Zgjidh një tiketë nga lista ose hap një të re.</p>
+          </div>
         ) : (
-          <ul className="mt-3 space-y-3">
-            {list.map((t) => {
-              const open = expandedId === t.id
-              return (
-                <li key={t.id} className={`${customerCardMuted} p-3`}>
-                  <button
-                    type="button"
-                    className="w-full text-left"
-                    onClick={() => {
-                      setExpandedId(open ? null : t.id)
-                      setReplyDraft('')
-                    }}
-                  >
-                    <p className="text-sm font-medium text-zinc-100">{t.subject}</p>
-                    <p className="mt-1 text-xs text-zinc-500">
-                      #{t.id} · {STATUS_SQ[t.status] ?? t.status} · {t.messageCount} mesazhe ·{' '}
-                      {new Date(t.createdAtUtc).toLocaleString('sq-AL')}
-                    </p>
-                  </button>
-                  {open ? (
-                    <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
-                      {threadLoading ? (
-                        <p className="text-sm text-zinc-500">Duke ngarkuar bisedën…</p>
-                      ) : thread ? (
-                        <>
-                          {thread.orderNumber || thread.restaurantName ? (
-                            <p className="text-xs text-zinc-500">
-                              {thread.orderNumber ? (
-                                <span>Porosi: {thread.orderNumber}</span>
-                              ) : null}
-                              {thread.orderNumber && thread.restaurantName ? ' · ' : null}
-                              {thread.restaurantName ? (
-                                <span>Restorant: {thread.restaurantName}</span>
-                              ) : null}
-                            </p>
-                          ) : null}
-                          <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3">
-                            <p className="text-xs text-violet-300/90">Mesazhi fillestar</p>
-                            <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
-                          </div>
-                          {thread.messages.map((m) => (
-                            <div
-                              key={m.id}
-                              className={`rounded-lg border p-3 ${
-                                m.isStaffReply
-                                  ? 'border-violet-500/30 bg-violet-950/20'
-                                  : 'border-white/10 bg-zinc-950/40'
-                              }`}
-                            >
-                              <p className="text-xs text-zinc-500">
-                                {m.isStaffReply ? 'Support' : 'Ti'} · {m.authorEmail} ·{' '}
-                                {new Date(m.createdAtUtc).toLocaleString('sq-AL')}
-                              </p>
-                              <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{m.body}</p>
-                            </div>
-                          ))}
-                          {thread.status === 0 ? (
-                            <form onSubmit={(e) => void sendReply(e)} className="space-y-2">
-                              <label className="block text-xs text-zinc-500">
-                                Shto përgjigje
-                                <textarea
-                                  value={replyDraft}
-                                  onChange={(e) => setReplyDraft(e.target.value)}
-                                  required
-                                  minLength={1}
-                                  maxLength={4000}
-                                  rows={3}
-                                  className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
-                                />
-                              </label>
-                              <button type="submit" disabled={replyBusy} className={customerBtnPrimary}>
-                                {replyBusy ? 'Duke dërguar…' : 'Dërgo'}
-                              </button>
-                            </form>
-                          ) : (
-                            <p className="text-sm text-zinc-500">Tiketa është e mbyllur — nuk mund të shtosh mesazhe.</p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm text-zinc-500">Nuk u gjet thread-i.</p>
-                      )}
+          /* ── Chat view ── */
+          <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#171c28]/80">
+            {/* Header */}
+            <div className="shrink-0 border-b border-white/[0.08] px-4 py-3">
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setActiveId(null)} className="text-zinc-500 hover:text-zinc-300 md:hidden">&larr;</button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-zinc-100">
+                    {thread?.subject ?? activeRow?.subject ?? `Tiketa #${activeId}`}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {activeRow && (
+                      <>
+                        <span className={`rounded-full border px-2 py-px text-[10px] font-semibold ${STATUS_COLORS[activeRow.status] ?? ''}`}>
+                          {STATUS_LABELS[activeRow.status] ?? '?'}
+                        </span>
+                        <span className={`rounded-full border px-2 py-px text-[10px] font-semibold ${PRIORITY_COLORS[activeRow.priority] ?? ''}`}>
+                          {PRIORITY_LABELS[activeRow.priority] ?? '?'}
+                        </span>
+                        <span className="text-[10px] text-zinc-500">{CATEGORY_LABELS[activeRow.category] ?? 'Tjetër'}</span>
+                      </>
+                    )}
+                    {thread?.orderNumber && <span className="text-[10px] text-zinc-500">Porosi: {thread.orderNumber}</span>}
+                    {thread?.restaurantName && <span className="text-[10px] text-zinc-500">Restorant: {thread.restaurantName}</span>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 scrollbar-thin">
+              {threadLoading ? (
+                <p className="py-12 text-center text-sm text-zinc-500">Duke ngarkuar bisedën…</p>
+              ) : thread ? (
+                <>
+                  {/* Initial message (always from customer) */}
+                  <div className="flex justify-start">
+                    <div className="max-w-[80%] rounded-2xl rounded-bl-md border border-white/[0.08] bg-[#1e2438] px-3.5 py-2.5">
+                      <p className="whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
+                      <p className="mt-1 text-right text-[10px] text-zinc-500">{timeLabel(thread.createdAtUtc)}</p>
                     </div>
-                  ) : null}
-                </li>
-              )
-            })}
-          </ul>
+                  </div>
+
+                  {thread.messages.map((m) => (
+                    <div key={m.id} className={`flex ${m.isStaffReply ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 ${
+                        m.isStaffReply
+                          ? 'rounded-br-md border border-violet-500/25 bg-violet-950/40'
+                          : 'rounded-bl-md border border-white/[0.08] bg-[#1e2438]'
+                      }`}>
+                        {m.isStaffReply && (
+                          <p className="mb-0.5 text-[10px] font-medium text-violet-300/80">Support</p>
+                        )}
+                        <p className="whitespace-pre-wrap text-sm text-zinc-200">{m.body}</p>
+                        <p className={`mt-1 text-[10px] ${m.isStaffReply ? 'text-left text-violet-400/50' : 'text-right text-zinc-500'}`}>
+                          {timeLabel(m.createdAtUtc)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </>
+              ) : (
+                <p className="py-12 text-center text-sm text-zinc-500">Nuk u gjet biseda.</p>
+              )}
+            </div>
+
+            {/* Input bar */}
+            {thread && thread.status !== 3 ? (
+              <div className="shrink-0 border-t border-white/[0.08] p-3">
+                {chatMsg && <p className="mb-2 text-xs text-amber-300">{chatMsg}</p>}
+                <form onSubmit={(e) => void sendReply(e)} className="flex items-end gap-2">
+                  <textarea
+                    value={replyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={1}
+                    maxLength={4000}
+                    placeholder="Shkruaj përgjigje…"
+                    className="flex-1 resize-none rounded-xl border border-white/10 bg-[#141928] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/40"
+                  />
+                  <button type="submit" disabled={replyBusy || !replyDraft.trim()}
+                    className="shrink-0 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-40">
+                    {replyBusy ? '…' : 'Dërgo'}
+                  </button>
+                </form>
+                <p className="mt-2 text-[10px] text-zinc-600 text-center">Support-i zakonisht përgjigjet brenda disa minutave</p>
+              </div>
+            ) : thread?.status === 3 ? (
+              <div className="shrink-0 border-t border-white/[0.08] px-4 py-3 text-center text-sm text-zinc-500">
+                Tiketa është e mbyllur — nuk mund të dërgosh mesazhe.
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
-    </section>
+    </div>
   )
 }
