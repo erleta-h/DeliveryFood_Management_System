@@ -14,19 +14,18 @@ public sealed class AuthService : IAuthService
     private readonly IUnitOfWork _uow;
     private readonly IPasswordHasher<User> _passwordHasher;
     private readonly IJwtTokenIssuer _jwt;
-   // private readonly IGeocodingService _geocode;
+    private readonly IRefreshTokenService _refreshTokens;
 
     public AuthService(
         IUnitOfWork uow,
         IPasswordHasher<User> passwordHasher,
-        IJwtTokenIssuer jwt //,
-       // IGeocodingService geocode
-      )
+        IJwtTokenIssuer jwt,
+        IRefreshTokenService refreshTokens)
     {
         _uow = uow;
         _passwordHasher = passwordHasher;
         _jwt = jwt;
-       //_geocode = geocode;
+        _refreshTokens = refreshTokens;
     }
 
     public async Task<AuthResult> RegisterCustomerAsync(RegisterCustomerRequest request, CancellationToken cancellationToken = default)
@@ -86,22 +85,15 @@ public sealed class AuthService : IAuthService
             IsDefault = true,
             CreatedAt = now,
         };
-        await ApplyGeocodeAsync(customerAddr, cancellationToken);
         _uow.Repository<CustomerAddress, long>().Add(customerAddr);
 
         await _uow.SaveChangesAsync(cancellationToken);
 
-        var token = _jwt.CreateAccessToken(
-            user.Id,
-            user.Email,
-            new[] { CustomerRoleName },
-            Array.Empty<string>(),
-            out var exp);
         var dto = await LoadAuthUserDtoAsync(user.Id, cancellationToken);
         if (dto is null)
             return AuthResult.Fail("Regjistrimi dështoi pas krijimit të llogarisë.", AuthErrorCode.Validation);
 
-        return AuthResult.Ok(new AuthResponseDto(token, exp, dto));
+        return await IssueSessionAsync(user.Id, user.Email, new[] { CustomerRoleName }, Array.Empty<string>(), dto, cancellationToken);
     }
 
     public async Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
@@ -134,9 +126,47 @@ public sealed class AuthService : IAuthService
         if (roleNames.Count == 0)
             roleNames.Add(CustomerRoleName);
         var permissions = await LoadPermissionNamesForUserAsync(user.Id, cancellationToken);
-        var token = _jwt.CreateAccessToken(user.Id, user.Email, roleNames, permissions, out var exp);
         var dto = MapUser(user);
-        return AuthResult.Ok(new AuthResponseDto(token, exp, dto));
+        return await IssueSessionAsync(user.Id, user.Email, roleNames, permissions, dto, cancellationToken);
+    }
+
+    public async Task<AuthResult> RefreshAsync(string refreshTokenPlain, CancellationToken cancellationToken = default)
+    {
+        var rotated = await _refreshTokens.RotateAsync(refreshTokenPlain, cancellationToken);
+        if (rotated is null)
+            return AuthResult.Fail("Sesioni ka skaduar. Hyr përsëri.", AuthErrorCode.InvalidRefreshToken);
+
+        var (newPlain, refreshExp, userId) = rotated.Value;
+
+        var user = await _uow.Repository<User, long>().Query.AsNoTracking()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null || !user.IsActive)
+            return AuthResult.Fail("Sesioni ka skaduar. Hyr përsëri.", AuthErrorCode.InvalidRefreshToken);
+
+        var roleNames = user.UserRoles
+            .Select(ur => ur.Role.Name)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        if (roleNames.Count == 0)
+            roleNames.Add(CustomerRoleName);
+
+        var permissions = await LoadPermissionNamesForUserAsync(user.Id, cancellationToken);
+        var dto = await LoadAuthUserDtoAsync(user.Id, cancellationToken);
+        if (dto is null)
+            return AuthResult.Fail("Sesioni ka skaduar. Hyr përsëri.", AuthErrorCode.InvalidRefreshToken);
+
+        var access = _jwt.CreateAccessToken(user.Id, user.Email, roleNames, permissions, out var accessExp);
+        return AuthResult.Ok(new AuthResponseDto(access, accessExp, dto, refreshExp), newPlain);
+    }
+
+    public Task LogoutAsync(string? refreshTokenPlain, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(refreshTokenPlain))
+            return _refreshTokens.RevokeAsync(refreshTokenPlain, cancellationToken);
+        return Task.CompletedTask;
     }
 
     public async Task<AuthUserDto?> GetProfileAsync(long userId, CancellationToken cancellationToken = default)
@@ -189,19 +219,15 @@ public sealed class AuthService : IAuthService
             addr.UpdatedAt = DateTime.UtcNow;
         }
 
-        if (request.Line1 != null || request.City != null || request.PostalCode != null)
-            await ApplyGeocodeAsync(addr, cancellationToken);
+        if (request.Latitude is not null && request.Longitude is not null)
+        {
+            addr.Latitude = request.Latitude;
+            addr.Longitude = request.Longitude;
+        }
 
         await _uow.SaveChangesAsync(cancellationToken);
         var dto = await LoadAuthUserDtoAsync(userId, cancellationToken);
         return (dto, null);
-    }
-
-    private async Task ApplyGeocodeAsync(CustomerAddress addr, CancellationToken cancellationToken)
-    {
-       // var (lat, lng) = await _geocode.GeocodeAddressAsync(addr.Line1, addr.City, addr.PostalCode, cancellationToken);
-        //addr.Latitude = lat;
-       // addr.Longitude = lng;
     }
 
     public async Task<string?> ChangePasswordAsync(
@@ -237,9 +263,14 @@ public sealed class AuthService : IAuthService
         user.UpdatedById = userId;
 
         var refresh = await _uow.Repository<RefreshToken, long>().Query
-            .Where(t => t.UserId == user.Id)
+            .Where(t => t.UserId == user.Id && t.RevokedAt == null)
             .ToListAsync(cancellationToken);
-        _uow.Repository<RefreshToken, long>().RemoveRange(refresh);
+        var nowRevoke = DateTime.UtcNow;
+        foreach (var t in refresh)
+        {
+            t.RevokedAt = nowRevoke;
+            t.UpdatedAt = nowRevoke;
+        }
 
         _uow.Repository<AuditLog, long>().Add(new AuditLog
         {
@@ -254,6 +285,19 @@ public sealed class AuthService : IAuthService
 
         await _uow.SaveChangesAsync(cancellationToken);
         return null;
+    }
+
+    private async Task<AuthResult> IssueSessionAsync(
+        long userId,
+        string email,
+        IReadOnlyList<string> roleNames,
+        IReadOnlyList<string> permissions,
+        AuthUserDto dto,
+        CancellationToken cancellationToken)
+    {
+        var access = _jwt.CreateAccessToken(userId, email, roleNames, permissions, out var accessExp);
+        var (plain, refreshExp) = await _refreshTokens.CreateAsync(userId, cancellationToken);
+        return AuthResult.Ok(new AuthResponseDto(access, accessExp, dto, refreshExp), plain);
     }
 
     private async Task<IReadOnlyList<string>> LoadPermissionNamesForUserAsync(
