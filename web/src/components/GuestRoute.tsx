@@ -18,7 +18,7 @@ export function GuestRoute() {
 
     /** Stafi → kuzhina, përveç nëse po hap /login me `next=driver` ose `next=app|customer`. */
     if (hasRestaurantStaffRole(token) && !wantDriverLogin && !wantClientApp)
-      return <Navigate to="/kitchen/orders" replace />
+      return <Navigate to="/kitchen" replace />
 
     if (hasDriverRole(token)) {
       if (wantDriverLogin) return <Outlet />

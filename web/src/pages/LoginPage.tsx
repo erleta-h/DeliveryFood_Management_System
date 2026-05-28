@@ -17,6 +17,12 @@ import {
   enableStaffCustomerAppMode,
 } from '../lib/staffCustomerApp'
 
+function loginSubtitle(next: string | null): string {
+  if (next === 'admin') return 'Hyrje për administrimin e platformës.'
+  if (next === 'driver') return 'Hyrje për llogarinë e deliverit.'
+  return 'Vendos emailin dhe fjalëkalimin për të vazhduar.'
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -64,13 +70,13 @@ export default function LoginPage() {
       /** Stafi i restorantit → paneli i porosive, përveç kur kërkohet qartë aplikacioni klient (`?next=app|customer`). */
       if (t && hasRestaurantStaffRole(t) && !wantClientApp) {
         clearStaffCustomerAppMode()
-        navigate('/kitchen/orders', { replace: true })
+        navigate('/kitchen', { replace: true })
         return
       }
 
       if (t && wantKitchen && hasRestaurantStaffRole(t)) {
         clearStaffCustomerAppMode()
-        navigate('/kitchen/orders', { replace: true })
+        navigate('/kitchen', { replace: true })
         return
       }
       if (t && wantClientApp && hasRestaurantStaffRole(t)) {
@@ -106,13 +112,7 @@ export default function LoginPage() {
 
         <section className={`${customerCard} animate-auth-panel-in`}>
           <h1 className="text-2xl font-bold text-zinc-100">Hyr në llogari</h1>
-          <p className={customerPanelSubtitle}>
-            {searchParams.get('next') === 'admin'
-              ? 'Hyr si administrator: vendos email dhe fjalëkalim të llogarisë që ka rol Admin në sistem.'
-              : searchParams.get('next') === 'driver'
-                ? 'Hyr me llogarinë e miratuar si Deliver (Driver). Nëse je kyçur si klient, përdor kredencialet e Deliver ose dil dhe hy përsëri.'
-                : 'Përdor emailin dhe fjalëkalimin. Stafi i restorantit çohet te paneli i kuzhinës; për hyrje si klient me të njëjtën llogari përdor /login?next=app.'}
-          </p>
+          <p className={customerPanelSubtitle}>{loginSubtitle(searchParams.get('next'))}</p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
             <div>
