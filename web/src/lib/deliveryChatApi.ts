@@ -7,6 +7,8 @@ export type DeliveryChatMessage = {
   senderRole: string
   body: string
   createdAtUtc: string
+  isDelivered: boolean
+  seenAtUtc: string | null
 }
 
 /** Hub-i / JSON ndonjëherë dërgon PascalCase — normalizo për krahasim dhe UI. */
@@ -19,8 +21,11 @@ export function normalizeDeliveryChatMessage(raw: unknown): DeliveryChatMessage 
   const senderRole = String(r.senderRole ?? r.SenderRole ?? '')
   const body = String(r.body ?? r.Body ?? '')
   const createdAtUtc = String(r.createdAtUtc ?? r.CreatedAtUtc ?? '')
+  const isDelivered = Boolean(r.isDelivered ?? r.IsDelivered ?? false)
+  const seenRaw = r.seenAtUtc ?? r.SeenAtUtc ?? null
+  const seenAtUtc = seenRaw ? String(seenRaw) : null
   if (!Number.isFinite(id) || !Number.isFinite(orderId) || !Number.isFinite(senderUserId)) return null
-  return { id, orderId, senderUserId, senderRole, body, createdAtUtc }
+  return { id, orderId, senderUserId, senderRole, body, createdAtUtc, isDelivered, seenAtUtc }
 }
 
 function authHeader(token: string) {
@@ -69,4 +74,11 @@ export async function postDeliveryChatMessage(
     /* ignore */
   }
   return { ok: false, message }
+}
+
+export async function markChatSeen(token: string, orderId: number): Promise<void> {
+  await fetch(apiPath(`/api/orders/${orderId}/delivery-chat/mark-seen`), {
+    method: 'POST',
+    headers: { ...authHeader(token) },
+  })
 }

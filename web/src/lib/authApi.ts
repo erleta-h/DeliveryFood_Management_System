@@ -9,6 +9,7 @@ import {
 } from './apiClient'
 
 export type AuthUser = {
+  id: number
   email: string
   firstName: string
   lastName: string
@@ -30,6 +31,7 @@ function authHeader(token: string) {
 
 export function mapAuthUser(data: AuthUser): AuthUser {
   return {
+      id: data.id,
     email: data.email,
     firstName: data.firstName,
     lastName: data.lastName,
