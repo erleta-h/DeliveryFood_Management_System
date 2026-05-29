@@ -21,7 +21,7 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Register([FromBody] RegisterCustomerRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.RegisterCustomerAsync(request, cancellationToken);
-        return FromAuthResult(result);
+        return FromAuthResult(result, setRefreshCookie: true);
     }
 
     [HttpPost("login")]
@@ -29,7 +29,29 @@ public sealed class AuthController : ControllerBase
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var result = await _auth.LoginAsync(request, cancellationToken);
-        return FromAuthResult(result);
+        return FromAuthResult(result, setRefreshCookie: true);
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var plain = AuthCookieHelper.ReadRefreshCookie(Request);
+        if (string.IsNullOrWhiteSpace(plain))
+            return Unauthorized(new { error = "Sesioni ka skaduar. Hyr përsëri.", code = AuthErrorCode.InvalidRefreshToken });
+
+        var result = await _auth.RefreshAsync(plain, cancellationToken);
+        return FromAuthResult(result, setRefreshCookie: true);
+    }
+
+    [HttpPost("logout")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    {
+        var plain = AuthCookieHelper.ReadRefreshCookie(Request);
+        await _auth.LogoutAsync(plain, cancellationToken);
+        AuthCookieHelper.DeleteRefreshCookie(Response, Request);
+        return NoContent();
     }
 
     [HttpGet("me")]
@@ -69,19 +91,35 @@ public sealed class AuthController : ControllerBase
             return Unauthorized();
 
         var error = await _auth.ChangePasswordAsync(userId.Value, request, cancellationToken);
-        return error is null ? NoContent() : BadRequest(new { error });
+        if (error is not null)
+            return BadRequest(new { error });
+
+        AuthCookieHelper.DeleteRefreshCookie(Response, Request);
+        return NoContent();
     }
 
-    private IActionResult FromAuthResult(AuthResult result)
+    private IActionResult FromAuthResult(AuthResult result, bool setRefreshCookie)
     {
-        if (result.Success)
-            return Ok(result.Data);
+        if (result.Success && result.Data is not null)
+        {
+            if (setRefreshCookie && !string.IsNullOrEmpty(result.RefreshTokenPlain))
+                AuthCookieHelper.SetRefreshCookie(Response, Request, result.RefreshTokenPlain, result.Data.RefreshExpiresAtUtc);
+
+            return Ok(new
+            {
+                token = result.Data.Token,
+                expiresAtUtc = result.Data.ExpiresAtUtc,
+                refreshExpiresAtUtc = result.Data.RefreshExpiresAtUtc,
+                user = result.Data.User,
+            });
+        }
 
         var payload = new { error = result.Error, code = result.Code };
         return result.Code switch
         {
             AuthErrorCode.DuplicateEmail => Conflict(payload),
             AuthErrorCode.InvalidCredentials => Unauthorized(payload),
+            AuthErrorCode.InvalidRefreshToken => Unauthorized(payload),
             AuthErrorCode.InactiveUser => StatusCode(StatusCodes.Status403Forbidden, payload),
             AuthErrorCode.RoleMissing => StatusCode(StatusCodes.Status503ServiceUnavailable, payload),
             _ => BadRequest(payload),

@@ -10,7 +10,11 @@ public record AuthUserDto(
     string? PostalCode,
     bool MustChangePassword);
 
-public record AuthResponseDto(string Token, DateTime ExpiresAtUtc, AuthUserDto User);
+public record AuthResponseDto(
+    string Token,
+    DateTime ExpiresAtUtc,
+    AuthUserDto User,
+    DateTime RefreshExpiresAtUtc);
 
 public record RegisterCustomerRequest(
     string Email,
@@ -24,6 +28,6 @@ public record RegisterCustomerRequest(
 
 public record LoginRequest(string Email, string Password);
 
-public record UpdateCustomerProfileRequest(string? Line1, string? City, string? PostalCode, string? Phone);
+public record UpdateCustomerProfileRequest(string? Line1, string? City, string? PostalCode, string? Phone, double? Latitude, double? Longitude);
 
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);

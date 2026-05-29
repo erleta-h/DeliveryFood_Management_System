@@ -9,4 +9,5 @@ public interface IStripePaymentService
         CancellationToken cancellationToken = default);
 
     Task HandleWebhookAsync(string json, string stripeSignature, CancellationToken cancellationToken = default);
+    Task<string?> ConfirmAfterPaymentAsync(long userId, long orderId, CancellationToken cancellationToken = default);
 }

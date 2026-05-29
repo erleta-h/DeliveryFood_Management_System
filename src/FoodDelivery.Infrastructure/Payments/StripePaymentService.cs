@@ -184,12 +184,54 @@ public sealed class StripePaymentService : IStripePaymentService
                             order.UserId,
                             order.OrderNumber,
                             cancellationToken);
-                       // await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken)
-                           // .ConfigureAwait(false);
                     }
                 }
             }
         }
+    }
+
+    public async Task<string?> ConfirmAfterPaymentAsync(
+        long userId,
+        long orderId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_stripe.SecretKey))
+            return "Stripe nuk është konfiguruar në server.";
+
+        StripeConfiguration.ApiKey = _stripe.SecretKey;
+
+        var payment = await _uow.Repository<Payment, long>().Query
+            .FirstOrDefaultAsync(
+                p => p.Order!.Id == orderId
+                     && p.Order.UserId == userId
+                     && p.Provider == "stripe",
+                cancellationToken);
+
+        if (payment is null)
+            return "Pagesa nuk u gjet.";
+
+        if (payment.Status == PaymentStatus.Captured)
+            return null;
+
+        if (string.IsNullOrEmpty(payment.ExternalId))
+            return "PaymentIntent mungon.";
+
+        var service = new PaymentIntentService();
+        PaymentIntent pi;
+        try
+        {
+            pi = await service.GetAsync(payment.ExternalId, cancellationToken: cancellationToken);
+        }
+        catch (StripeException ex)
+        {
+            return ex.StripeError?.Message ?? ex.Message;
+        }
+
+        if (pi.Status != "succeeded")
+            return $"Pagesa ende nuk është konfirmuar (status: {pi.Status}).";
+
+        await MarkStripePaymentCapturedAsync(pi.Id, pi.Status, cancellationToken);
+        return null;
     }
 
     private async Task MarkStripePaymentCapturedAsync(
@@ -228,6 +270,5 @@ public sealed class StripePaymentService : IStripePaymentService
             .Select(o => o.RestaurantId)
             .FirstOrDefaultAsync(cancellationToken);
         await _realtime.NotifyRestaurantNewOrderAsync(payment.OrderId, restaurantId, cancellationToken);
-        //await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken).ConfigureAwait(false);
     }
 }

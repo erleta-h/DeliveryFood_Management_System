@@ -6,6 +6,10 @@ public interface IAuthService
 
     Task<AuthResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
 
+    Task<AuthResult> RefreshAsync(string refreshTokenPlain, CancellationToken cancellationToken = default);
+
+    Task LogoutAsync(string? refreshTokenPlain, CancellationToken cancellationToken = default);
+
     Task<AuthUserDto?> GetProfileAsync(long userId, CancellationToken cancellationToken = default);
 
     /// <returns>(User, null) sukses; (null, ValidationError) gabim validimi; (null, null) përdoruesi nuk u gjet.</returns>
@@ -28,9 +32,11 @@ public sealed class AuthResult
     public AuthResponseDto? Data { get; private init; }
     public string? Error { get; private init; }
     public AuthErrorCode? Code { get; private init; }
+    /// <summary>Plaintext refresh — vetëm për vendosje cookie; mos e kthe në JSON.</summary>
+    public string? RefreshTokenPlain { get; private init; }
 
-    public static AuthResult Ok(AuthResponseDto data) =>
-        new() { Success = true, Data = data };
+    public static AuthResult Ok(AuthResponseDto data, string? refreshTokenPlain = null) =>
+        new() { Success = true, Data = data, RefreshTokenPlain = refreshTokenPlain };
 
     public static AuthResult Fail(string message, AuthErrorCode code) =>
         new() { Success = false, Error = message, Code = code };
@@ -43,4 +49,5 @@ public enum AuthErrorCode
     InactiveUser,
     RoleMissing,
     Validation,
+    InvalidRefreshToken,
 }

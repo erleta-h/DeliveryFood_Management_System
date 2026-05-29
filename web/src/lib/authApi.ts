@@ -1,5 +1,12 @@
 import { apiPath } from './apiBase'
 import { networkErrorMessage, readApiErrorMessage } from './apiErrors'
+import {
+  bootstrapSessionFromCookie,
+  fetchWithAuth,
+  logoutSession,
+  refreshSession,
+  type AuthSessionPayload,
+} from './apiClient'
 
 export type AuthUser = {
   email: string
@@ -9,15 +16,11 @@ export type AuthUser = {
   line1: string
   city: string
   postalCode?: string | null
-    /** True kur admini ka dhënë fjalëkalim të përkohshëm — paneli kërkon ndryshim para përdorimit të plotë. */
+  /** True kur admini ka dhënë fjalëkalim të përkohshëm — paneli kërkon ndryshim para përdorimit të plotë. */
   mustChangePassword?: boolean
 }
 
-export type AuthResponse = {
-  token: string
-  expiresAtUtc: string
-  user: AuthUser
-}
+export type AuthResponse = AuthSessionPayload & { user: AuthUser }
 
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
@@ -33,7 +36,6 @@ export function mapAuthUser(data: AuthUser): AuthUser {
     city: data.city,
     postalCode: data.postalCode ?? undefined,
     mustChangePassword: data.mustChangePassword === true,
-
   }
 }
 
@@ -51,6 +53,7 @@ export async function registerCustomer(body: {
     const res = await fetch(apiPath('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     })
     if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
@@ -69,6 +72,7 @@ export async function loginCustomer(
     const res = await fetch(apiPath('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, password }),
     })
     if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
@@ -79,10 +83,8 @@ export async function loginCustomer(
   }
 }
 
-export async function fetchCurrentUser(
-  token: string,
-): Promise<AuthUser | null> {
-  const res = await fetch(apiPath('/api/auth/me'), {
+export async function fetchCurrentUser(token: string): Promise<AuthUser | null> {
+  const res = await fetchWithAuth('/api/auth/me', {
     headers: { ...authHeader(token) },
   })
   if (res.status === 401 || res.status === 403) return null
@@ -93,16 +95,18 @@ export async function fetchCurrentUser(
 
 export async function patchCustomerProfile(
   token: string,
-  partial: { line1?: string; city?: string; postalCode?: string; phone?: string },
+  partial: { line1?: string; city?: string; postalCode?: string; phone?: string; latitude?: number; longitude?: number },
 ): Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }> {
-  const res = await fetch(apiPath('/api/auth/profile'), {
-    method: 'PATCH',
+  const res = await fetchWithAuth('/api/auth/profile', {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({
       ...(partial.line1 !== undefined ? { line1: partial.line1 } : {}),
       ...(partial.city !== undefined ? { city: partial.city } : {}),
       ...(partial.postalCode !== undefined ? { postalCode: partial.postalCode } : {}),
       ...(partial.phone !== undefined ? { phone: partial.phone } : {}),
+      ...(partial.latitude !== undefined ? { latitude: partial.latitude } : {}),
+      ...(partial.longitude !== undefined ? { longitude: partial.longitude } : {}),
     }),
   })
   if (!res.ok) return { ok: false, error: await readApiErrorMessage(res) }
@@ -110,13 +114,13 @@ export async function patchCustomerProfile(
   return { ok: true, user: mapAuthUser(user) }
 }
 
-/** Për çdo rol të kyçur; invalidon refresh token-et — nëse përdor «mba mend», duhet hyrje përsëri. */
+/** Invalidon refresh token-et në server — pas ndryshimit të fjalëkalimit duhet hyrje përsëri. */
 export async function changePassword(
   token: string,
   currentPassword: string,
   newPassword: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await fetch(apiPath('/api/auth/change-password'), {
+  const res = await fetchWithAuth('/api/auth/change-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ currentPassword, newPassword }),
@@ -124,3 +128,4 @@ export async function changePassword(
   if (res.status === 204) return { ok: true }
   return { ok: false, error: await readApiErrorMessage(res) }
 }
+export { bootstrapSessionFromCookie, fetchWithAuth, logoutSession, refreshSession }
