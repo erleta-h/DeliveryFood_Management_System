@@ -631,13 +631,20 @@ export type AdminSupportTicketRow = {
   subject: string
   body: string
   status: number
+  category: number
+  priority: number
   createdAtUtc: string
   updatedAtUtc: string | null
+  resolvedAtUtc: string | null
   adminNote: string | null
   orderId: number | null
   orderNumber: string | null
   restaurantId: number | null
   restaurantName: string | null
+  driverId: number | null
+  driverName: string | null
+  assignedToUserId: number | null
+  assignedToEmail: string | null
   messageCount: number
 }
 
@@ -650,13 +657,20 @@ export type AdminSupportTicketListResult = {
 
 export async function fetchAdminSupportTickets(
   token: string,
-  q: { search?: string; sort?: string; page?: number; pageSize?: number },
+  q: {
+    search?: string; sort?: string; page?: number; pageSize?: number
+    status?: number | null; category?: number | null; priority?: number | null; assignedTo?: number | null
+  },
 ): Promise<AdminSupportTicketListResult> {
   const p = new URLSearchParams()
   if (q.search?.trim()) p.set('search', q.search.trim())
   if (q.sort?.trim()) p.set('sort', q.sort.trim())
   p.set('page', String(q.page ?? 1))
   p.set('pageSize', String(q.pageSize ?? 25))
+  if (q.status != null) p.set('status', String(q.status))
+  if (q.category != null) p.set('category', String(q.category))
+  if (q.priority != null) p.set('priority', String(q.priority))
+  if (q.assignedTo != null) p.set('assignedTo', String(q.assignedTo))
   const res = await fetch(apiPath(`/api/admin/support/tickets?${p}`), {
     headers: { ...authHeader(token) },
   })
@@ -701,13 +715,20 @@ export type AdminSupportTicketThread = {
   subject: string
   initialBody: string
   status: number
+  category: number
+  priority: number
   createdAtUtc: string
   updatedAtUtc: string | null
+  resolvedAtUtc: string | null
   adminNote: string | null
   orderId: number | null
   orderNumber: string | null
   restaurantId: number | null
   restaurantName: string | null
+  driverId: number | null
+  driverName: string | null
+  assignedToUserId: number | null
+  assignedToEmail: string | null
   messages: AdminSupportTicketMessageRow[]
 }
 
@@ -742,6 +763,73 @@ export async function postAdminSupportTicketMessage(
     /* ignore */
   }
   return { ok: false, message }
+}
+
+export async function adminAssignTicket(
+  token: string,
+  ticketId: number,
+  agentUserId: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/support/tickets/${ticketId}/assign`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ agentUserId }),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try { const j = (await res.json()) as { message?: string }; if (j.message) message = j.message } catch { /* */ }
+  return { ok: false, message }
+}
+
+export async function adminChangeTicketStatus(
+  token: string,
+  ticketId: number,
+  status: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/support/tickets/${ticketId}/status`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ status }),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try { const j = (await res.json()) as { message?: string }; if (j.message) message = j.message } catch { /* */ }
+  return { ok: false, message }
+}
+
+export async function adminChangeTicketPriority(
+  token: string,
+  ticketId: number,
+  priority: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/support/tickets/${ticketId}/priority`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ priority }),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try { const j = (await res.json()) as { message?: string }; if (j.message) message = j.message } catch { /* */ }
+  return { ok: false, message }
+}
+
+export type AdminTicketAuditRow = {
+  id: number
+  actorUserId: number
+  actorEmail: string
+  action: string
+  createdAtUtc: string
+}
+
+export async function fetchAdminTicketAudit(
+  token: string,
+  ticketId: number,
+): Promise<AdminTicketAuditRow[]> {
+  const res = await fetch(apiPath(`/api/admin/support/tickets/${ticketId}/audit`), {
+    headers: { ...authHeader(token) },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminTicketAuditRow[]>
 }
 
 // --- Delivera ---

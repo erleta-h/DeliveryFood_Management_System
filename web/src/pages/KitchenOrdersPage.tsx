@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import {
   fetchKitchenAssignableDrivers,
@@ -17,6 +16,17 @@ import {
 import { DRIVER_LEG } from '../lib/driverApi'
 import { distanceKmBetween, type LatLng } from '../lib/geo'
 import { createOrdersHubConnection } from '../lib/orderHub'
+import {
+  ColumnEmptyState,
+  KanbanColumn,
+  MerchantAssignDriverBtn,
+  MerchantDetailsBtn,
+  MerchantGhostBtn,
+  MerchantOrderCard,
+  MerchantPrimaryBtn,
+  RecentHistorySection,
+  StatsRow,
+} from '../components/kitchen/MerchantKitchenUi.tsx'
 
 /** Tingull i shkurtër për porosi të re (tablet). */
 function playNewOrderChime() {
@@ -149,7 +159,7 @@ function woltEnRouteParts(): { lead: string; timePart: string; timeGreen: boolea
  * «Out»: kupon porosi. «Ready» + delivery pa korrier: tre kuponat më të afërt; prekja cakton manualisht.
  * Gjatë përgatitjes të njëjtat kuponat (vetëm pamje) rifreskohen me listën e korrierëve të panelit.
  */
-function DeliverWoltRailCard({
+export function DeliverWoltRailCard({
   o,
   nowMs,
   mode,
@@ -302,9 +312,6 @@ const dangerActionLink =
   'w-full py-1 text-center text-xs font-medium text-red-400/90 hover:text-red-300 disabled:opacity-45'
 const woltGhostBtn =
   'rounded-xl border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-white/[0.08] disabled:opacity-40'
-const woltStatCard =
-  'rounded-2xl border border-white/[0.06] bg-[#14161c] p-3.5 text-center shadow-sm sm:p-4'
-
 function PrepMinutesEditor({
   orderId,
   minutes,
@@ -677,7 +684,7 @@ function DriverProximityCouponsList({
   )
 }
 
-function OrderCard({
+export function OrderCard({
   o,
   busy,
   onAction,
@@ -839,24 +846,21 @@ function OrderCard({
 function KitchenBoardSkeleton() {
   return (
     <div className="space-y-4 animate-pulse" aria-hidden>
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-[4.5rem] rounded-2xl bg-[#14161c] sm:h-24" />
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-20 rounded-xl bg-[#161b22]" />
         ))}
       </div>
-      <div className="flex gap-3 overflow-hidden md:grid md:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div
-            key={i}
-            className="min-h-[12rem] min-w-[260px] flex-shrink-0 rounded-2xl border border-white/[0.05] bg-[#14161c] md:min-w-0"
-          />
+      <div className="flex gap-3 overflow-hidden lg:grid lg:grid-cols-5">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="min-h-[18rem] min-w-[220px] flex-shrink-0 rounded-xl bg-[#161b22] lg:min-w-0" />
         ))}
       </div>
     </div>
   )
 }
 
-function Column({
+export function Column({
   title,
   count,
   children,
@@ -1017,10 +1021,9 @@ export default function KitchenOrdersPage() {
     }
   }, [token, refresh])
 
-  const { incoming, preparing, ready, out, history } = useMemo(() => {
+  const { incoming, preparing, ready, out, completed, history } = useMemo(() => {
     const incoming = orders.filter((o) => o.status === S.Pending)
     const preparing = orders.filter((o) => o.status === S.Confirmed || o.status === S.Preparing)
-    /** Ready: pickup, ose dërgesë pa korrier (zgjedhje kuponash). Me korrier → vetëm në «Out». */
     const ready = orders.filter(
       (o) =>
         o.status === S.ReadyForPickup &&
@@ -1034,10 +1037,20 @@ export default function KitchenOrdersPage() {
         o.assignedDriverUserId != null
       )
     })
+    const completed = orders.filter((o) => o.status === S.Delivered).slice(0, 10)
     const history = orders
       .filter((o) => o.status === S.Delivered || o.status === S.Cancelled)
-      .slice(0, 40)
-    return { incoming, preparing, ready, out, history }
+      .slice(0, 5)
+    return { incoming, preparing, ready, out, completed, history }
+  }, [orders])
+
+  const avgPrepMinutes = useMemo(() => {
+    const active = orders.filter(
+      (o) => o.status !== S.Cancelled && o.status !== S.Delivered && o.estimatedPrepMinutes > 0,
+    )
+    if (active.length === 0) return null
+    const sum = active.reduce((a, o) => a + o.estimatedPrepMinutes, 0)
+    return Math.round(sum / active.length)
   }, [orders])
 
   /** Së fundmi në «gati për marrje» më sipër (ID më i lartë = porosi më e re në sistem). */
@@ -1058,12 +1071,6 @@ export default function KitchenOrdersPage() {
       return tb - ta
     })
   }, [out])
-
-  /** Dërgesa në kuzhinë (Confirmed/Preparing): kuponat e korrierëve vetëm në kolonën Ready, jo te karta In progress. */
-  const preparingDeliveryOpen = useMemo(
-    () => preparing.filter((o) => o.fulfillmentType !== 'pickup'),
-    [preparing],
-  )
 
   const needKitchenClock = useMemo(
     () =>
@@ -1174,8 +1181,8 @@ export default function KitchenOrdersPage() {
     <div className="space-y-5">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold tracking-tight text-white sm:text-2xl">Orders</h1>
-          <p className="mt-0.5 text-[13px] text-zinc-500">Porosi aktive · panel restoranti</p>
+          <h1 className="text-xl font-bold tracking-tight text-white sm:text-2xl">Porositë</h1>
+          <p className="mt-0.5 text-sm text-zinc-500">Porosi aktive · panel restoranti</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
@@ -1192,16 +1199,16 @@ export default function KitchenOrdersPage() {
             aria-checked={rush}
             disabled={sessionExpired}
             onClick={() => setRush((x) => !x)}
-            className={`rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
               rush
                 ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                : 'border-white/[0.1] bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06]'
+                : 'border-[#30363d] bg-[#161b22] text-zinc-400 hover:bg-[#21262d]'
             }`}
           >
             Rush {rush ? 'ON' : 'OFF'}
           </button>
-          <span className="flex max-w-[10rem] items-center gap-1.5 text-xs font-medium leading-tight text-[#3ddc84] sm:max-w-none">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-[#3ddc84] shadow-[0_0_8px_rgba(61,220,132,0.5)]" aria-hidden />
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]" aria-hidden />
             Open
           </span>
         </div>
@@ -1224,22 +1231,7 @@ export default function KitchenOrdersPage() {
       ) : null}
 
       {stats && !sessionExpired ? (
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className={woltStatCard}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Today</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{stats.ordersCount}</p>
-            <p className="text-[10px] text-zinc-500">orders · UTC</p>
-          </div>
-          <div className={woltStatCard}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Completed</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-white">{stats.completedCount}</p>
-          </div>
-          <div className={woltStatCard}>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">Revenue</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-[#3ddc84]">{stats.revenueTotal.toFixed(2)} €</p>
-            <p className="text-[10px] text-zinc-500">excl. cancelled</p>
-          </div>
-        </div>
+        <StatsRow stats={stats} inDeliveryCount={out.length} avgPrepMinutes={avgPrepMinutes} />
       ) : null}
 
       {loading ? <KitchenBoardSkeleton /> : null}
@@ -1265,160 +1257,180 @@ export default function KitchenOrdersPage() {
       ) : null}
 
       <div
-        className={`-mx-1 flex gap-3 overflow-x-auto overflow-y-visible pb-1 pt-0.5 snap-x snap-mandatory md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:snap-none xl:grid xl:grid-cols-[minmax(260px,1fr)_minmax(260px,1fr)_max-content] ${sessionExpired ? 'pointer-events-none opacity-45' : ''}`}
+        className={`flex gap-2 overflow-x-auto pb-2 lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible ${sessionExpired ? 'pointer-events-none opacity-45' : ''}`}
       >
-        <Column title="New" count={incoming.length} accent="ring-1 ring-amber-400/20">
+        <KanbanColumn kind="new" count={incoming.length}>
           {incoming.length === 0 ? (
-            <p className="px-1 py-4 text-center text-xs text-zinc-600">—</p>
+            <ColumnEmptyState
+              icon={
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M6 2h12l2 5H4l2-5zM4 7h16v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" />
+                </svg>
+              }
+              text="Nuk ka porosi të reja"
+            />
           ) : (
             incoming.map((o) => (
-              <OrderCard
+              <MerchantOrderCard
                 key={o.id}
                 o={o}
-                busy={busyId === o.id}
-                onAction={(id, st, n) => void runAction(id, st, n)}
-                onReject={setRejectForId}
-                onPrepUpdate={(oid, m) => void runPrepUpdate(oid, m)}
-                onRequestAccept={setConfirmAcceptOrderId}
+                highlight
+                footer={
+                  <div className="space-y-1">
+                    <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => setConfirmAcceptOrderId(o.id)}>
+                      Prano porosinë
+                    </MerchantPrimaryBtn>
+                    <MerchantGhostBtn busy={busyId === o.id} danger onClick={() => setRejectForId(o.id)}>
+                      Refuzo porosinë
+                    </MerchantGhostBtn>
+                  </div>
+                }
               />
             ))
           )}
-        </Column>
-        <Column title="In progress" count={preparing.length}>
+        </KanbanColumn>
+
+        <KanbanColumn kind="progress" count={preparing.length}>
           {preparing.length === 0 ? (
-            <p className="px-1 py-4 text-center text-xs text-zinc-600">—</p>
+            <ColumnEmptyState
+              icon={
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M4 14h16M6 18h12M8 10h8M10 6h4" />
+                </svg>
+              }
+              text="Nuk ka porosi në përgatitje"
+            />
           ) : (
             preparing.map((o) => (
-              <OrderCard
+              <MerchantOrderCard
                 key={o.id}
                 o={o}
-                busy={busyId === o.id}
-                onAction={(id, st, n) => void runAction(id, st, n)}
-                onReject={setRejectForId}
-                onPrepUpdate={(oid, m) => void runPrepUpdate(oid, m)}
+                statusLine={o.status === S.Confirmed ? 'E konfirmuar' : 'Në përgatitje'}
+                footer={
+                  <div className="space-y-1">
+                    <PrepMinutesEditor
+                      orderId={o.id}
+                      minutes={o.estimatedPrepMinutes}
+                      busy={busyId === o.id}
+                      onSave={(oid, m) => void runPrepUpdate(oid, m)}
+                    />
+                    {o.status === S.Confirmed ? (
+                      <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.Preparing)}>
+                        Fillo përgatitjen
+                      </MerchantPrimaryBtn>
+                    ) : (
+                      <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.ReadyForPickup)}>
+                        Gati për marrje
+                      </MerchantPrimaryBtn>
+                    )}
+                    <MerchantGhostBtn busy={busyId === o.id} danger onClick={() => setRejectForId(o.id)}>
+                      Refuzo porosinë
+                    </MerchantGhostBtn>
+                  </div>
+                }
               />
             ))
           )}
-        </Column>
-        {/* Ready + Out: bashkë me gap të vogël — shmang kolonën 1fr bosh mes tyre */}
-        <div className="flex w-max max-w-full shrink-0 snap-start gap-2 md:col-span-2 xl:col-span-1 xl:w-auto xl:max-w-none xl:justify-self-start">
-          <Column
-            title="Ready"
-            count={ready.length}
-            narrow
-            woltRail
-            bodyClassName="max-h-[min(72vh,560px)] min-h-0 overflow-y-auto overscroll-y-contain"
-          >
-            {preparingDeliveryOpen.map((o) => {
-              const short = o.orderNumber.startsWith('FD-') ? o.orderNumber.slice(3) : o.orderNumber
+        </KanbanColumn>
+
+        <KanbanColumn kind="ready" count={ready.length}>
+          {ready.length === 0 ? (
+            <ColumnEmptyState
+              icon={
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <path d="M12 3v18M8 7h8M6 11h12" />
+                </svg>
+              }
+              text="Nuk ka porosi gati"
+            />
+          ) : (
+            readyOrdered.map((o) => {
+              const needsDriver =
+                o.fulfillmentType !== 'pickup' && o.assignedDriverUserId == null
+              const nearestId = needsDriver
+                ? pickNearestAssignableDriverUserId(o, assignableDrivers)
+                : null
               return (
-                <div
-                  key={`ready-prep-${o.id}`}
-                  className="mb-3 max-h-[min(48vh,400px)] overflow-y-auto overscroll-y-contain pr-0.5"
-                >
-                  <DriverProximityCouponsList
-                    o={o}
-                    assignableDrivers={assignableDrivers}
-                    interactive={false}
-                    intro={
-                      preparingDeliveryOpen.length > 1 ? (
-                        <>
-                          <span className="font-semibold tabular-nums text-zinc-300">#{short}</span>
-                          {' — '}
-                          <span className="font-medium text-zinc-400">3 Deliver-at</span> më të afërt (GPS); rifreskim
-                          automatik. «Gati për marrje» → <span className="font-semibold text-zinc-300">#1</span>.
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium text-zinc-400">3 Deliver-at</span> më të afërt (GPS); rendi
-                          rifreskohet me panelin. «Gati për marrje» cakton{' '}
-                          <span className="font-semibold text-zinc-300">#1</span> (më i afërmi në këtë listë).
-                        </>
-                      )
-                    }
-                  />
-                </div>
+                <MerchantOrderCard
+                  key={o.id}
+                  o={o}
+                  nowMs={nowMs}
+                  statusLine="Gati për dërgesë"
+                  footer={
+                    needsDriver ? (
+                      <MerchantAssignDriverBtn
+                        busy={busyId === o.id}
+                        onClick={() => {
+                          if (nearestId != null) void runAssignDriver(o.id, nearestId)
+                          else setActionError('Nuk ka driver online për caktim.')
+                        }}
+                      />
+                    ) : o.fulfillmentType === 'pickup' ? (
+                      <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.Delivered)}>
+                        Klienti e mori
+                      </MerchantPrimaryBtn>
+                    ) : null
+                  }
+                />
               )
-            })}
-            {readyOrdered.map((o) => (
-              <DeliverWoltRailCard
+            })
+          )}
+        </KanbanColumn>
+
+        <KanbanColumn kind="out" count={out.length}>
+          {out.length === 0 ? (
+            <ColumnEmptyState
+              icon={
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <circle cx="6" cy="17" r="2" />
+                  <circle cx="18" cy="17" r="2" />
+                  <path d="M8 17h8M6 15l2-6h7l2 4h3" />
+                </svg>
+              }
+              text="Nuk ka porosi në dorëzim"
+            />
+          ) : (
+            outOrdered.map((o) => (
+              <MerchantOrderCard
                 key={o.id}
                 o={o}
                 nowMs={nowMs}
-                mode="ready"
-                busy={busyId === o.id}
-                assignableDrivers={assignableDrivers}
-                onAssignNearest={(oid, du) => void runAssignDriver(oid, du, { immediateHandoff: false })}
-                onPickupComplete={(id) => void runAction(id, S.Delivered)}
-              />
-            ))}
-            {ready.length === 0 && preparingDeliveryOpen.length === 0 ? (
-              <p className="px-1 py-4 text-center text-[11px] leading-relaxed text-zinc-500">
-                Gjatë përgatitjes së një <span className="font-medium text-zinc-400">dërgese</span>, këtu shfaqet vetëm
-                paneli me 3 Deliver-at më të afërt (GPS). Pas caktimit të Deliver-it, porosia kalon në{' '}
-                <span className="font-medium text-zinc-400">Out for delivery</span>.
-              </p>
-            ) : null}
-        </Column>
-          <Column title="Out for delivery" count={out.length} narrow woltRail>
-            {out.length === 0 ? (
-              <p className="px-1 py-4 text-center text-xs text-zinc-600">—</p>
-            ) : (
-              outOrdered.map((o) => {
-                const useCompact =
-                  o.fulfillmentType !== 'pickup' && o.assignedDriverUserId != null
-                if (useCompact) {
-                  const railMode =
-                    o.status === S.ReadyForPickup && o.fulfillmentType !== 'pickup' ? 'ready' : 'enroute'
-                  return <DeliverWoltRailCard key={o.id} o={o} nowMs={nowMs} mode={railMode} />
+                statusLine={
+                  o.assignedDriverDisplay
+                    ? `Deliver: ${o.assignedDriverDisplay}`
+                    : 'Në rrugë për klientin'
                 }
-                return (
-                  <OrderCard
-                    key={o.id}
-                    o={o}
-                    busy={busyId === o.id}
-                    onAction={(id, st, n) => void runAction(id, st, n)}
-                    onReject={setRejectForId}
-                    onPrepUpdate={(oid, m) => void runPrepUpdate(oid, m)}
-                  />
-                )
-              })
-            )}
-          </Column>
-        </div>
+              />
+            ))
+          )}
+        </KanbanColumn>
+
+        <KanbanColumn kind="completed" count={completed.length}>
+          {completed.length === 0 ? (
+            <ColumnEmptyState
+              icon={
+                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M8 12l2.5 2.5L16 9" />
+                </svg>
+              }
+              text="Nuk ka porosi të përfunduara sot"
+            />
+          ) : (
+            completed.map((o) => (
+              <MerchantOrderCard
+                key={o.id}
+                o={o}
+                nowMs={nowMs}
+                statusLine="Dorëzuar"
+                footer={<MerchantDetailsBtn />}
+              />
+            ))
+          )}
+        </KanbanColumn>
       </div>
 
-      {history.length > 0 ? (
-        <section>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">Recent history</h2>
-            <Link
-              to="/kitchen/history"
-              className="text-[11px] font-medium text-[#009fe3] hover:text-[#5cc8ff]"
-            >
-              Historik i plotë →
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {history.map((o) => (
-              <li
-                key={o.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/[0.06] bg-[#14161c] px-3 py-2.5 text-xs text-zinc-400"
-              >
-                <span className="font-medium tabular-nums text-zinc-200">{o.orderNumber}</span>
-                <span>
-                  {o.status === S.Cancelled
-                    ? 'Refuzuar / anuluar'
-                    : o.fulfillmentType === 'pickup'
-                      ? 'Marrë në lokacion'
-                      : 'Dorëzuar'}
-                </span>
-                <span>{o.total.toFixed(2)} €</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <RecentHistorySection rows={history} historyLink="/kitchen/history" />
 
       {acceptPreviewOrder && acceptPreviewOrder.status === S.Pending ? (
         <div

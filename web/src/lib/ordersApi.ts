@@ -1,4 +1,4 @@
-import { fetchWithAuth } from './apiClient'
+//import { fetchWithAuth } from './apiClient'
 
 /** Përputhet me backend `OrderFulfillmentType`. */
 export const FULFILLMENT_DELIVERY = 0

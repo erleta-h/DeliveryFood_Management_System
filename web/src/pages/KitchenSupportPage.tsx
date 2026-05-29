@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   createSupportTicket,
   fetchMySupportTickets,
@@ -17,10 +16,10 @@ import {
 import { useAuthStore } from '../store/authStore'
 
 const btnPrimary =
-  'rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50'
-const cardMuted = 'rounded-xl border border-white/10 bg-[#141a28]'
+  'rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-500 disabled:opacity-50'
+const cardMuted = 'rounded-xl border border-white/10 bg-[#18122b]'
 
-export default function DriverSupportPage() {
+export default function KitchenSupportPage() {
   const token = useAuthStore((s) => s.token)
 
   const [list, setList] = useState<MySupportTicketRow[] | null>(null)
@@ -121,12 +120,7 @@ export default function DriverSupportPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-bold text-zinc-100">Mbështetja</h1>
-        <Link to="/driver" className="text-xs text-sky-400 hover:text-sky-300">
-          ← Paneli
-        </Link>
-      </div>
+      <h1 className="text-xl font-bold text-zinc-100">Mbështetja</h1>
 
       <form onSubmit={(e) => void submit(e)} className={`${cardMuted} max-w-xl space-y-3 p-4`}>
         <p className="text-sm font-medium text-zinc-300">Hap një tiketë të re</p>
@@ -232,7 +226,7 @@ export default function DriverSupportPage() {
                             </p>
                           ) : null}
                           <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3">
-                            <p className="text-xs text-emerald-300/90">Mesazhi fillestar</p>
+                            <p className="text-xs text-violet-300/90">Mesazhi fillestar</p>
                             <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
                           </div>
                           {thread.messages.map((m) => (
@@ -240,7 +234,7 @@ export default function DriverSupportPage() {
                               key={m.id}
                               className={`rounded-lg border p-3 ${
                                 m.isStaffReply
-                                  ? 'border-emerald-500/30 bg-emerald-950/20'
+                                  ? 'border-violet-500/30 bg-violet-950/20'
                                   : 'border-white/10 bg-zinc-950/40'
                               }`}
                             >

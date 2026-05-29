@@ -32,6 +32,24 @@ public sealed class OrderTrackingHub : Hub
         return Groups.AddToGroupAsync(Context.ConnectionId, $"user-{id.Value}");
     }
 
+    /// <summary>Grupi <c>admin-{id}</c> — njoftime real-time për panelin admin.</summary>
+    public Task JoinAdmin()
+    {
+        var id = HubUserId(Context);
+        if (id is null)
+            throw new HubException("Unauthorized");
+        return Groups.AddToGroupAsync(Context.ConnectionId, $"admin-{id.Value}");
+    }
+
+    /// <summary>Grupi <c>kitchen-user-{id}</c> — njoftime personale për stafin e kuzhinës.</summary>
+    public Task JoinKitchen()
+    {
+        var id = HubUserId(Context);
+        if (id is null)
+            throw new HubException("Unauthorized");
+        return Groups.AddToGroupAsync(Context.ConnectionId, $"kitchen-user-{id.Value}");
+    }
+
     private static long? HubUserId(HubCallerContext ctx)
     {
         var u = ctx.User;

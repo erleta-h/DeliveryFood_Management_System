@@ -1,26 +1,26 @@
 import { create } from 'zustand'
 
-export type RealtimeSupportMessage = {
+type SupportToast = { title: string; message: string } | null
+
+type LastSupportMessage = {
   ticketId: number
-  messageId: number
+  messageId?: number
   authorUserId: number
   authorEmail: string
   isStaffReply: boolean
   body: string
   createdAtUtc: string
-}
-
-type SupportToast = { title: string; message: string } | null
+} | null
 
 type CustomerNotificationsState = {
   unreadCount: number
   supportToast: SupportToast
-  lastSupportMessage: RealtimeSupportMessage | null
+  lastSupportMessage: LastSupportMessage
   setUnreadCount: (n: number) => void
   bumpUnread: () => void
   showSupportToast: (t: { title: string; message: string }) => void
   clearSupportToast: () => void
-  pushSupportMessage: (m: RealtimeSupportMessage) => void
+  setLastSupportMessage: (m: NonNullable<LastSupportMessage>) => void
   clearLastSupportMessage: () => void
 }
 
@@ -32,6 +32,6 @@ export const useCustomerNotificationsStore = create<CustomerNotificationsState>(
   bumpUnread: () => set((s) => ({ unreadCount: s.unreadCount + 1 })),
   showSupportToast: (t) => set({ supportToast: t }),
   clearSupportToast: () => set({ supportToast: null }),
-  pushSupportMessage: (m) => set({ lastSupportMessage: m }),
+  setLastSupportMessage: (m) => set({ lastSupportMessage: m }),
   clearLastSupportMessage: () => set({ lastSupportMessage: null }),
 }))
