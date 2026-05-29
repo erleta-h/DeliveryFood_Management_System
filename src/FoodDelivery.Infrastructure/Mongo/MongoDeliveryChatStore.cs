@@ -74,6 +74,23 @@ public sealed class MongoDeliveryChatStore : IDeliveryChatStore
         }
     }
 
+    public async Task MarkDeliveredAsync(long orderId, long messageId, CancellationToken cancellationToken = default)
+    {
+        var filter = Builders<DeliveryChatMessageDocument>.Filter.Eq(x => x.OrderId, orderId) &
+                     Builders<DeliveryChatMessageDocument>.Filter.Eq(x => x.Id, messageId);
+        var update = Builders<DeliveryChatMessageDocument>.Update.Set(x => x.IsDelivered, true);
+        await _collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task MarkSeenAsync(long orderId, long recipientUserId, CancellationToken cancellationToken = default)
+    {
+        var filter = Builders<DeliveryChatMessageDocument>.Filter.Eq(x => x.OrderId, orderId) &
+                     Builders<DeliveryChatMessageDocument>.Filter.Ne(x => x.SenderUserId, recipientUserId) &
+                     Builders<DeliveryChatMessageDocument>.Filter.Eq(x => x.SeenAtUtc, null);
+        var update = Builders<DeliveryChatMessageDocument>.Update.Set(x => x.SeenAtUtc, DateTime.UtcNow);
+        await _collection.UpdateManyAsync(filter, update, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
     private static DeliveryChatMessageRecord Map(DeliveryChatMessageDocument d) =>
-        new(d.Id, d.OrderId, d.SenderUserId, d.Body, d.CreatedAtUtc);
+        new(d.Id, d.OrderId, d.SenderUserId, d.Body, d.CreatedAtUtc, d.IsDelivered, d.SeenAtUtc);
 }

@@ -6,7 +6,9 @@ public sealed record DeliveryChatMessageRecord(
     long OrderId,
     long SenderUserId,
     string Body,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsDelivered = false,
+    DateTime? SeenAtUtc = null);
 
 public interface IDeliveryChatStore
 {
@@ -19,4 +21,8 @@ public interface IDeliveryChatStore
         long senderUserId,
         string body,
         CancellationToken cancellationToken = default);
+
+    Task MarkDeliveredAsync(long orderId, long messageId, CancellationToken cancellationToken = default);
+
+    Task MarkSeenAsync(long orderId, long recipientUserId, CancellationToken cancellationToken = default);
 }

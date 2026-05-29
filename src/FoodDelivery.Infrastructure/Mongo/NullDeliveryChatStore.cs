@@ -18,4 +18,10 @@ public sealed class NullDeliveryChatStore : IDeliveryChatStore
         Task.FromException<DeliveryChatMessageRecord>(
             new InvalidOperationException(
                 "Chat dërgese kërkon MongoDB. Nis MongoDB ose konfiguro Mongo__ConnectionString në .env."));
+
+    public Task MarkDeliveredAsync(long orderId, long messageId, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task MarkSeenAsync(long orderId, long recipientUserId, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }

@@ -15,4 +15,8 @@ public sealed class DeliveryChatMessageDocument
     public string Body { get; set; } = string.Empty;
 
     public DateTime CreatedAtUtc { get; set; }
+
+    public bool IsDelivered { get; set; }
+
+    public DateTime? SeenAtUtc { get; set; }
 }

@@ -50,4 +50,19 @@ public sealed class OrderDeliveryChatController : ControllerBase
 
         return Ok(msg);
     }
+
+    [HttpPost("mark-seen")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> MarkSeen(long orderId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var error = await _chat.MarkSeenAsync(orderId, userId.Value, cancellationToken);
+        if (error is not null)
+            return BadRequest(new { message = error });
+
+        return NoContent();
+    }
 }

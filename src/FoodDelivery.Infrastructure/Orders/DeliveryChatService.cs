@@ -58,13 +58,46 @@ public sealed class DeliveryChatService : IDeliveryChatService
             return (null, err);
 
         var record = await _chatStore.InsertAsync(orderId, userId, trimmed, cancellationToken);
-        var dto = MapDto(record, ctx.Order!.UserId);
+        await _chatStore.MarkDeliveredAsync(orderId, record.Id, cancellationToken);
+        var delivered = record with { IsDelivered = true };
+        var order = ctx.Order!;
+        var dto = MapDto(delivered, order.UserId);
 
-        await _hub.Clients
-            .Group($"order-{orderId}")
+        var orderGroup = $"order-{orderId}";
+        await _hub.Clients.Group(orderGroup)
             .SendAsync("deliveryChatMessage", dto, cancellationToken);
 
+        var driverUserId = order.Delivery?.DriverUserId;
+        if (driverUserId is not null)
+        {
+            await _hub.Clients.Group($"driver-{driverUserId.Value}")
+                .SendAsync("deliveryChatMessage", dto, cancellationToken);
+        }
+
         return (dto, null);
+    }
+
+    public async Task<string?> MarkSeenAsync(long orderId, long userId, CancellationToken cancellationToken = default)
+    {
+        var ctx = await LoadParticipantContextAsync(orderId, userId, requireOpenThread: false, cancellationToken);
+        if (ctx.Error is { } err)
+            return err;
+
+        var order = ctx.Order!;
+        await _chatStore.MarkSeenAsync(orderId, userId, cancellationToken);
+
+        var seenPayload = new { orderId, seenByUserId = userId, seenAtUtc = DateTime.UtcNow };
+        await _hub.Clients.Group($"order-{orderId}")
+            .SendAsync("deliveryChatSeen", seenPayload, cancellationToken);
+
+        var driverUserId = order.Delivery?.DriverUserId;
+        if (driverUserId is not null)
+        {
+            await _hub.Clients.Group($"driver-{driverUserId.Value}")
+                .SendAsync("deliveryChatSeen", seenPayload, cancellationToken);
+        }
+
+        return null;
     }
 
     private async Task<(Order? Order, string? Error)> LoadParticipantContextAsync(
@@ -105,6 +138,6 @@ public sealed class DeliveryChatService : IDeliveryChatService
     private static DeliveryChatMessageDto MapDto(DeliveryChatMessageRecord m, long customerUserId)
     {
         var role = m.SenderUserId == customerUserId ? "customer" : "driver";
-        return new DeliveryChatMessageDto(m.Id, m.OrderId, m.SenderUserId, role, m.Body, m.CreatedAtUtc);
+        return new DeliveryChatMessageDto(m.Id, m.OrderId, m.SenderUserId, role, m.Body, m.CreatedAtUtc, m.IsDelivered, m.SeenAtUtc);
     }
 }

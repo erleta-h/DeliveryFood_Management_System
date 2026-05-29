@@ -12,4 +12,6 @@ public interface IDeliveryChatService
         long userId,
         string body,
         CancellationToken cancellationToken = default);
+
+    Task<string?> MarkSeenAsync(long orderId, long userId, CancellationToken cancellationToken = default);
 }
