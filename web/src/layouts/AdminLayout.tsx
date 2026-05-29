@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { AdminTopBar } from '../components/admin/AdminTopBar'
 
 import { getVisibleAdminNavGroups } from '../lib/adminNav'
+import { createOrdersHubConnection } from '../lib/orderHub'
 
 import { customerShellBg } from '../lib/adminTheme'
 
 import { useAuthStore } from '../store/authStore'
+import { useAdminNotificationsStore } from '../store/adminNotificationsStore'
 
 
 
@@ -41,6 +43,32 @@ export default function AdminLayout() {
   const navGroups = getVisibleAdminNavGroups(token)
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const adminToast = useAdminNotificationsStore((s) => s.toast)
+  const clearToast = useAdminNotificationsStore((s) => s.clearToast)
+  const hubRef = useRef<ReturnType<typeof createOrdersHubConnection> | null>(null)
+
+  useEffect(() => {
+    if (!token) return
+    const hub = createOrdersHubConnection(token)
+    hubRef.current = hub
+
+    hub.on('adminNotification', (data: { title?: string; message?: string }) => {
+      useAdminNotificationsStore.getState().bumpUnread()
+      useAdminNotificationsStore.getState().showToast({ title: data.title ?? 'Njoftim', message: data.message ?? '' })
+    })
+
+    hub.start()
+      .then(() => hub.invoke('JoinAdmin'))
+      .catch((err:unknown) => console.warn('[AdminHub] connection/join failed', err))
+    return () => { hub.stop().catch(() => {}) }
+  }, [token])
+
+  useEffect(() => {
+    if (!adminToast) return
+    const t = setTimeout(() => clearToast(), 6000)
+    return () => clearTimeout(t)
+  }, [adminToast, clearToast])
 
   function handleLogout() {
     logout()
@@ -234,6 +262,19 @@ export default function AdminLayout() {
         </main>
 
       </div>
+
+      {adminToast && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-200 bg-white px-4 py-3 shadow-xl">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm">💬</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-900">{adminToast.title}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{adminToast.message}</p>
+            </div>
+            <button type="button" onClick={clearToast} className="shrink-0 text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+        </div>
+      )}
 
     </div>
 

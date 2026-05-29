@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchKitchenContext, type KitchenStaffContext } from '../lib/kitchenApi'
 import { hasCustomerRole } from '../lib/jwtRoles'
+import { createOrdersHubConnection } from '../lib/orderHub'
 import { customerBtnPrimary } from '../lib/customerTheme'
 import { enableStaffCustomerAppMode } from '../lib/staffCustomerApp'
 import { useAuthStore } from '../store/authStore'
+import { useKitchenNotificationsStore } from '../store/kitchenNotificationsStore'
 
 type CtxPhase = 'loading' | 'ready' | 'unauthorized' | 'error'
 
 function navClass(isActive: boolean) {
-  return `rounded-lg px-3 py-2 text-sm transition-colors ${
+  return `relative px-2 py-2 text-sm transition-colors ${
     isActive
-      ? 'bg-[#009fe3]/18 font-medium text-white ring-1 ring-[#009fe3]/35'
-      : 'text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-200'
+      ? 'font-medium text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-white'
+      : 'text-zinc-500 hover:text-zinc-200'
   }`
 }
 
@@ -24,6 +26,10 @@ export default function KitchenLayout() {
   const user = useAuthStore((s) => s.user)
   const [kitchenCtx, setKitchenCtx] = useState<KitchenStaffContext | null>(null)
   const [ctxPhase, setCtxPhase] = useState<CtxPhase>('loading')
+  const kitchenUnread = useKitchenNotificationsStore((s) => s.unreadCount)
+  const kitchenToast = useKitchenNotificationsStore((s) => s.toast)
+  const clearKitchenToast = useKitchenNotificationsStore((s) => s.clearToast)
+  const hubRef = useRef<ReturnType<typeof createOrdersHubConnection> | null>(null)
 
   useEffect(() => {
     if (!token) {
@@ -48,10 +54,39 @@ export default function KitchenLayout() {
     }
   }, [token])
 
+  useEffect(() => {
+    if (!token) return
+    const hub = createOrdersHubConnection(token)
+    hubRef.current = hub
+
+    hub.on('kitchenNotification', (data: { title?: string; message?: string }) => {
+      useKitchenNotificationsStore.getState().bumpUnread()
+      useKitchenNotificationsStore.getState().showToast({ title: data.title ?? 'Njoftim', message: data.message ?? '' })
+    })
+
+    hub.start()
+      .then(() => hub.invoke('JoinKitchen'))
+      .catch((err:unknown) => console.warn('[KitchenHub] connection/join failed', err))
+    return () => { hub.stop().catch(() => {}) }
+  }, [token])
+
+  useEffect(() => {
+    if (!kitchenToast) return
+    const t = setTimeout(() => clearKitchenToast(), 6000)
+    return () => clearTimeout(t)
+  }, [kitchenToast, clearKitchenToast])
+
   const restaurantTitle =
     kitchenCtx?.isLinked && kitchenCtx.restaurantName
-      ? kitchenCtx.restaurantName
-      : 'Paneli i restorantit'
+      ? kitchenCtx.restaurantName.toUpperCase()
+      : 'PANELI I RESTORANTIT'
+
+  const kitchenLabel =
+    kitchenCtx?.isLinked && kitchenCtx.restaurantName
+      ? `Kuzhinë ${kitchenCtx.restaurantName.split(' ')[0]}`
+      : user?.firstName
+        ? `Kuzhinë ${user.firstName}`
+        : 'Kuzhinë'
 
   function onReauth() {
     logout()
@@ -63,33 +98,23 @@ export default function KitchenLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0c0e12] font-sans text-zinc-200 antialiased">
-      <header className="border-b border-white/[0.06] bg-[#13151a] px-3 py-3 sm:px-4">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-[#0d1117] font-sans text-zinc-200 antialiased">
+      <header className="border-b border-[#30363d] bg-[#0d1117] px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1600px] flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            <p className="truncate text-sm font-bold tracking-wide text-white sm:text-base">
               {ctxPhase === 'loading' && token ? (
-                <span className="animate-pulse text-zinc-500">Duke lidhur me restorantin…</span>
+                <span className="animate-pulse text-zinc-500">Duke lidhur…</span>
               ) : (
                 restaurantTitle
               )}
             </p>
-            <p className="mt-0.5 text-sm font-medium text-zinc-200">
-              {user?.firstName} {user?.lastName}
-              {kitchenCtx?.isLinked && kitchenCtx.slug ? (
-                <>
-                  {' · '}
-                  <span className="text-zinc-500">/{kitchenCtx.slug}</span>
-                </>
-              ) : null}
-              <span className="hidden sm:inline">
-                {' '}
-                · porositë hyrëse (merchant)
-              </span>
+            <p className="mt-0.5 text-xs text-zinc-500">
+              {kitchenLabel} / Porositë hyrëse (merchant)
             </p>
           </div>
-          <nav className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            <NavLink to="/kitchen/orders" className={({ isActive }) => navClass(isActive)}>
+          <nav className="flex flex-wrap items-center gap-1 sm:gap-4">
+            <NavLink to="/kitchen" end className={({ isActive }) => navClass(isActive)}>
               Porositë
             </NavLink>
             <NavLink to="/kitchen/history" className={({ isActive }) => navClass(isActive)}>
@@ -101,25 +126,32 @@ export default function KitchenLayout() {
             <NavLink to="/kitchen/account" className={({ isActive }) => navClass(isActive)}>
               Llogaria
             </NavLink>
+            <NavLink to="/kitchen/support" className={({ isActive }) => navClass(isActive)}>
+              <span className="relative inline-flex items-center gap-1">
+                Mbështetja
+                {kitchenUnread > 0 ? (
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
+                    {kitchenUnread > 9 ? '9+' : kitchenUnread}
+                  </span>
+                ) : null}
+              </span>
+            </NavLink>
             {token && hasCustomerRole(token) ? (
               <Link
                 to="/app/restaurants"
                 onClick={() => enableStaffCustomerAppMode()}
-                className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                className="hidden px-2 py-2 text-sm text-zinc-500 hover:text-zinc-200 sm:inline"
               >
                 Porosit si klient
               </Link>
             ) : null}
-            <Link
-              to="/"
-              className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-            >
+            <Link to="/" className="px-2 py-2 text-sm text-zinc-500 hover:text-zinc-200">
               Ballina
             </Link>
             <button
               type="button"
               onClick={() => logout()}
-              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-zinc-300 hover:bg-white/5"
+              className="rounded-lg border border-[#30363d] px-3 py-1.5 text-sm text-zinc-300 hover:bg-[#21262d]"
             >
               Dil
             </button>
@@ -128,7 +160,7 @@ export default function KitchenLayout() {
       </header>
 
       {ctxPhase === 'unauthorized' ? (
-        <div className="mx-auto max-w-6xl px-4 pt-4">
+        <div className="mx-auto max-w-[1600px] px-4 pt-4 sm:px-6">
           <div className="rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             <p className="font-medium">Sesioni nuk është më i vlefshëm ose nuk ke akses në panel.</p>
             <p className="mt-1 text-xs text-red-200/80">
@@ -142,7 +174,7 @@ export default function KitchenLayout() {
       ) : null}
 
       {ctxPhase === 'error' ? (
-        <div className="mx-auto max-w-6xl px-4 pt-4">
+        <div className="mx-auto max-w-[1600px] px-4 pt-4 sm:px-6">
           <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
             Nuk u lexua dot lidhja me restorantin (rrjet ose server). Rifresko faqen ose kontrollo nëse API është
             ndezur.
@@ -151,20 +183,30 @@ export default function KitchenLayout() {
       ) : null}
 
       {ctxPhase === 'ready' && kitchenCtx && !kitchenCtx.isLinked ? (
-        <div className="mx-auto max-w-6xl px-4 pt-6">
+        <div className="mx-auto max-w-[1600px] px-4 pt-6 sm:px-6">
           <p className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            <strong className="font-semibold">Llogaria nuk është lidhur me restorant.</strong> Ke rol stafi në sistem,
-            por mungon rreshti <code className="rounded bg-black/30 px-1">RestaurantStaff</code> (cilin restoran
-            përfaqëson). Kjo krijohet nga <strong className="font-semibold">admini</strong> kur miratohet partneri —
-            deri atëherë nuk shfaqen porosi. (Seed:{' '}
-            <code className="rounded bg-black/30 px-1">kitchen@fooddelivery.local</code> është i lidhur me Napoli.)
+            <strong className="font-semibold">Llogaria nuk është lidhur me restorant.</strong> Kontakto administratorin
+            për lidhjen e stafit me restorantin.
           </p>
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-5 sm:py-7">
+      <main className="mx-auto max-w-[1600px] px-3 py-5 sm:px-6 sm:py-6">
         <Outlet />
       </main>
+
+      {kitchenToast && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm">💬</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-violet-200">{kitchenToast.title}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{kitchenToast.message}</p>
+            </div>
+            <button type="button" onClick={clearKitchenToast} className="shrink-0 text-zinc-500 hover:text-zinc-300">✕</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

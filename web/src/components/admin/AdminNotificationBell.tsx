@@ -9,6 +9,7 @@ import {
 } from '../../lib/adminNotificationsApi'
 import { customerBtnGhost } from '../../lib/adminTheme'
 import { useAuthStore } from '../../store/authStore'
+import { useAdminNotificationsStore } from '../../store/adminNotificationsStore'
 
 function formatWhen(iso: string) {
   try {
@@ -55,11 +56,11 @@ export function AdminNotificationBell() {
     }
   }, [token])
 
+  const unreadBump = useAdminNotificationsStore((s) => s.unreadBump)
+
   useEffect(() => {
     void refreshCount()
-    const t = window.setInterval(() => void refreshCount(), 60_000)
-    return () => window.clearInterval(t)
-  }, [refreshCount])
+  }, [refreshCount, unreadBump])
 
   useEffect(() => {
     if (open) void loadList()
