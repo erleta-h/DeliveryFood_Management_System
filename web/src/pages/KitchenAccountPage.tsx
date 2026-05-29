@@ -17,7 +17,6 @@ export default function KitchenAccountPage() {
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
-  const refreshUser = useAuthStore((s) => s.refreshUser)
   const mustChangePassword = user?.mustChangePassword === true
   const [showPasswordSection, setShowPasswordSection] = useState(false)
   const [current, setCurrent] = useState('')
@@ -64,12 +63,11 @@ export default function KitchenAccountPage() {
       setCurrent('')
       setNext('')
       setConfirm('')
-      await refreshUser()
       setErr(null)
       setShowPasswordSection(false)
-      setSuccessBanner(
-        'Fjalëkalimi u përditësua. Nëse keni «mbaj mend» në pajisje të tjera, duhet hyrje përsëri me fjalëkalimin e ri.',
-      )
+      setSuccessBanner('Fjalëkalimi u përditësua. Hyr përsëri me fjalëkalimin e ri.')
+      await logout()
+      void navigate('/partner/login', { replace: true })
     } else {
       const m = r.error
       if (/\b401\b/.test(m) || m.toLowerCase().includes('unauthorized')) {

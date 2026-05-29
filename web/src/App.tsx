@@ -8,7 +8,7 @@ import { KitchenStaffRoute } from './components/KitchenStaffRoute'
 import { LandingPage } from './components/LandingPage'
 import { PageSpinner } from './components/PageSpinner'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { KitchenAccountPage, KitchenHistoryPage, KitchenMenuPage } from './lazy/kitchen'
+import { KitchenAccountPage, KitchenHistoryPage, KitchenMenuPage , KitchenSupportPage  } from './lazy/kitchen'
 import { useAuthStore } from './store/authStore'
 
 const CustomerLayout = lazy(() => import('./layouts/CustomerLayout'))
@@ -51,6 +51,8 @@ const DriverDeliveriesPage = lazy(() => import('./pages/DriverDeliveriesPage'))
 const DriverEarningsPage = lazy(() => import('./pages/DriverEarningsPage'))
 const DriverHistoryPage = lazy(() => import('./pages/DriverHistoryPage'))
 const DriverProfilePage = lazy(() => import('./pages/DriverProfilePage'))
+
+
 
 const lazyFallback = <PageSpinner />
 
@@ -315,6 +317,15 @@ function App() {
                 </Suspense>
               }
             />
+            <Route
+  path="support"
+  element={
+    <Suspense fallback={lazyFallback}>
+      <KitchenSupportPage />
+    </Suspense>
+  }
+/>
+        
           </Route>
         </Route>
         <Route element={<GuestRoute />}>
