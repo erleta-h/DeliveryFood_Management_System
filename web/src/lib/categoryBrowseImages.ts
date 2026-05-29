@@ -25,8 +25,12 @@ const PATTERNS: { test: RegExp; url: string }[] = [
     url: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=280&h=280&fit=crop&q=80',
   },
   {
-    test: /pije|drink|juice/i,
+    test: /pije|drink|juice|cola|fanta|ujë/i,
     url: 'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=280&h=280&fit=crop&q=80',
+  },
+  {
+    test: /akullore|ice.?cream|dessert|ëmbëlsir|sweet/i,
+    url: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=280&h=280&fit=crop&q=80',
   },
   {
     test: /pasta|italian/i,

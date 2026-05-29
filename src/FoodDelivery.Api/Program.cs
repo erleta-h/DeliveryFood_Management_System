@@ -8,6 +8,9 @@ using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure;
 using FoodDelivery.Infrastructure.Data;
 using FoodDelivery.Infrastructure.Realtime;
+using FoodDelivery.Infrastructure.Restaurants;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
@@ -154,15 +157,16 @@ builder.Services.AddCors(options =>
                     }
                 })
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowCredentials();
         }
         else if (corsSection is { Length: > 0 })
         {
-            policy.WithOrigins(corsSection).AllowAnyHeader().AllowAnyMethod();
+            policy.WithOrigins(corsSection).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
         else
         {
-            policy.WithOrigins("http://localhost:5173").AllowAnyHeader().AllowAnyMethod();
+            policy.WithOrigins("http://localhost:5173").AllowAnyHeader().AllowAnyMethod().AllowCredentials();
         }
     });
 });
@@ -190,6 +194,16 @@ if (autoMigrate)
         {
             var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>();
             await DbSeeder.SeedAsync(db, dbLog, passwordHasher);
+
+            var imgOpt = scope.ServiceProvider.GetRequiredService<IOptions<MenuImageStorageOptions>>().Value;
+            var cache = scope.ServiceProvider.GetRequiredService<IDistributedCache>();
+            var contentRoot = scope.ServiceProvider.GetRequiredService<IHostEnvironment>().ContentRootPath;
+            await MenuImageDiskRepair.RepairAsync(
+                db,
+                cache,
+                contentRoot,
+                imgOpt.RelativeRoot,
+                dbLog);
         }
     }
     catch (Exception ex)

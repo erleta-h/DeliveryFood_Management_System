@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { customerBtnGhost, customerBtnPrimary } from '../lib/customerTheme'
+import { customerBtnGhost } from '../lib/customerTheme'
 
 type Props = {
   open: boolean

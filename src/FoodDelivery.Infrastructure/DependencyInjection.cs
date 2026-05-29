@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         services.AddScoped<IJwtTokenIssuer, JwtTokenIssuer>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminPartnerApplicationService, AdminPartnerApplicationService>();
@@ -93,6 +94,7 @@ public static class DependencyInjection
         services.Configure<GoogleMapsSettings>(configuration.GetSection(GoogleMapsSettings.SectionName));
         services.Configure<StripeSettings>(configuration.GetSection(StripeSettings.SectionName));
         services.Configure<WebPushSettings>(configuration.GetSection(WebPushSettings.SectionName));
+        services.Configure<MenuImageStorageOptions>(configuration.GetSection(MenuImageStorageOptions.SectionName));
 
         services.AddDistributedMemoryCache();
         services.AddMongoDb(configuration);

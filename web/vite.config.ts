@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
-      https: devHttps,
+      ...(devHttps ? { https: {} } : {}),
       host: true,
       port: 5173,
       strictPort: true,

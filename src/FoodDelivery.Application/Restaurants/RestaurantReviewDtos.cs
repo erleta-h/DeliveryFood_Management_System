@@ -1,4 +1,4 @@
-﻿namespace FoodDelivery.Application.Restaurants;
+namespace FoodDelivery.Application.Restaurants;
 
 public sealed record RestaurantReviewDto(
     long Id,

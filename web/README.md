@@ -1,98 +1,48 @@
-# React + TypeScript + Vite
+# Frontend (web)
 
-## Instalimi (për kolegët)
+React + TypeScript + Vite. Për SQL, Mongo, JWT dhe pjesën tjetër shiko `README.md` në rrënjë.
 
-Pas klonimit të projektit, hyr në folderin `web` dhe instalo varësitë:
+## Instalimi
 
 ```bash
 cd web
+copy .env.example .env
 npm install
+npm run dev
 ```
 
-Nëse merr gabim nga Vite që `@microsoft/signalr` nuk mund të zgjidhet (p.sh. në `src/lib/orderHub.ts`), paketa mungon lokalisht. Instaloje eksplicit:
+Hap http://localhost:5173 (API duhet të jetë në http://localhost:5183).
+
+`web/.env` është opsionale — pa të, proxy drejt 5183 funksionon vetë. Kopjoje `.env.example` vetëm nëse ndryshon portin.
+
+## web/.env
+
+Kopjo nga `.env.example`. Variablat `VITE_*` lexohen nga Vite:
+
+- `VITE_DEV_API_PROXY` — URL e API-s për proxy (`/api`, `/hubs`). Parazgjedhja: `http://localhost:5183`
+- `VITE_DEV_HTTPS` — vetëm nëse do HTTPS lokal; zakonisht mos e aktivizo
+
+JWT, Stripe dhe Google server key shkruhen në `.env` në rrënjën e repo-s, jo këtu.
+
+## npm install
+
+Mjafton një herë pas klonimit. Paketat kryesore:
+
+- `react`, `react-router-dom`, `zustand`
+- `@microsoft/signalr` — porosi real-time
+- `leaflet`, `react-leaflet`, `@types/leaflet` — harta OSM
+- `@types/google.maps` — Google Maps në TS
+- `@mui/material`, `@stripe/stripe-js`, `tailwindcss`, `vite`
+
+Mos i instalo manualisht një nga një — janë në `package.json`.
+
+## Komanda
 
 ```bash
-npm install @microsoft/signalr
+npm run dev      # zhvillim
+npm run build    # production
+npm run preview  # shiko dist/
+npm run lint
 ```
 
-Për hartën (Leaflet), nëse nuk janë tashmë në `node_modules`:
-
-```bash
-npm install leaflet react-leaflet
-```
-
-`@microsoft/signalr` përdoret për lidhjen real-time me API-n (hub i porosive `/hubs/orders`).
-
----
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Në dev, Vite proxy-ja `/api/*` dhe `/hubs/*` te Kestrel — nuk duhet CORS i veçantë.
