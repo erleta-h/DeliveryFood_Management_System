@@ -36,7 +36,7 @@ type AuthState = {
   /** Rifreskon /api/auth/me (p.sh. pas ndryshimit të fjalëkalimit). */
   refreshUser: () => Promise<void>
   updateProfile: (
-    partial: Partial<Pick<UserProfile, 'line1' | 'city' | 'postalCode' | 'phone'>>,
+    partial: Partial<Pick<UserProfile, 'line1' | 'city' | 'postalCode' | 'phone' | 'latitude'| 'longitude'>>,
   ) => Promise<{ ok: boolean; error?: string }>
 }
 

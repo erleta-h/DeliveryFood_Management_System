@@ -18,6 +18,8 @@ export type AuthUser = {
   postalCode?: string | null
   /** True kur admini ka dhënë fjalëkalim të përkohshëm — paneli kërkon ndryshim para përdorimit të plotë. */
   mustChangePassword?: boolean
+  latitude?: number
+  longitude?: number
 }
 
 export type AuthResponse = AuthSessionPayload & { user: AuthUser }
