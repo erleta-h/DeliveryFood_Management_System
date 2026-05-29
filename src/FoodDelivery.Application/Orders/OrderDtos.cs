@@ -35,6 +35,14 @@ public record CustomerOrderSummaryDto(
 
 public record CustomerOrderItemDto(string Name, int Quantity, decimal UnitPrice, decimal LineTotal);
 
+/// <summary>Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende.</summary>
+public record CustomerOrderDriverDto(
+    string DisplayName,
+    string? Phone,
+    string? VehicleType,
+    string? LicensePlate,
+    double? Rating);
+
 public record CustomerOrderDetailDto(
     long Id,
     string OrderNumber,
@@ -63,7 +71,9 @@ public record CustomerOrderDetailDto(
     /// <summary>Faza Deliver (<c>DeliveryDriverLeg</c>); null për pickup ose pa dërgesë.</summary>
     int? DeliveryLegStatus,
     /// <summary>True kur ekziston pagesë Stripe në gjendje «pending» (nuk është kapur ende).</summary>
-    bool PendingStripePayment);
+    bool PendingStripePayment,
+    /// <summary>Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende.</summary>
+    CustomerOrderDriverDto? Driver);
 
 public record DeliveryChatMessageDto(
     long Id,
@@ -72,7 +82,9 @@ public record DeliveryChatMessageDto(
     /// <summary>"customer" ose "driver" — për stilin në UI.</summary>
     string SenderRole,
     string Body,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    bool IsDelivered = false,
+    DateTime? SeenAtUtc = null);
 
 public record PostDeliveryChatRequest(string Body);
 

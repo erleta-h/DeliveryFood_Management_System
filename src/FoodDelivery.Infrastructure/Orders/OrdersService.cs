@@ -194,7 +194,8 @@ public sealed class OrdersService : IOrdersService
                 o.Status,
                 o.FulfillmentType,
                 o.Total,
-                false))
+                o.Delivery != null && o.Delivery.AcceptedAtUtc != null
+                    && o.FulfillmentType != OrderFulfillmentType.Pickup))
             .ToListAsync(cancellationToken);
     }
 
@@ -208,6 +209,9 @@ public sealed class OrdersService : IOrdersService
             .Include(o => o.CustomerAddress)
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.Delivery)
+                .ThenInclude(d => d!.Driver)
+                    .ThenInclude(u => u.DriverProfile)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
 
         if (order is null)
@@ -215,6 +219,23 @@ public sealed class OrdersService : IOrdersService
 
         var pendingStripePayment = order.Payments.Any(p =>
             p.Provider == "stripe" && p.Status == PaymentStatus.Pending);
+
+        var delivery = order.Delivery;
+        var chatAvailable = delivery?.AcceptedAtUtc != null
+                            && order.FulfillmentType != OrderFulfillmentType.Pickup;
+        var driverUser = delivery?.Driver;
+        var driverProfile = driverUser?.DriverProfile;
+
+        CustomerOrderDriverDto? driverDto = null;
+        if (driverUser != null && delivery?.AcceptedAtUtc != null)
+        {
+            driverDto = new CustomerOrderDriverDto(
+                driverUser.FirstName,
+                driverUser.Phone,
+                driverProfile?.VehicleType,
+                driverProfile?.LicensePlate,
+                null);
+        }
 
         var items = order.Items
             .Select(i => new CustomerOrderItemDto(
@@ -245,11 +266,12 @@ public sealed class OrdersService : IOrdersService
             order.Restaurant.Longitude,
             order.CustomerAddress.Latitude,
             order.CustomerAddress.Longitude,
-            null,
-            null,
-            false,
-            null,
-            pendingStripePayment);
+            driverProfile?.LastLatitude,
+            driverProfile?.LastLongitude,
+            chatAvailable,
+            delivery?.Status,
+            pendingStripePayment,
+            driverDto);
     }
 
     public async Task<(bool Ok, string? Error)> CancelUnpaidStripeOrderAsync(

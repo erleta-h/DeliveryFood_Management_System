@@ -42,6 +42,25 @@ public class StripePaymentsController : ControllerBase
         return Ok(new { clientSecret });
     }
 
+    public sealed record ConfirmAfterPaymentBody(long OrderId);
+
+    [HttpPost("confirm-after-payment")]
+    [Authorize(Roles = "Customer")]
+    public async Task<IActionResult> ConfirmAfterPayment(
+        [FromBody] ConfirmAfterPaymentBody body,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+            return Unauthorized();
+
+        var error = await _stripe.ConfirmAfterPaymentAsync(userId.Value, body.OrderId, cancellationToken);
+        if (error is not null)
+            return BadRequest(new { message = error });
+
+        return Ok(new { confirmed = true });
+    }
+
     [HttpPost("webhook")]
     [AllowAnonymous]
     public async Task<IActionResult> Webhook(CancellationToken cancellationToken)
