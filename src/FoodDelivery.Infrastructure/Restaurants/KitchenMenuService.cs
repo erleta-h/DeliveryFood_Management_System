@@ -374,7 +374,6 @@ public sealed class KitchenMenuService : IKitchenMenuService
             FileSize = totalWritten,
             UploadedBy = staffUserId,
             CreatedAt = now,
-            CreatedById = staffUserId,
         };
         _uow.Repository<StoredFile, long>().Add(stored);
         await _uow.SaveChangesAsync(cancellationToken);

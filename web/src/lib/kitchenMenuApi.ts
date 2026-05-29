@@ -22,8 +22,9 @@ function authHeader(token: string) {
 
 async function readMessage(res: Response): Promise<string> {
   try {
-    const j = (await res.json()) as { message?: string }
+    const j = (await res.json()) as { message?: string; error?: string }
     if (typeof j.message === 'string' && j.message) return j.message
+    if (typeof j.error === 'string' && j.error) return j.error
   } catch {
     /* ignore */
   }

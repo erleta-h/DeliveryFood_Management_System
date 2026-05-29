@@ -218,26 +218,38 @@ export default function KitchenMenuPage() {
       setError('Për artikull të ri: emër dhe çmim të vlefshëm.')
       return
     }
-    const r = await run(async () => {
-      const created = await createKitchenMenuItem(token, {
-        menuCategoryId: catId,
-        name,
-        price,
-        description: raw.description.trim() || null,
-        isAvailable: true,
+    try {
+      const r = await run(async () => {
+        const created = await createKitchenMenuItem(token, {
+          menuCategoryId: catId,
+          name,
+          price,
+          description: raw.description.trim() || null,
+          isAvailable: true,
+        })
+        if (!created.ok) return created
+        if (file) {
+          const im = await uploadKitchenMenuItemImage(token, created.id, file)
+          if (!im.ok) return { ok: false as const, message: im.message, itemCreated: true as const, itemId: created.id }
+        }
+        return { ok: true as const }
       })
-      if (!created.ok) return created
-      if (file) {
-        const im = await uploadKitchenMenuItemImage(token, created.id, file)
-        if (!im.ok) return im
+      if (r && !r.ok) {
+        if ('itemCreated' in r && r.itemCreated) {
+          setNewItem((n) => ({ ...n, [catId]: { name: '', price: '', description: '', imageFile: null } }))
+          setFlash('Artikulli u shtua, por fotoja nuk u ngarkua.')
+          setError(`Foto: ${r.message}. Mund ta ngarkosh te «Ndrysho» te artikulli.`)
+          await load()
+          return
+        }
+        setError(r.message)
+        return
       }
-      return { ok: true as const }
-    })
-    if (r && !r.ok) setError(r.message)
-    else {
       setNewItem((n) => ({ ...n, [catId]: { name: '', price: '', description: '', imageFile: null } }))
       setFlash('Artikulli u shtua.')
       await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Gabim gjatë shtimit të artikullit.')
     }
   }
 
@@ -619,11 +631,11 @@ export default function KitchenMenuPage() {
                 />
                 <button
                   type="button"
-                  disabled={mutating || sessionExpired}
+                  disabled={mutating || sessionExpired || !(newItem[cat.id]?.name ?? '').trim()}
                   className={`${customerBtnPrimary} text-sm`}
                   onClick={() => void onCreateItem(cat.id)}
                 >
-                  Shto artikullin
+                  {mutating ? 'Duke ruajtur…' : 'Shto artikullin'}
                 </button>
               </div>
               <textarea
