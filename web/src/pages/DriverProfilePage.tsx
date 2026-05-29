@@ -1,5 +1,5 @@
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { changePassword } from '../lib/authApi'
 import { customerBtnGhost, customerBtnPrimary, customerCardMuted } from '../lib/customerTheme'
 import {
@@ -20,9 +20,10 @@ function fmtMoney(n: number) {
 }
 
 export default function DriverProfilePage() {
+  const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
   const mustChangePassword = useAuthStore((s) => s.user?.mustChangePassword === true)
-  const refreshUser = useAuthStore((s) => s.refreshUser)
+  const logout = useAuthStore((s) => s.logout)
   const [acc, setAcc] = useState<DriverAccountProfile | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -104,11 +105,12 @@ export default function DriverProfilePage() {
     setPwMsg(null)
     const r = await changePassword(token, curPw, newPw)
     if (r.ok) {
-      await refreshUser()
       setCurPw('')
       setNewPw('')
       setShowPw(false)
-      setPwSuccessBanner('Fjalëkalimi u ndryshua. Tani mund të përdorësh panelin normalisht.')
+      setPwSuccessBanner('Fjalëkalimi u ndryshua. Hyr përsëri me fjalëkalimin e ri.')
+      await logout()
+      void navigate('/login', { replace: true })
     } else setPwMsg(r.error)
   }
 

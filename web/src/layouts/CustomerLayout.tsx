@@ -62,7 +62,7 @@ export default function CustomerLayout() {
 
     hub.start()
       .then(() => hub.invoke('JoinCustomer'))
-      .catch((err) => console.warn('[CustomerHub] connection/join failed', err))
+      .catch((err:any) => console.warn('[CustomerHub] connection/join failed', err))
     return () => { hub.stop().catch(() => {}) }
   }, [token])
 
