@@ -322,7 +322,6 @@ function NavigateToCustomerView({
 
 function DeliveryCompleteView({
   detail,
-  onBack,
 }: {
   detail: DriverOrderDetail
   onBack: () => void

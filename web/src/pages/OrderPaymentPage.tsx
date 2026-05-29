@@ -217,6 +217,14 @@ export default function OrderPaymentPage() {
       return
     }
 
+    try {
+      await fetch(apiPath('/api/stripe/confirm-after-payment'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId }),
+      })
+    } catch { /* webhook will handle it as fallback */ }
+
     clearCart()
     clearStripeCheckoutOrderSession()
     navigate(`/app/orders/${orderId}?payment=success`, { replace: true })

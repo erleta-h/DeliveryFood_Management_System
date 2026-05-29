@@ -3,6 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { estimateDriveEtaMinutes } from '../lib/geoEta'
 import {
   ORDER_STATUS_OUT_FOR_DELIVERY,
+  ORDER_STATUS_CONFIRMED,
+  ORDER_STATUS_PREPARING,
+  ORDER_STATUS_READY_FOR_PICKUP,
   isCourierEnRouteToCustomer,
   isTerminalOrderStatus,
 } from '../lib/orderStatusLabels'
@@ -15,45 +18,6 @@ import {
 } from '../lib/ordersApi'
 import { createOrdersHubConnection } from '../lib/orderHub'
 import { useAuthStore } from '../store/authStore'
-import { OrderTrackingMapLeaflet } from './OrderTrackingMapLeaflet'
-
-const STORAGE_KEY = 'fd-customer-order-float-pos-v1'
-/** Diametër i butonit (px) — pak më i madh për lexim dhe prekje më të lehtë. */
-const WIDGET = 92
-const EDGE = 10
-const DRAG_THRESHOLD = 8
-
-type Pos = { left: number; top: number }
-
-function readPos(): Pos | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const j = JSON.parse(raw) as Pos
-    if (typeof j.left !== 'number' || typeof j.top !== 'number') return null
-    return j
-  } catch {
-    return null
-  }
-}
-
-function defaultPos(): Pos {
-  if (typeof window === 'undefined') return { left: 16, top: 100 }
-  return {
-    left: Math.max(EDGE, window.innerWidth - WIDGET - 20),
-    top: Math.max(EDGE, window.innerHeight - WIDGET - 100),
-  }
-}
-
-function clampPos(p: Pos): Pos {
-  if (typeof window === 'undefined') return p
-  const maxL = Math.max(EDGE, window.innerWidth - WIDGET - EDGE)
-  const maxT = Math.max(EDGE, window.innerHeight - WIDGET - EDGE)
-  return {
-    left: Math.min(maxL, Math.max(EDGE, p.left)),
-    top: Math.min(maxT, Math.max(EDGE, p.top)),
-  }
-}
 
 function pickActiveOrder(list: CustomerOrderSummary[]): CustomerOrderSummary | null {
   const active = list.filter((o) => !isTerminalOrderStatus(o.status))
@@ -62,33 +26,35 @@ function pickActiveOrder(list: CustomerOrderSummary[]): CustomerOrderSummary | n
   return active[0] ?? null
 }
 
-function shortLabel(order: CustomerOrderDetail): string {
-  if (isCourierEnRouteToCustomer(order)) return 'Në rrugë'
-  if (order.status === 0) return 'Dërguar'
-  if (order.status === 1) return 'Pranuar'
-  if (order.status === 2) return 'Përgatitje'
-  if (order.status === 5) return 'Gati'
-  if (order.status === ORDER_STATUS_OUT_FOR_DELIVERY) return 'Në rrugë'
-  return '…'
+function statusLabel(order: CustomerOrderDetail): string {
+  if (isCourierEnRouteToCustomer(order)) return 'Në rrugë për te ju'
+  if (order.status === 0) return 'Dërguar te restoranti'
+  if (order.status === ORDER_STATUS_CONFIRMED) return 'Pranuar nga restoranti'
+  if (order.status === ORDER_STATUS_PREPARING) return 'Duke u përgatitur...'
+  if (order.status === ORDER_STATUS_READY_FOR_PICKUP) return 'Gati për marrje'
+  if (order.status === ORDER_STATUS_OUT_FOR_DELIVERY) return 'Në rrugë për te ju'
+  return 'Duke u procesuar...'
+}
+
+function progressPercent(detail: CustomerOrderDetail): number {
+  if (isTerminalOrderStatus(detail.status)) return 100
+  const pickup = detail.fulfillmentType === FULFILLMENT_PICKUP
+  const m: Record<number, number> = pickup
+    ? { 0: 12, 1: 30, 2: 50, 5: 72, 3: 85 }
+    : { 0: 10, 1: 22, 2: 38, 5: 52, 3: 78, 4: 100 }
+  if (!pickup && isCourierEnRouteToCustomer(detail)) return m[ORDER_STATUS_OUT_FOR_DELIVERY]
+  return m[detail.status] ?? 18
 }
 
 export function CustomerOrderFloatWidget() {
   const token = useAuthStore((s) => s.token)
   const location = useLocation()
   const navigate = useNavigate()
-  const [pos, setPos] = useState<Pos>(() => clampPos(readPos() ?? defaultPos()))
   const [summary, setSummary] = useState<CustomerOrderSummary | null>(null)
   const [detail, setDetail] = useState<CustomerOrderDetail | null>(null)
   const [liveDriver, setLiveDriver] = useState<{ lat: number; lng: number } | null>(null)
-  const drag = useRef<{
-    startX: number
-    startY: number
-    origLeft: number
-    origTop: number
-    moved: boolean
-    /** Me `setPointerCapture`, `pointerup.target` bëhet div-i kapës — ruajmë prekjen fillestare. */
-    startedOnMiniMap: boolean
-  } | null>(null)
+  const orderRef = useRef<CustomerOrderDetail | null>(null)
+  orderRef.current = detail
 
   const refresh = useCallback(async () => {
     if (!token) {
@@ -136,15 +102,7 @@ export function CustomerOrderFloatWidget() {
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [refresh])
 
-  useEffect(() => {
-    const onResize = () => setPos((p) => clampPos(p))
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-
   const orderId = summary?.id
-  const orderRef = useRef<CustomerOrderDetail | null>(null)
-  orderRef.current = detail
 
   useEffect(() => {
     if (!token || !orderId || !Number.isFinite(orderId)) {
@@ -217,245 +175,113 @@ export function CustomerOrderFloatWidget() {
   const onOrderDetailPage =
     detail != null && location.pathname === `/app/orders/${detail.id}`
 
-  const restaurantPt =
-    detail &&
-    detail.restaurantLatitude != null &&
-    detail.restaurantLongitude != null
-      ? {
-          lat: detail.restaurantLatitude,
-          lng: detail.restaurantLongitude,
-          title: detail.restaurantName,
-          label: 'R',
-          color: '#c4a574',
-        }
-      : null
-  const customerPt =
-    detail &&
-    detail.customerLatitude != null &&
-    detail.customerLongitude != null
-      ? {
-          lat: detail.customerLatitude,
-          lng: detail.customerLongitude,
-          title: 'Adresa',
-          label: 'K',
-          color: '#7dd3fc',
-        }
-      : null
-  const driverPt = driverForMap
-    ? {
-        ...driverForMap,
-        title: liveDriver ? 'Korrieri (live)' : 'Korrieri',
-        label: 'D',
-        color: '#86efac',
-      }
-    : null
-  const canMap = !!(restaurantPt || customerPt || driverPt) && detail && !isTerminalOrderStatus(detail.status)
-
-  const orderIdRef = useRef(detail?.id ?? 0)
-  orderIdRef.current = detail?.id ?? 0
-
-  const enRoute = detail != null && isCourierEnRouteToCustomer(detail)
-
-  const showMiniMap = detail != null && enRoute && canMap
-
-  const floatEtaPinStyle = showMiniMap && enRoute && etaMinutes != null
-
-  const centerText = useMemo(() => {
-    if (!detail) return ''
-    if (enRoute && etaMinutes != null) return `${etaMinutes}m`
-    return shortLabel(detail)
-  }, [detail, enRoute, etaMinutes])
-
-  const ringPct = useMemo(() => {
-    if (!detail) return 0
-    if (isTerminalOrderStatus(detail.status)) return 100
-    const pickup = detail.fulfillmentType === FULFILLMENT_PICKUP
-    const m: Record<number, number> = pickup
-      ? { 0: 12, 1: 30, 2: 50, 5: 72, 3: 85 }
-      : { 0: 10, 1: 22, 2: 38, 5: 52, 3: 78, 4: 100 }
-    if (!pickup && isCourierEnRouteToCustomer(detail)) return m[ORDER_STATUS_OUT_FOR_DELIVERY]
-    return m[detail.status] ?? 18
-  }, [detail])
-
-  const gradId = detail ? `fd-float-ring-${detail.id}` : 'fd-float-ring'
-
-  function onPointerDown(e: React.PointerEvent) {
-    if (e.button !== 0) return
-    const t = e.target as HTMLElement | null
-    const startedOnMiniMap = Boolean(
-      showMiniMap && t?.closest?.('[data-fd-float-map]'),
-    )
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    drag.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origLeft: pos.left,
-      origTop: pos.top,
-      moved: false,
-      startedOnMiniMap,
-    }
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    const d = drag.current
-    if (!d) return
-    const dx = e.clientX - d.startX
-    const dy = e.clientY - d.startY
-    if (Math.hypot(dx, dy) > DRAG_THRESHOLD) d.moved = true
-    setPos(clampPos({ left: d.origLeft + dx, top: d.origTop + dy }))
-  }
-
-  function onPointerUp(e: React.PointerEvent) {
-    const d = drag.current
-    drag.current = null
-    try {
-      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-    } catch {
-      /* */
-    }
-    setPos((p) => {
-      const c = clampPos(p)
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(c))
-      } catch {
-        /* */
-      }
-      return c
-    })
-    if (!d || d.moved || !orderIdRef.current) return
-    if (d.startedOnMiniMap) void goOrderTracking()
-    else void navigate(`/app/orders/${orderIdRef.current}`)
-  }
-
-  function goOrderTracking() {
-    const id = orderIdRef.current
-    if (!id) return
-    /** `harta=1` hap modalin «Ku është korrieri» në faqen e porosisë (si në screenshot). */
-    void navigate(`/app/orders/${id}?harta=1`)
-  }
-
   if (!token || !summary || !detail || onOrderDetailPage) return null
 
+  const ringPct = progressPercent(detail)
+  const enRoute = isCourierEnRouteToCustomer(detail)
+  const centerContent = enRoute && etaMinutes != null ? `${etaMinutes}` : null
+  const gradId = `fd-widget-ring-${detail.id}`
+  const circumference = 2 * Math.PI * 22
+
   return (
-    <>
-      <div
-        className="pointer-events-auto fixed z-[85] select-none touch-none"
-        style={{ left: pos.left, top: pos.top, width: WIDGET, height: WIDGET }}
+    <div
+      className="fixed right-4 top-[72px] z-[85] animate-[fd-slide-in_0.35s_ease-out]"
+      style={{ animationFillMode: 'backwards' }}
+    >
+      <button
+        type="button"
+        onClick={() => navigate(`/app/orders/${detail.id}`)}
+        className="group flex items-center gap-3.5 rounded-2xl border border-white/[0.08] bg-[#111827]/95 px-4 py-3 shadow-[0_8px_32px_rgba(0,0,0,0.45),0_0_0_1px_rgba(255,255,255,0.04)] backdrop-blur-xl transition-all hover:border-[#F5B800]/25 hover:shadow-[0_8px_32px_rgba(0,0,0,0.5),0_0_4px_rgba(245,184,0,0.15)]"
       >
-        <div
-          tabIndex={showMiniMap ? -1 : 0}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onKeyDown={(e) => {
-            if (showMiniMap) return
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              goOrderTracking()
-            }
-          }}
-          className="absolute inset-0 flex cursor-grab flex-col items-center justify-center rounded-full border-2 border-emerald-400/40 bg-gradient-to-br from-slate-900/92 via-[#0f1c17]/93 to-slate-950/92 shadow-[0_10px_42px_-8px_rgba(52,211,153,0.3),0_4px_20px_rgba(0,0,0,0.48)] backdrop-blur-md transition hover:brightness-[1.06] active:cursor-grabbing"
-          style={{ WebkitTapHighlightColor: 'transparent' }}
-          aria-label={`Porosia aktive: ${detail.orderNumber}. Tërhiq nga unaza; prek për detajet e porosisë${showMiniMap ? '; prek hartën në mes për gjurmimin e korrierit.' : ''}.`}
-        >
-          {!showMiniMap ? (
-            <span className="pointer-events-none absolute inset-[3px] rounded-full bg-emerald-500/[0.08]" />
-          ) : null}
-          <svg
-            className="pointer-events-none absolute h-[calc(100%-8px)] w-[calc(100%-8px)] -rotate-90"
-            viewBox="0 0 100 100"
-            aria-hidden
-          >
+        {/* Progress ring */}
+        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
+          <svg className="absolute inset-0 -rotate-90" viewBox="0 0 56 56" aria-hidden>
             <circle
-              cx="50"
-              cy="50"
-              r="42"
+              cx="28"
+              cy="28"
+              r="22"
               fill="none"
-              stroke="rgba(52,211,153,0.16)"
-              strokeWidth="5"
+              stroke="rgba(52,211,153,0.12)"
+              strokeWidth="3.5"
             />
             <circle
-              cx="50"
-              cy="50"
-              r="42"
+              cx="28"
+              cy="28"
+              r="22"
               fill="none"
               stroke={`url(#${gradId})`}
-              strokeWidth="5"
+              strokeWidth="3.5"
               strokeLinecap="round"
-              strokeDasharray={`${(ringPct / 100) * 264} 264`}
-              className="transition-[stroke-dasharray] duration-500"
+              strokeDasharray={`${(ringPct / 100) * circumference} ${circumference}`}
+              className="transition-[stroke-dasharray] duration-700"
             />
             <defs>
               <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#6ee7b7" />
-                <stop offset="45%" stopColor="#34d399" />
+                <stop offset="50%" stopColor="#34d399" />
                 <stop offset="100%" stopColor="#22c55e" />
               </linearGradient>
             </defs>
           </svg>
-
-          {showMiniMap ? (
-            <div
-              role="button"
-              tabIndex={0}
-              data-fd-float-map
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  goOrderTracking()
-                }
-              }}
-              className="absolute left-1/2 top-1/2 z-[8] h-[58px] w-[58px] -translate-x-1/2 -translate-y-1/2 cursor-grab overflow-hidden rounded-full border border-emerald-400/40 bg-slate-950/30 shadow-[0_3px_14px_rgba(0,0,0,0.4),0_0_0_1px_rgba(52,211,153,0.12),inset_0_1px_0_rgba(255,255,255,0.06)] transition active:cursor-grabbing active:scale-[0.98]"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-              aria-label="Hap faqen e gjurmimit të korrierit; tërhiq nga unaza jashtë hartës për ta lëvizur widget-in."
-              title="Gjurmo korrierin"
-            >
-              <div className="relative h-full w-full">
-                <OrderTrackingMapLeaflet
-                  variant="mini"
-                  restaurant={restaurantPt}
-                  customer={customerPt}
-                  driver={driverPt}
-                  followDriver={!!driverPt}
-                  driverEtaMinutes={etaMinutes}
-                  className="pointer-events-none h-full w-full [&_.leaflet-container]:brightness-[0.78] [&_.leaflet-container]:saturate-[0.92]"
-                />
-                {/* Lehtë hije që të mos “djegë” hartën — ende duket qartë që është hartë. */}
-                <div
-                  className="pointer-events-none absolute inset-0 z-[1] rounded-full bg-gradient-to-b from-black/12 via-transparent to-black/22 shadow-[inset_0_2px_16px_rgba(0,0,0,0.35),inset_0_0_0_1px_rgba(0,0,0,0.12)]"
-                  aria-hidden
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {floatEtaPinStyle ? (
-            <span className="pointer-events-none relative z-[12] flex flex-col items-center px-0.5 text-center font-sans">
-              <span className="text-[15px] font-bold leading-none tracking-tight text-white tabular-nums drop-shadow-[0_1px_3px_rgba(0,0,0,0.85)]">
-                {etaMinutes}
-              </span>
-              <span className="mt-1 text-[7px] font-semibold uppercase tracking-[0.16em] text-emerald-200/75 drop-shadow-[0_1px_2px_rgba(0,0,0,0.75)]">
-                min
-              </span>
-            </span>
-          ) : (
-            <span
-              className={`relative z-[12] block max-w-[5rem] px-1 py-0.5 text-center font-sans font-bold leading-snug tracking-tight line-clamp-2 sm:max-w-[5.5rem] ${
-                showMiniMap
-                  ? 'pointer-events-none rounded-md bg-slate-950/60 px-1.5 py-1 text-[10px] uppercase tracking-[0.07em] text-emerald-50 shadow-[0_2px_12px_rgba(0,0,0,0.5)]'
-                  : 'pointer-events-none text-[11px] text-emerald-50 sm:text-[12px]'
-              }`}
-            >
-              {centerText}
-            </span>
-          )}
-          {liveDriver && enRoute && !showMiniMap ? (
-            <span className="pointer-events-none absolute bottom-2.5 left-1/2 z-[14] h-2 w-2 -translate-x-1/2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.65)]" />
-          ) : null}
+          <div className="relative z-10 flex flex-col items-center">
+            {centerContent ? (
+              <>
+                <span className="text-[17px] font-bold leading-none tracking-tight text-white tabular-nums">
+                  {centerContent}
+                </span>
+                <span className="mt-0.5 text-[8px] font-semibold uppercase tracking-widest text-emerald-300/70">
+                  min
+                </span>
+              </>
+            ) : (
+              <div className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+            )}
+          </div>
         </div>
-      </div>
-    </>
+
+        {/* Order info */}
+        <div className="min-w-0 text-left">
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[#F5B800]">
+            Porosia jote
+          </p>
+          <p className="mt-0.5 truncate text-sm font-semibold text-white">
+            {detail.restaurantName}
+          </p>
+          <p className="mt-0.5 text-xs text-zinc-400">
+            {statusLabel(detail)}
+          </p>
+          <p className="mt-1 text-xs font-medium text-[#F5B800] transition-colors group-hover:text-[#ffd04a]">
+            Shiko porosinë →
+          </p>
+        </div>
+
+        {/* Delivery motorcycle icon */}
+        <div className="ml-1 flex shrink-0 items-center">
+          <svg
+            className="h-9 w-9 text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.4)]"
+            viewBox="0 0 48 48"
+            fill="none"
+            aria-hidden
+          >
+            <circle cx="14" cy="34" r="5" stroke="currentColor" strokeWidth="2.2" />
+            <circle cx="36" cy="34" r="5" stroke="currentColor" strokeWidth="2.2" />
+            <path
+              d="M19 34h12M14 29l5-10h6l3 5h8"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <rect x="22" y="14" width="6" height="5" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+            <path
+              d="M25 14v-3"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
+      </button>
+    </div>
   )
 }

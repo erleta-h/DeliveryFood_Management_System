@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { MapContainer, Marker, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -177,16 +177,17 @@ export function OrderTrackingMapLeaflet({
         }
         scrollWheelZoom={!mini}
         dragging={!mini}
-        zoomControl={!mini}
+        zoomControl={false}
         doubleClickZoom={!mini}
         boxZoom={!mini}
         keyboard={!mini}
         attributionControl={!mini}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+        {!mini && <ZoomControl position="bottomright" />}
         <FitAllMarkers points={points} mini={mini} />
         {followDriver && driver ? <PanToDriver driver={driver} /> : null}
         {markers.map((m) => (

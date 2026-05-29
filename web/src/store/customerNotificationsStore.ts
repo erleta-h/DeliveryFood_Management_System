@@ -22,6 +22,8 @@ type CustomerNotificationsState = {
   clearSupportToast: () => void
   setLastSupportMessage: (m: NonNullable<LastSupportMessage>) => void
   clearLastSupportMessage: () => void
+  /** Shtohet për t'u përdorur te CustomerLayout gjatë pranimit të mesazheve realtime */
+  pushSupportMessage: (m: NonNullable<LastSupportMessage>) => void // <-- SHTO KËTË TE TIPI
 }
 
 export const useCustomerNotificationsStore = create<CustomerNotificationsState>((set) => ({
@@ -34,4 +36,9 @@ export const useCustomerNotificationsStore = create<CustomerNotificationsState>(
   clearSupportToast: () => set({ supportToast: null }),
   setLastSupportMessage: (m) => set({ lastSupportMessage: m }),
   clearLastSupportMessage: () => set({ lastSupportMessage: null }),
+  
+  pushSupportMessage: (m) => set((s) => ({
+    unreadCount: s.unreadCount + 1, // Rrit njoftimet automatikisht
+    lastSupportMessage: m           // Përditëson mesazhin e fundit
+  })),
 }))

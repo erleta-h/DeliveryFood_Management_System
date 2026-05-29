@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   DRIVER_LEG,
   fetchDriverDeliveries,
@@ -28,11 +28,6 @@ function fmtMoney(n: number) {
   return `${n.toFixed(2)} €`
 }
 
-function fmtDurationSeconds(total: number) {
-  const m = Math.floor(total / 60)
-  const s = total % 60
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
 
 function fmtOnlineTime(totalSeconds: number) {
   const h = Math.floor(totalSeconds / 3600)
@@ -699,7 +694,6 @@ function ActiveOrderCard({
   onPickup,
   onDelivered,
   onOpenDetail,
-  onOpenChat,
 }: {
   row: DriverDeliveryRow
   busyId: number | null
