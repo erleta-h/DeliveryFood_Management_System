@@ -3,17 +3,19 @@ import { create } from 'zustand'
 export type DriverOfferPayload = { orderId: number; orderNumber: string }
 
 type DriverAlertsState = {
-  /** Numër njoftimesh «live» (SignalR) që nuk janë hapur paneli. */
   bellUnread: number
+  chatUnread: number
   assignmentToast: DriverOfferPayload | null
   pushAssignmentAlert: (p: DriverOfferPayload) => void
   clearAssignmentToast: () => void
-  /** Thirr kur hapet /driver (paneli kryesor). */
   clearBell: () => void
+  incrementChatUnread: () => void
+  clearChatUnread: () => void
 }
 
 export const useDriverAlertsStore = create<DriverAlertsState>((set) => ({
   bellUnread: 0,
+  chatUnread: 0,
   assignmentToast: null,
   pushAssignmentAlert: (p) =>
     set((s) => ({
@@ -22,4 +24,6 @@ export const useDriverAlertsStore = create<DriverAlertsState>((set) => ({
     })),
   clearAssignmentToast: () => set({ assignmentToast: null }),
   clearBell: () => set({ bellUnread: 0 }),
+  incrementChatUnread: () => set((s) => ({ chatUnread: s.chatUnread + 1, bellUnread: s.bellUnread + 1 })),
+  clearChatUnread: () => set({ chatUnread: 0 }),
 }))
