@@ -172,6 +172,20 @@ public class FoodDeliveryDbContext : DbContext
                 .HasForeignKey(x => x.MenuCategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<StoredFile>(e =>
+        {
+            // InitialCreate: dbo.Files, kolona UploadedBy (jo StoredFiles / UploaderId).
+            e.ToTable("Files");
+            e.Property(x => x.UploaderId).HasColumnName("UploadedBy");
+            e.Ignore(x => x.CreatedById);
+            e.Ignore(x => x.UpdatedAt);
+            e.Ignore(x => x.UpdatedById);
+            e.HasOne(x => x.Uploader)
+                .WithMany()
+                .HasForeignKey(x => x.UploaderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.Entity<Notification>(e =>
         {
             e.HasOne(x => x.User)
@@ -333,14 +347,14 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.OrderId);
             e.HasIndex(x => x.RestaurantId);
 
-           e.HasOne(x => x.Driver)
-           .WithMany()
-           .HasForeignKey(x => x.DriverId)
-           .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.Driver)
+                .WithMany()
+                .HasForeignKey(x => x.DriverId)
+                .OnDelete(DeleteBehavior.NoAction);
             e.HasOne(x => x.AssignedTo)
                 .WithMany()
                 .HasForeignKey(x => x.AssignedToUserId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<SupportTicketMessage>(e =>
@@ -355,6 +369,22 @@ public class FoodDeliveryDbContext : DbContext
                 .WithMany(x => x.SupportTicketMessages)
                 .HasForeignKey(x => x.AuthorUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.SupportTicketId);
+            e.HasIndex(x => x.CreatedAt);
+        });
+
+        modelBuilder.Entity<SupportTicketAudit>(e =>
+        {
+            e.ToTable("SupportTicketAudits");
+            e.Property(x => x.Action).HasMaxLength(200).IsRequired();
+            e.HasOne(x => x.SupportTicket)
+                .WithMany(x => x.Audits)
+                .HasForeignKey(x => x.SupportTicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Actor)
+                .WithMany()
+                .HasForeignKey(x => x.ActorUserId)
+                .OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => x.SupportTicketId);
             e.HasIndex(x => x.CreatedAt);
         });

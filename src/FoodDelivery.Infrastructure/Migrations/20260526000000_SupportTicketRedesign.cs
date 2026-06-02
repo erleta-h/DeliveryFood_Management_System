@@ -1,80 +1,18 @@
-﻿using System;
+﻿using FoodDelivery.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace FoodDelivery.Infrastructure.Migrations;
 
+[DbContext(typeof(FoodDeliveryDbContext))]
+[Migration("20260526000000_SupportTicketRedesign")]
 public partial class SupportTicketRedesign : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        // New columns on SupportTickets
-        migrationBuilder.AddColumn<int>(name: "Category", table: "SupportTickets", type: "int", nullable: false, defaultValue: 6); // Other
-        migrationBuilder.AddColumn<int>(name: "Priority", table: "SupportTickets", type: "int", nullable: false, defaultValue: 1); // Medium
-        migrationBuilder.AddColumn<long>(name: "DriverId", table: "SupportTickets", type: "bigint", nullable: true);
-        migrationBuilder.AddColumn<long>(name: "AssignedToUserId", table: "SupportTickets", type: "bigint", nullable: true);
-        migrationBuilder.AddColumn<DateTime>(name: "ResolvedAt", table: "SupportTickets", type: "datetime2", nullable: true);
-
-        // Migrate old Status=1 (Closed) to new Status=3 (Closed)
-        migrationBuilder.Sql("UPDATE [SupportTickets] SET [Status] = 3 WHERE [Status] = 1");
-
-        // Indexes
-        migrationBuilder.CreateIndex(name: "IX_SupportTickets_Status", table: "SupportTickets", column: "Status");
-        migrationBuilder.CreateIndex(name: "IX_SupportTickets_Category", table: "SupportTickets", column: "Category");
-        migrationBuilder.CreateIndex(name: "IX_SupportTickets_Priority", table: "SupportTickets", column: "Priority");
-        migrationBuilder.CreateIndex(name: "IX_SupportTickets_DriverId", table: "SupportTickets", column: "DriverId");
-        migrationBuilder.CreateIndex(name: "IX_SupportTickets_AssignedToUserId", table: "SupportTickets", column: "AssignedToUserId");
-
-        // FK for DriverId
-        migrationBuilder.AddForeignKey(
-            name: "FK_SupportTickets_Users_DriverId",
-            table: "SupportTickets",
-            column: "DriverId",
-            principalTable: "Users",
-            principalColumn: "Id",
-            onDelete: ReferentialAction.SetNull);
-
-        // FK for AssignedToUserId
-        migrationBuilder.AddForeignKey(
-            name: "FK_SupportTickets_Users_AssignedToUserId",
-            table: "SupportTickets",
-            column: "AssignedToUserId",
-            principalTable: "Users",
-            principalColumn: "Id",
-            onDelete: ReferentialAction.SetNull);
-
-        // SupportTicketAudits table
-        migrationBuilder.CreateTable(
-            name: "SupportTicketAudits",
-            columns: table => new
-            {
-                Id = table.Column<long>(type: "bigint", nullable: false)
-                    .Annotation("SqlServer:Identity", "1, 1"),
-                SupportTicketId = table.Column<long>(type: "bigint", nullable: false),
-                ActorUserId = table.Column<long>(type: "bigint", nullable: false),
-                Action = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
-                CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-            },
-            constraints: table =>
-            {
-                table.PrimaryKey("PK_SupportTicketAudits", x => x.Id);
-                table.ForeignKey(
-                    name: "FK_SupportTicketAudits_SupportTickets_SupportTicketId",
-                    column: x => x.SupportTicketId,
-                    principalTable: "SupportTickets",
-                    principalColumn: "Id",
-                    onDelete: ReferentialAction.Cascade);
-                table.ForeignKey(
-                    name: "FK_SupportTicketAudits_Users_ActorUserId",
-                    column: x => x.ActorUserId,
-                    principalTable: "Users",
-                    principalColumn: "Id",
-                    onDelete: ReferentialAction.Restrict);
-            });
-
-        migrationBuilder.CreateIndex(name: "IX_SupportTicketAudits_SupportTicketId", table: "SupportTicketAudits", column: "SupportTicketId");
-        migrationBuilder.CreateIndex(name: "IX_SupportTicketAudits_CreatedAt", table: "SupportTicketAudits", column: "CreatedAt");
+        migrationBuilder.Sql(SupportTicketRedesignSql.Up);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
@@ -98,4 +36,75 @@ public partial class SupportTicketRedesign : Migration
         migrationBuilder.DropColumn(name: "AssignedToUserId", table: "SupportTickets");
         migrationBuilder.DropColumn(name: "ResolvedAt", table: "SupportTickets");
     }
+}
+
+/// <summary>SQL idempotent për skemën e tiketave — përdoret nga migrimet EF.</summary>
+internal static class SupportTicketRedesignSql
+{
+    internal const string Up = """
+        IF OBJECT_ID(N'dbo.SupportTickets', N'U') IS NULL
+            RETURN;
+
+        IF COL_LENGTH(N'dbo.SupportTickets', N'Category') IS NULL
+            ALTER TABLE [SupportTickets] ADD [Category] INT NOT NULL CONSTRAINT DF_SupportTickets_Category DEFAULT(6);
+
+        IF COL_LENGTH(N'dbo.SupportTickets', N'Priority') IS NULL
+            ALTER TABLE [SupportTickets] ADD [Priority] INT NOT NULL CONSTRAINT DF_SupportTickets_Priority DEFAULT(1);
+
+        IF COL_LENGTH(N'dbo.SupportTickets', N'DriverId') IS NULL
+            ALTER TABLE [SupportTickets] ADD [DriverId] BIGINT NULL;
+
+        IF COL_LENGTH(N'dbo.SupportTickets', N'AssignedToUserId') IS NULL
+            ALTER TABLE [SupportTickets] ADD [AssignedToUserId] BIGINT NULL;
+
+        IF COL_LENGTH(N'dbo.SupportTickets', N'ResolvedAt') IS NULL
+            ALTER TABLE [SupportTickets] ADD [ResolvedAt] DATETIME2 NULL;
+
+        UPDATE [SupportTickets] SET [Status] = 3 WHERE [Status] = 1;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'SupportTicketAudits')
+        BEGIN
+            CREATE TABLE [SupportTicketAudits] (
+                [Id] BIGINT IDENTITY(1,1) NOT NULL,
+                [SupportTicketId] BIGINT NOT NULL,
+                [ActorUserId] BIGINT NOT NULL,
+                [Action] NVARCHAR(200) NOT NULL,
+                [CreatedAt] DATETIME2 NOT NULL,
+                CONSTRAINT [PK_SupportTicketAudits] PRIMARY KEY ([Id]),
+                CONSTRAINT [FK_SupportTicketAudits_SupportTickets_SupportTicketId]
+                    FOREIGN KEY ([SupportTicketId]) REFERENCES [SupportTickets]([Id]) ON DELETE CASCADE,
+                CONSTRAINT [FK_SupportTicketAudits_Users_ActorUserId]
+                    FOREIGN KEY ([ActorUserId]) REFERENCES [Users]([Id]) ON DELETE NO ACTION
+            );
+        END;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTicketAudits_SupportTicketId' AND object_id = OBJECT_ID(N'SupportTicketAudits'))
+            CREATE INDEX [IX_SupportTicketAudits_SupportTicketId] ON [SupportTicketAudits]([SupportTicketId]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTicketAudits_CreatedAt' AND object_id = OBJECT_ID(N'SupportTicketAudits'))
+            CREATE INDEX [IX_SupportTicketAudits_CreatedAt] ON [SupportTicketAudits]([CreatedAt]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTickets_Status' AND object_id = OBJECT_ID(N'SupportTickets'))
+            CREATE INDEX [IX_SupportTickets_Status] ON [SupportTickets]([Status]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTickets_Category' AND object_id = OBJECT_ID(N'SupportTickets'))
+            CREATE INDEX [IX_SupportTickets_Category] ON [SupportTickets]([Category]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTickets_Priority' AND object_id = OBJECT_ID(N'SupportTickets'))
+            CREATE INDEX [IX_SupportTickets_Priority] ON [SupportTickets]([Priority]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTickets_DriverId' AND object_id = OBJECT_ID(N'SupportTickets'))
+            CREATE INDEX [IX_SupportTickets_DriverId] ON [SupportTickets]([DriverId]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_SupportTickets_AssignedToUserId' AND object_id = OBJECT_ID(N'SupportTickets'))
+            CREATE INDEX [IX_SupportTickets_AssignedToUserId] ON [SupportTickets]([AssignedToUserId]);
+
+        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_SupportTickets_Users_DriverId')
+            ALTER TABLE [SupportTickets] ADD CONSTRAINT [FK_SupportTickets_Users_DriverId]
+                FOREIGN KEY ([DriverId]) REFERENCES [Users]([Id]) ON DELETE NO ACTION;
+
+        IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_SupportTickets_Users_AssignedToUserId')
+            ALTER TABLE [SupportTickets] ADD CONSTRAINT [FK_SupportTickets_Users_AssignedToUserId]
+                FOREIGN KEY ([AssignedToUserId]) REFERENCES [Users]([Id]) ON DELETE NO ACTION;
+        """;
 }

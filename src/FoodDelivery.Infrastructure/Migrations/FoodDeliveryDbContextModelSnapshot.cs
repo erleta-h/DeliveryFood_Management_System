@@ -1273,9 +1273,6 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<long?>("CreatedById")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("Entity")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1295,23 +1292,15 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<long?>("UpdatedById")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("UploadedBy")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("UploaderId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("UploadedBy");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UploaderId");
 
-                    b.ToTable("StoredFiles");
+                    b.ToTable("Files");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicket", b =>
@@ -1396,10 +1385,8 @@ namespace FoodDelivery.Infrastructure.Migrations
 
                     b.Property<string>("Action")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<long>("ActorId")
-                        .HasColumnType("bigint");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<long>("ActorUserId")
                         .HasColumnType("bigint");
@@ -1412,7 +1399,9 @@ namespace FoodDelivery.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorId");
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("SupportTicketId");
 
@@ -1920,12 +1909,12 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.HasOne("FoodDelivery.Domain.Entities.User", "AssignedTo")
                         .WithMany()
                         .HasForeignKey("AssignedToUserId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("FoodDelivery.Domain.Entities.User", "Driver")
                         .WithMany()
                         .HasForeignKey("DriverId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("FoodDelivery.Domain.Entities.Order", "Order")
                         .WithMany()
@@ -1958,8 +1947,8 @@ namespace FoodDelivery.Infrastructure.Migrations
                 {
                     b.HasOne("FoodDelivery.Domain.Entities.User", "Actor")
                         .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("FoodDelivery.Domain.Entities.SupportTicket", "SupportTicket")
