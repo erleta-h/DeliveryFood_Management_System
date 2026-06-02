@@ -51,5 +51,10 @@ public interface IKitchenMenuService
 
     /// <summary>Hiq foton e artikullit.</summary>
     Task<string?> ClearItemImageAsync(long staffUserId, long itemId, CancellationToken cancellationToken = default);
+
+    /// <summary>Rrugë fizike e fotos për GET publik (panel kuzhinë / img tag).</summary>
+    Task<(string? PhysicalPath, string? ContentType, string? Error)> GetItemImageFileAsync(
+        long itemId,
+        CancellationToken cancellationToken = default);
 }
 

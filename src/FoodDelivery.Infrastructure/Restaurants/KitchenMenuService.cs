@@ -65,7 +65,7 @@ public sealed class KitchenMenuService : IKitchenMenuService
                         i.Description,
                         i.Price,
                         i.IsAvailable,
-                        MenuItemImageUrls.PublicUrl(i.ImageFileId)))
+                        MenuItemImageUrls.KitchenItemImageUrl(i.Id, i.ImageFileId)))
                     .ToList()))
             .ToListAsync(cancellationToken);
     }
@@ -372,7 +372,7 @@ public sealed class KitchenMenuService : IKitchenMenuService
             Filename = displayName,
             FilePath = fullPath,
             FileSize = totalWritten,
-            UploadedBy = staffUserId,
+            UploaderId = staffUserId,
             CreatedAt = now,
         };
         _uow.Repository<StoredFile, long>().Add(stored);
@@ -384,6 +384,27 @@ public sealed class KitchenMenuService : IKitchenMenuService
         await _uow.SaveChangesAsync(cancellationToken);
         await InvalidatePublicCatalogAsync(restaurantId.Value, cancellationToken).ConfigureAwait(false);
         return null;
+    }
+
+    public async Task<(string? PhysicalPath, string? ContentType, string? Error)> GetItemImageFileAsync(
+        long itemId,
+        CancellationToken cancellationToken = default)
+    {
+        var imageFileId = await _uow.Repository<MenuItem, long>().Query.AsNoTracking()
+            .Where(i => i.Id == itemId)
+            .Select(i => i.ImageFileId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (imageFileId is null or 0)
+            return (null, null, "Artikulli nuk ka foto.");
+
+        var file = await _uow.Repository<StoredFile, long>().Query.AsNoTracking()
+            .FirstOrDefaultAsync(f => f.Id == imageFileId.Value, cancellationToken);
+        if (file is null || string.IsNullOrWhiteSpace(file.FilePath))
+            return (null, null, "Skedari i fotos nuk u gjet.");
+        if (!File.Exists(file.FilePath))
+            return (null, null, "Skedari i fotos mungon në disk.");
+
+        return (file.FilePath, GuessContentType(file.Filename), null);
     }
 
     public async Task<string?> ClearItemImageAsync(
@@ -497,5 +518,18 @@ public sealed class KitchenMenuService : IKitchenMenuService
             return null;
         var t = description.Trim();
         return t.Length > MaxDescriptionLength ? t[..MaxDescriptionLength] : t;
+    }
+
+    private static string GuessContentType(string filename)
+    {
+        var ext = Path.GetExtension(filename).ToLowerInvariant();
+        return ext switch
+        {
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "application/octet-stream",
+        };
     }
 }

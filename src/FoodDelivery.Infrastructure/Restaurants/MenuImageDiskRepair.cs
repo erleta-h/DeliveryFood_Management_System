@@ -78,7 +78,7 @@ public static class MenuImageDiskRepair
                 Filename = fi.Name,
                 FilePath = fullPath,
                 FileSize = fi.Length,
-                UploadedBy = uploaderId,
+                UploaderId = uploaderId,
                 CreatedAt = now,
             };
             db.StoredFiles.Add(stored);

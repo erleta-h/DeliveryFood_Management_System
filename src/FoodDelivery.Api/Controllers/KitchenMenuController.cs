@@ -123,6 +123,19 @@ public sealed class KitchenMenuController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Foto e artikullit — publik për &lt;img&gt; (pa JWT; vetëm artikuj me foto në menu).</summary>
+    [HttpGet("items/{id:long}/image")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetItemImage(long id, CancellationToken cancellationToken)
+    {
+        var (path, contentType, err) = await _menu.GetItemImageFileAsync(id, cancellationToken);
+        if (err is not null || path is null)
+            return NotFound();
+        return PhysicalFile(path, contentType ?? "application/octet-stream");
+    }
+
     /// <summary>Ngarko foto për artikull (JPEG, PNG, WebP, GIF).</summary>
     [HttpPost("items/{id:long}/image")]
     [RequestSizeLimit(6_291_456)]

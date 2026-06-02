@@ -1,6 +1,6 @@
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=DESKTOP-M2A23M8\\SQLEXPRESS;Database=FoodDeliveryDb_Dev;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
+    "DefaultConnection": "Server=localhost;Database=FoodDeliveryDb_Dev;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true"
   },
   "Jwt": {
     "Secret": "DevOnly_DoNotUseInProduction_SuperSecretKey_32chars_Min__",
