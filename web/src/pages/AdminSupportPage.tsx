@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   fetchAdminSupportTickets,
   fetchAdminSupportTicketThread,
@@ -37,6 +38,7 @@ const PRIORITY_COLORS_LIGHT: Record<number, string> = {
 
 export default function AdminSupportPage() {
   const token = useAuthStore((s) => s.token)
+  const [searchParams, setSearchParams] = useSearchParams()
   const def = ADMIN_SECTIONS.support
 
   const [tickets, setTickets] = useState<AdminSupportTicketRow[]>([])
@@ -55,6 +57,7 @@ export default function AdminSupportPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [thread, setThread] = useState<AdminSupportTicketThread | null>(null)
   const [threadLoading, setThreadLoading] = useState(false)
+  const [threadError, setThreadError] = useState<string | null>(null)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyBusy, setReplyBusy] = useState(false)
 
@@ -92,16 +95,26 @@ export default function AdminSupportPage() {
     if (!token) return
     setThreadLoading(true)
     setAuditLoading(true)
+    setThreadError(null)
     try {
-      const [t, a] = await Promise.all([
-        fetchAdminSupportTicketThread(token, id),
-        fetchAdminTicketAudit(token, id),
-      ])
+      const t = await fetchAdminSupportTicketThread(token, id)
+      if (!t) {
+        setThread(null)
+        setThreadError('Tiketa nuk u gjet.')
+        setAuditTrail([])
+        return
+      }
       setThread(t)
-      setAuditTrail(a)
-    } catch {
+      try {
+        const a = await fetchAdminTicketAudit(token, id)
+        setAuditTrail(a)
+      } catch {
+        setAuditTrail([])
+      }
+    } catch (e: unknown) {
       setThread(null)
       setAuditTrail([])
+      setThreadError(e instanceof Error ? e.message : 'Gabim ngarkimi të tiketës.')
     } finally {
       setThreadLoading(false)
       setAuditLoading(false)
@@ -112,10 +125,19 @@ export default function AdminSupportPage() {
     if (selectedId == null) {
       setThread(null)
       setAuditTrail([])
+      setThreadError(null)
       return
     }
     void loadThread(selectedId)
   }, [selectedId, loadThread])
+
+  useEffect(() => {
+    const q = searchParams.get('ticket')
+    if (!q || !/^\d+$/.test(q)) return
+    const id = Number(q)
+    if (!Number.isFinite(id)) return
+    setSelectedId(id)
+  }, [searchParams])
 
   async function sendReply() {
     if (!token || !selectedId || !replyDraft.trim()) return
@@ -262,7 +284,11 @@ export default function AdminSupportPage() {
                   <li key={t.id}>
                     <button
                       type="button"
-                      onClick={() => { setSelectedId(t.id); setReplyDraft('') }}
+                      onClick={() => {
+                        setSelectedId(t.id)
+                        setReplyDraft('')
+                        setSearchParams({ ticket: String(t.id) }, { replace: true })
+                      }}
                       className={`w-full px-3 py-3 text-left transition ${
                         selectedId === t.id ? 'bg-violet-50' : 'hover:bg-gray-50'
                       }`}
@@ -315,7 +341,7 @@ export default function AdminSupportPage() {
             </div>
           ) : !thread ? (
             <div className="flex flex-1 items-center justify-center p-8">
-              <p className="text-sm text-gray-400">Tiketa nuk u gjet.</p>
+              <p className="text-sm text-amber-700">{threadError ?? 'Tiketa nuk u gjet.'}</p>
             </div>
           ) : (
             <>
