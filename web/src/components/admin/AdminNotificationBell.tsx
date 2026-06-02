@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   fetchAdminNotificationUnreadCount,
@@ -24,22 +24,36 @@ function formatWhen(iso: string) {
   }
 }
 
+function mergeNotifications(api: AdminNotificationRow[], live: AdminNotificationRow[]): AdminNotificationRow[] {
+  const apiIds = new Set(api.map((x) => x.id))
+  const extra = live.filter((x) => x.id === 0 || !apiIds.has(x.id))
+  return [...extra, ...api]
+}
+
 export function AdminNotificationBell() {
   const token = useAuthStore((s) => s.token)
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [unread, setUnread] = useState(0)
+  const [apiUnread, setApiUnread] = useState(0)
   const [rows, setRows] = useState<AdminNotificationRow[]>([])
   const [loading, setLoading] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  const unreadBump = useAdminNotificationsStore((s) => s.unreadBump)
+  const liveItems = useAdminNotificationsStore((s) => s.liveItems)
+  const clearLive = useAdminNotificationsStore((s) => s.clearLive)
+  const removeLive = useAdminNotificationsStore((s) => s.removeLive)
+
+  const displayRows = useMemo(() => mergeNotifications(rows, liveItems), [rows, liveItems])
+  const unread = Math.max(apiUnread, displayRows.filter((x) => !x.isRead).length)
 
   const refreshCount = useCallback(async () => {
     if (!token) return
     try {
       const c = await fetchAdminNotificationUnreadCount(token)
-      setUnread(c)
+      setApiUnread(c)
     } catch {
-      setUnread(0)
+      setApiUnread(0)
     }
   }, [token])
 
@@ -49,22 +63,18 @@ export function AdminNotificationBell() {
     try {
       const list = await fetchAdminNotifications(token, 25)
       setRows(list)
+      clearLive()
     } catch {
       setRows([])
     } finally {
       setLoading(false)
     }
-  }, [token])
-
-  const unreadBump = useAdminNotificationsStore((s) => s.unreadBump)
+  }, [token, clearLive])
 
   useEffect(() => {
     void refreshCount()
-  }, [refreshCount, unreadBump])
-
-  useEffect(() => {
     if (open) void loadList()
-  }, [open, loadList])
+  }, [refreshCount, loadList, open, unreadBump])
 
   useEffect(() => {
     if (!open) return
@@ -79,12 +89,15 @@ export function AdminNotificationBell() {
 
   async function onOpenItem(n: AdminNotificationRow) {
     if (!token) return
-    if (!n.isRead) {
+    if (n.id > 0 && !n.isRead) {
       const ok = await markAdminNotificationRead(token, n.id)
       if (ok) {
         setRows((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)))
-        setUnread((c) => Math.max(0, c - 1))
+        setApiUnread((c) => Math.max(0, c - 1))
+        removeLive(n)
       }
+    } else if (n.id === 0) {
+      removeLive(n)
     }
     setOpen(false)
     if (n.linkPath) navigate(n.linkPath)
@@ -94,8 +107,9 @@ export function AdminNotificationBell() {
     if (!token) return
     const ok = await markAllAdminNotificationsRead(token)
     if (ok) {
-      setUnread(0)
+      setApiUnread(0)
       setRows((prev) => prev.map((x) => ({ ...x, isRead: true })))
+      clearLive()
     }
   }
 
@@ -103,7 +117,10 @@ export function AdminNotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setOpen((o) => !o)
+          if (!open) void loadList()
+        }}
         className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-lg transition hover:border-violet-300 hover:bg-violet-50"
         title="Njoftimet"
         aria-expanded={open}
@@ -134,12 +151,12 @@ export function AdminNotificationBell() {
           <div className="max-h-80 overflow-y-auto">
             {loading ? (
               <p className="px-3 py-6 text-center text-sm text-gray-500">Duke ngarkuar…</p>
-            ) : rows.length === 0 ? (
+            ) : displayRows.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-gray-500">Nuk ka njoftime.</p>
             ) : (
               <ul>
-                {rows.map((n) => (
-                  <li key={n.id} className="border-b border-gray-50 last:border-0">
+                {displayRows.map((n) => (
+                  <li key={n.id > 0 ? n.id : `live-${n.createdAtUtc}-${n.title}`} className="border-b border-gray-50 last:border-0">
                     <button
                       type="button"
                       onClick={() => void onOpenItem(n)}
@@ -158,7 +175,14 @@ export function AdminNotificationBell() {
             )}
           </div>
 
-          <div className="border-t border-gray-100 px-3 py-2">
+          <div className="flex flex-col gap-1 border-t border-gray-100 px-3 py-2">
+            <Link
+              to="/admin/support"
+              className={`${customerBtnGhost} block w-full text-center text-xs`}
+              onClick={() => setOpen(false)}
+            >
+              Support & konflikte
+            </Link>
             <Link
               to="/admin/partner-applications"
               className={`${customerBtnGhost} block w-full text-center text-xs`}

@@ -4,7 +4,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { AdminTopBar } from '../components/admin/AdminTopBar'
 
 import { getVisibleAdminNavGroups } from '../lib/adminNav'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 
 import { customerShellBg } from '../lib/adminTheme'
 
@@ -53,14 +53,38 @@ export default function AdminLayout() {
     const hub = createOrdersHubConnection(token)
     hubRef.current = hub
 
-    hub.on('adminNotification', (data: { title?: string; message?: string }) => {
-      useAdminNotificationsStore.getState().bumpUnread()
-      useAdminNotificationsStore.getState().showToast({ title: data.title ?? 'Njoftim', message: data.message ?? '' })
+    hub.on('adminNotification', (data: {
+      id?: number
+      title?: string
+      message?: string
+      type?: string
+      linkPath?: string
+      ticketId?: number
+      createdAtUtc?: string
+    }) => {
+      const store = useAdminNotificationsStore.getState()
+      const linkPath =
+        data.linkPath ?? (data.ticketId != null ? `/admin/support?ticket=${data.ticketId}` : null)
+      store.pushLive({
+        id: data.id ?? 0,
+        title: data.title ?? 'Njoftim',
+        message: data.message ?? '',
+        type: data.type ?? '',
+        linkPath,
+        createdAtUtc: data.createdAtUtc ?? new Date().toISOString(),
+        isRead: false,
+      })
+      store.bumpUnread()
+      store.showToast({
+        title: data.title ?? 'Njoftim',
+        message: data.message ?? '',
+        linkPath: linkPath ?? undefined,
+      })
     })
 
-    hub.start()
-      .then(() => hub.invoke('JoinAdmin'))
-      .catch((err:unknown) => console.warn('[AdminHub] connection/join failed', err))
+    void startOrdersHub(hub, [{ kind: 'admin' }]).catch((err: unknown) =>
+      console.warn('[AdminHub] connection/join failed', err),
+    )
     return () => { hub.stop().catch(() => {}) }
   }, [token])
 
@@ -264,14 +288,42 @@ export default function AdminLayout() {
       </div>
 
       {adminToast && (
-        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-200 bg-white px-4 py-3 shadow-xl">
+        <div
+          role={adminToast.linkPath ? 'button' : undefined}
+          tabIndex={adminToast.linkPath ? 0 : undefined}
+          onClick={() => {
+            if (adminToast.linkPath) {
+              clearToast()
+              navigate(adminToast.linkPath)
+            }
+          }}
+          onKeyDown={(e) => {
+            if (adminToast.linkPath && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              clearToast()
+              navigate(adminToast.linkPath)
+            }
+          }}
+          className={`fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-200 bg-white px-4 py-3 shadow-xl ${
+            adminToast.linkPath ? 'cursor-pointer hover:border-violet-300' : ''
+          }`}
+        >
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm">💬</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-gray-900">{adminToast.title}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-gray-600">{adminToast.message}</p>
+              {adminToast.linkPath ? (
+                <p className="mt-1 text-[10px] font-medium text-violet-600">Kliko për të hapur →</p>
+              ) : null}
             </div>
-            <button type="button" onClick={clearToast} className="shrink-0 text-gray-400 hover:text-gray-600">✕</button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); clearToast() }}
+              className="shrink-0 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

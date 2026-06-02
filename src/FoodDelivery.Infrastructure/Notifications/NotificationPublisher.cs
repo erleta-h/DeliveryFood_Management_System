@@ -57,17 +57,21 @@ public sealed class NotificationPublisher : INotificationPublisher
                 return;
 
             var now = DateTime.UtcNow;
+            var storedType = type.Trim();
+            var saved = new List<Notification>();
             foreach (var userId in userIds)
             {
-                _db.Notifications.Add(new Notification
+                var row = new Notification
                 {
                     UserId = userId,
                     Title = title.Trim(),
                     Message = message.Trim(),
-                    Type = type.Trim(),
+                    Type = storedType,
                     IsRead = false,
                     CreatedAt = now,
-                });
+                };
+                _db.Notifications.Add(row);
+                saved.Add(row);
             }
 
             try
@@ -77,23 +81,63 @@ public sealed class NotificationPublisher : INotificationPublisher
             catch (Exception dbEx)
             {
                 _log.LogWarning(dbEx, "Ruajtja e njoftimit në DB dështoi për rolet [{Roles}].", string.Join(", ", roleNames));
+                saved.Clear();
             }
 
             if (isAdminNotif)
             {
-                var linkPath = NotificationTypes.AdminLinkPath(type);
-                var payload = new { title = title.Trim(), message = message.Trim(), type, createdAtUtc = now, linkPath };
-                _log.LogInformation("Dërgoj adminNotification SignalR te {Count} admin(s) për tipin '{Type}'.", userIds.Count, type);
-                foreach (var userId in userIds)
+                var linkPath = NotificationTypes.AdminLinkPath(storedType);
+                var ticketId = NotificationTypes.TicketIdFromType(storedType);
+                _log.LogInformation("Dërgoj adminNotification SignalR te {Count} admin(s) për tipin '{Type}'.", userIds.Count, storedType);
+
+                if (saved.Count > 0)
                 {
-                    try
+                    foreach (var row in saved)
                     {
-                        await _hub.Clients.Group($"admin-{userId}")
-                            .SendAsync("adminNotification", payload, cancellationToken);
+                        var payload = new
+                        {
+                            id = row.Id,
+                            title = row.Title,
+                            message = row.Message,
+                            type = row.Type,
+                            ticketId,
+                            createdAtUtc = now,
+                            linkPath,
+                        };
+                        try
+                        {
+                            await _hub.Clients.Group($"admin-{row.UserId}")
+                                .SendAsync("adminNotification", payload, cancellationToken);
+                        }
+                        catch (Exception hubEx)
+                        {
+                            _log.LogWarning(hubEx, "SignalR adminNotification për admin-{UserId} dështoi.", row.UserId);
+                        }
                     }
-                    catch (Exception hubEx)
+                }
+                else
+                {
+                    var fallback = new
                     {
-                        _log.LogWarning(hubEx, "SignalR adminNotification për admin-{UserId} dështoi.", userId);
+                        id = 0L,
+                        title = title.Trim(),
+                        message = message.Trim(),
+                        type = storedType,
+                        ticketId,
+                        createdAtUtc = now,
+                        linkPath,
+                    };
+                    foreach (var userId in userIds)
+                    {
+                        try
+                        {
+                            await _hub.Clients.Group($"admin-{userId}")
+                                .SendAsync("adminNotification", fallback, cancellationToken);
+                        }
+                        catch (Exception hubEx)
+                        {
+                            _log.LogWarning(hubEx, "SignalR adminNotification për admin-{UserId} dështoi.", userId);
+                        }
                     }
                 }
             }
