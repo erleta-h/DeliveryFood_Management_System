@@ -12,12 +12,15 @@ public class AddUserMustChangePassword : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<bool>(
-            name: "MustChangePassword",
-            table: "Users",
-            type: "bit",
-            nullable: false,
-            defaultValue: false);
+        migrationBuilder.Sql(
+            """
+            IF COL_LENGTH('dbo.Users', 'MustChangePassword') IS NULL
+            BEGIN
+                ALTER TABLE dbo.Users
+                ADD MustChangePassword bit NOT NULL
+                    CONSTRAINT DF_Users_MustChangePassword DEFAULT(0);
+            END
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
