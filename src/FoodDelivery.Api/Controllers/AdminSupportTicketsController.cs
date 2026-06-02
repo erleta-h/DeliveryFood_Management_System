@@ -65,8 +65,16 @@ public sealed class AdminSupportTicketsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<SupportTicketThreadDto>> GetThread(long id, CancellationToken cancellationToken)
     {
-        var thread = await _svc.GetThreadAsync(id, cancellationToken);
-        return thread is null ? NotFound() : Ok(thread);
+        try
+        {
+            var thread = await _svc.GetThreadAsync(id, cancellationToken);
+            return thread is null ? NotFound() : Ok(thread);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "GetThread dështoi për tiketën {TicketId}.", id);
+            return StatusCode(500, new { message = "Gabim i brendshëm — kontrollo migrimet e support-it." });
+        }
     }
 
     [HttpPost("{id:long}/messages")]
@@ -166,7 +174,15 @@ public sealed class AdminSupportTicketsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<SupportTicketAuditDto>>> GetAudit(
         long id, CancellationToken cancellationToken)
     {
-        var trail = await _svc.GetAuditTrailAsync(id, cancellationToken);
-        return Ok(trail);
+        try
+        {
+            var trail = await _svc.GetAuditTrailAsync(id, cancellationToken);
+            return Ok(trail);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "GetAudit dështoi për tiketën {TicketId}.", id);
+            return Ok(Array.Empty<SupportTicketAuditDto>());
+        }
     }
 }

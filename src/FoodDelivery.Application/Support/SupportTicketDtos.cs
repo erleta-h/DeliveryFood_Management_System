@@ -18,6 +18,8 @@ public sealed record CreateSupportTicketRequest(
     string Body,
     int Category,
     long? OrderId = null,
+    /// <summary>Nr. porosie si <c>FD-20260602-...</c> kur nuk dërgohet <see cref="OrderId"/> numerik.</summary>
+    string? OrderNumber = null,
     long? RestaurantId = null);
 
 public sealed record PostSupportTicketMessageRequest(string Body);

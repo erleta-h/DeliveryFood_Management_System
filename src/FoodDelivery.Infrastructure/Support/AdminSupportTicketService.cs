@@ -129,6 +129,21 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
         var preview = trimmed.Length > 120 ? trimmed[..120] + "…" : trimmed;
         var pushBody = $"{t.Subject}: {preview}";
 
+        _uow.Repository<SupportTicketMessage, long>().Add(new SupportTicketMessage
+        {
+            SupportTicketId = ticketId,
+            AuthorUserId = staffUserId,
+            Body = trimmed,
+            IsStaffReply = true,
+            CreatedAt = now,
+        });
+        t.UpdatedAt = now;
+
+        if (t.Status == SupportTicketStatus.Open)
+            t.Status = SupportTicketStatus.InReview;
+
+        await _uow.SaveChangesAsync(cancellationToken);
+
         var notif = new Notification
         {
             UserId = t.UserId,
@@ -139,22 +154,16 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
             CreatedAt = now,
             CreatedById = staffUserId,
         };
-
-        _uow.Repository<SupportTicketMessage, long>().Add(new SupportTicketMessage
+        try
         {
-            SupportTicketId = ticketId,
-            AuthorUserId = staffUserId,
-            Body = trimmed,
-            IsStaffReply = true,
-            CreatedAt = now,
-        });
-        _uow.Repository<Notification, long>().Add(notif);
-        t.UpdatedAt = now;
-
-        if (t.Status == SupportTicketStatus.Open)
-            t.Status = SupportTicketStatus.InReview;
-
-        await _uow.SaveChangesAsync(cancellationToken);
+            _uow.Repository<Notification, long>().Add(notif);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex, "Njoftimi in-app për tiketën {TicketId} nuk u ruajt; mesazhi i support-it u ruajt.", ticketId);
+            notif.Id = 0;
+        }
 
         try { await _push.SendToUserAsync(t.UserId, pushTitle, pushBody, cancellationToken); }
         catch (Exception ex) { _log.LogWarning(ex, "Push për tiketën {TicketId} dështoi.", ticketId); }
@@ -165,7 +174,16 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
                 .Where(u => u.Id == staffUserId).Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
 
             var customerGroup = _hub.Clients.Group($"user-{t.UserId}");
-            await customerGroup.SendAsync("customerNotification", new { id = notif.Id, title = pushTitle, message = pushBody, type = "support_reply", ticketId, createdAtUtc = now }, cancellationToken);
+            await customerGroup.SendAsync("customerNotification", new
+            {
+                id = notif.Id > 0 ? notif.Id : (long?)null,
+                title = pushTitle,
+                message = pushBody,
+                type = "support_reply",
+                ticketId,
+                createdAtUtc = now,
+                linkPath = $"/app/support?ticket={ticketId}",
+            }, cancellationToken);
             await customerGroup.SendAsync("supportTicketMessageReceived", new
             {
                 ticketId,
@@ -288,11 +306,15 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
     public async Task<IReadOnlyList<SupportTicketAuditDto>> GetAuditTrailAsync(
         long ticketId, CancellationToken cancellationToken = default)
     {
-        return await _uow.Repository<SupportTicketAudit, long>().Query.AsNoTracking()
-            .Where(a => a.SupportTicketId == ticketId)
-            .OrderByDescending(a => a.CreatedAt)
-            .Select(a => new SupportTicketAuditDto(
-                a.Id, a.ActorUserId, a.Actor.Email, a.Action, a.CreatedAt))
+        var audits = _uow.Repository<SupportTicketAudit, long>().Query.AsNoTracking()
+            .Where(a => a.SupportTicketId == ticketId);
+        var users = _uow.Repository<User, long>().Query.AsNoTracking();
+
+        return await (
+            from a in audits
+            join u in users on a.ActorUserId equals u.Id
+            orderby a.CreatedAt descending
+            select new SupportTicketAuditDto(a.Id, a.ActorUserId, u.Email, a.Action, a.CreatedAt))
             .ToListAsync(cancellationToken);
     }
 }

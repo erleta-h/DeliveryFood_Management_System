@@ -11,18 +11,16 @@ namespace FoodDelivery.Infrastructure.Support;
 
 public sealed class SupportTicketService : ISupportTicketService
 {
-    private static readonly string[] AdminNotifyRoles = ["Admin", "Support"];
-
     private readonly IUnitOfWork _uow;
-    private readonly INotificationPublisher _notifications;
     private readonly IHubContext<OrderTrackingHub> _hub;
     private readonly ILogger<SupportTicketService> _log;
 
-    public SupportTicketService(IUnitOfWork uow, INotificationPublisher notifications,
-        IHubContext<OrderTrackingHub> hub, ILogger<SupportTicketService> log)
+    public SupportTicketService(
+        IUnitOfWork uow,
+        IHubContext<OrderTrackingHub> hub,
+        ILogger<SupportTicketService> log)
     {
         _uow = uow;
-        _notifications = notifications;
         _hub = hub;
         _log = log;
     }
@@ -41,23 +39,16 @@ public sealed class SupportTicketService : ISupportTicketService
         if (!SupportTicketCategory.IsValid(request.Category))
             return (null, "Kategoria e pavlefshme.");
 
-        long? orderId = request.OrderId;
-        long? restaurantId = request.RestaurantId;
-        long? driverId = null;
+        var (orderId, restaurantId, driverId, orderErr) = await ResolveOrderLinkAsync(
+            userId,
+            request.OrderId,
+            request.OrderNumber,
+            request.RestaurantId,
+            cancellationToken);
+        if (orderErr is not null)
+            return (null, orderErr);
 
-        if (orderId is { } oid)
-        {
-            var order = await _uow.Repository<Order, long>().Query.AsNoTracking()
-                .FirstOrDefaultAsync(o => o.Id == oid, cancellationToken);
-            if (order is null)
-                return (null, "Porosia nuk u gjet.");
-            restaurantId ??= order.RestaurantId;
-
-            var delivery = await _uow.Repository<Delivery, long>().Query.AsNoTracking()
-                .FirstOrDefaultAsync(d => d.OrderId == oid, cancellationToken);
-            driverId = delivery?.DriverUserId;
-        }
-        else if (restaurantId is { } restId)
+        if (orderId is null && restaurantId is { } restId)
         {
             var exists = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
                 .AnyAsync(r => r.Id == restId, cancellationToken);
@@ -84,14 +75,70 @@ public sealed class SupportTicketService : ISupportTicketService
         _uow.Repository<SupportTicket, long>().Add(t);
         await _uow.SaveChangesAsync(cancellationToken);
 
-        await _notifications.NotifyUsersInRolesAsync(
-            AdminNotifyRoles,
+        await AdminSupportNotificationHelper.NotifyAdminsAsync(
+            _uow,
+            _hub,
+            _log,
+            t.Id,
             "Tiketë support e re",
             $"[{SupportTicketCategory.Labels.GetValueOrDefault(request.Category, "?")}] {subject}",
             NotificationTypes.SupportTicketNew,
             cancellationToken);
 
         return (t.Id, null);
+    }
+
+    private async Task<(long? OrderId, long? RestaurantId, long? DriverId, string? Error)> ResolveOrderLinkAsync(
+        long userId,
+        long? orderId,
+        string? orderNumber,
+        long? restaurantId,
+        CancellationToken cancellationToken)
+    {
+        long? resolvedOrderId = orderId is > 0 ? orderId : null;
+        if (resolvedOrderId is null)
+        {
+            var refText = orderNumber?.Trim();
+            if (!string.IsNullOrEmpty(refText))
+            {
+                resolvedOrderId = await _uow.Repository<Order, long>().Query.AsNoTracking()
+                    .Where(o => o.OrderNumber == refText)
+                    .Select(o => (long?)o.Id)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (resolvedOrderId is null)
+                    return (null, restaurantId, null, "Porosia nuk u gjet — kontrollo nr. porosisë (FD-...) ose ID-në numerike.");
+            }
+        }
+
+        if (resolvedOrderId is not { } oid)
+            return (null, restaurantId, null, null);
+
+        var orderRow = await _uow.Repository<Order, long>().Query.AsNoTracking()
+            .Where(o => o.Id == oid)
+            .Select(o => new { o.RestaurantId, o.UserId })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (orderRow is null)
+            return (null, restaurantId, null, "Porosia nuk u gjet.");
+
+        var canLink = orderRow.UserId == userId
+            || await _uow.Repository<Delivery, long>().Query.AsNoTracking()
+                .AnyAsync(d => d.OrderId == oid && d.DriverUserId == userId, cancellationToken)
+            || await (
+                from s in _uow.Repository<RestaurantStaff, long>().Query.AsNoTracking()
+                where s.UserId == userId && s.RestaurantId == orderRow.RestaurantId
+                select s.Id).AnyAsync(cancellationToken);
+
+        if (!canLink)
+            return (null, restaurantId, null, "Porosia nuk u gjet ose nuk ke akses për ta lidhur me tiketën.");
+
+        restaurantId ??= orderRow.RestaurantId;
+
+        var driverId = await _uow.Repository<Delivery, long>().Query.AsNoTracking()
+            .Where(d => d.OrderId == oid)
+            .Select(d => (long?)d.DriverUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return (oid, restaurantId, driverId, null);
     }
 
     public async Task<IReadOnlyList<SupportTicketMineItemDto>> ListMineAsync(
@@ -160,37 +207,16 @@ public sealed class SupportTicketService : ISupportTicketService
         t.UpdatedAt = now;
         await _uow.SaveChangesAsync(cancellationToken);
 
-        try
-        {
-            var userEmail = await _uow.Repository<User, long>().Query.AsNoTracking()
-                .Where(u => u.Id == userId).Select(u => u.Email).FirstOrDefaultAsync(cancellationToken);
-            var preview = trimmed.Length > 80 ? trimmed[..80] + "…" : trimmed;
-            var adminPayload = new
-            {
-                title = "Përgjigje nga klienti",
-                message = $"{t.Subject}: {preview}",
-                type = "support_client_reply",
-                ticketId,
-                createdAtUtc = now,
-                linkPath = "/admin/support",
-            };
-
-            var adminUserIds = await (
-                from ur in _uow.Repository<UserRole, long>().Query.AsNoTracking()
-                join r in _uow.Repository<Role, long>().Query.AsNoTracking() on ur.RoleId equals r.Id
-                where r.Name == "Admin" || r.Name == "Support"
-                select ur.UserId)
-                .Distinct().ToListAsync(cancellationToken);
-
-            _log.LogInformation("Dërgoj adminNotification për tiketë {TicketId} te {Count} admin(s): [{Ids}]",
-                ticketId, adminUserIds.Count, string.Join(",", adminUserIds));
-            foreach (var aid in adminUserIds)
-            {
-                try { await _hub.Clients.Group($"admin-{aid}").SendAsync("adminNotification", adminPayload, cancellationToken); }
-                catch (Exception hubEx) { _log.LogWarning(hubEx, "SignalR adminNotif për admin-{Aid} dështoi.", aid); }
-            }
-        }
-        catch (Exception ex) { _log.LogWarning(ex, "SignalR admin njoftim për tiketën {TicketId} dështoi.", ticketId); }
+        var preview = trimmed.Length > 80 ? trimmed[..80] + "…" : trimmed;
+        await AdminSupportNotificationHelper.NotifyAdminsAsync(
+            _uow,
+            _hub,
+            _log,
+            ticketId,
+            "Përgjigje nga klienti",
+            $"{t.Subject}: {preview}",
+            NotificationTypes.SupportClientReply,
+            cancellationToken);
 
         return null;
     }
