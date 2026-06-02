@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type SupportToast = { title: string; message: string } | null
+type SupportToast = { title: string; message: string; ticketId?: number } | null
 
 type LastSupportMessage = {
   ticketId: number
@@ -18,7 +18,7 @@ type CustomerNotificationsState = {
   lastSupportMessage: LastSupportMessage
   setUnreadCount: (n: number) => void
   bumpUnread: () => void
-  showSupportToast: (t: { title: string; message: string }) => void
+  showSupportToast: (t: { title: string; message: string; ticketId?: number }) => void
   clearSupportToast: () => void
   setLastSupportMessage: (m: NonNullable<LastSupportMessage>) => void
   clearLastSupportMessage: () => void

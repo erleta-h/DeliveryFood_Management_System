@@ -67,6 +67,9 @@ public sealed class DeliveryChatService : IDeliveryChatService
         await _hub.Clients.Group(orderGroup)
             .SendAsync("deliveryChatMessage", dto, cancellationToken);
 
+        await _hub.Clients.Group($"user-{order.UserId}")
+            .SendAsync("deliveryChatMessage", dto, cancellationToken);
+
         var driverUserId = order.Delivery?.DriverUserId;
         if (driverUserId is not null)
         {
@@ -88,6 +91,9 @@ public sealed class DeliveryChatService : IDeliveryChatService
 
         var seenPayload = new { orderId, seenByUserId = userId, seenAtUtc = DateTime.UtcNow };
         await _hub.Clients.Group($"order-{orderId}")
+            .SendAsync("deliveryChatSeen", seenPayload, cancellationToken);
+
+        await _hub.Clients.Group($"user-{order.UserId}")
             .SendAsync("deliveryChatSeen", seenPayload, cancellationToken);
 
         var driverUserId = order.Delivery?.DriverUserId;

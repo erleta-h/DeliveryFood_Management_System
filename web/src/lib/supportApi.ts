@@ -123,6 +123,7 @@ export async function createSupportTicket(
     body: string
     category: number
     orderId?: number | null
+    orderNumber?: string | null
     restaurantId?: number | null
   },
 ): Promise<{ ok: true; id: number } | { ok: false; message: string }> {

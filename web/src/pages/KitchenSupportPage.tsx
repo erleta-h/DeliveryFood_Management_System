@@ -64,12 +64,15 @@ export default function KitchenSupportPage() {
     setMsg(null)
     setBusy(true)
     try {
-      const oid = linkOrderId.trim() ? Number(linkOrderId.trim()) : undefined
+      const orderRef = linkOrderId.trim()
+      const oid = orderRef && /^\d+$/.test(orderRef) ? Number(orderRef) : undefined
+      const orderNumber = orderRef && !/^\d+$/.test(orderRef) ? orderRef : undefined
       const r = await createSupportTicket(token, {
         subject,
         body,
         category,
-        orderId: Number.isFinite(oid) ? oid : undefined,
+        orderId: oid !== undefined && Number.isFinite(oid) ? oid : undefined,
+        orderNumber,
       })
       if (!r.ok) {
         setMsg(r.message)

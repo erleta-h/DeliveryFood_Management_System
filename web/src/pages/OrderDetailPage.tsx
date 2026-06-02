@@ -13,7 +13,7 @@ import {
   isCourierEnRouteToCustomer,
   isTerminalOrderStatus,
 } from '../lib/orderStatusLabels'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import {
   clearStripeCheckoutOrderSession,
   FULFILLMENT_PICKUP,
@@ -202,8 +202,17 @@ export default function OrderDetailPage() {
       if (m.senderRole === 'driver') setUnreadChat((n) => n + 1)
     })
     let stopped = false
-    ;(async () => { try { await conn.start(); if (!stopped) await conn.invoke('JoinOrder', orderId) } catch {} })()
-    return () => { stopped = true; void conn.stop() }
+    ;(async () => {
+      try {
+        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+      } catch (err) {
+        console.warn('[OrderDetail] SignalR nuk u lidh.', err)
+      }
+    })()
+    return () => {
+      stopped = true
+      void conn.stop()
+    }
   }, [token, orderId])
 
   /* computed */
@@ -474,7 +483,13 @@ export default function OrderDetailPage() {
       {/* ═══ Chat panel ═══ */}
       {showChat && token && (
         <div className="border-t border-white/[0.06] bg-[#0f1419] p-5">
-          <OrderDeliveryChatPanel token={token} orderId={order.id} allowPost={!isTerminalOrderStatus(order.status)} useOwnHubConnection refreshSignal={chatRefresh} />
+          <OrderDeliveryChatPanel
+            token={token}
+            orderId={order.id}
+            allowPost={!isTerminalOrderStatus(order.status)}
+            useOwnHubConnection={false}
+            refreshSignal={chatRefresh}
+          />
         </div>
       )}
 

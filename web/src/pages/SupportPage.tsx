@@ -27,8 +27,10 @@ export default function SupportPage() {
   const token = useAuthStore((s) => s.token)
   const [searchParams] = useSearchParams()
   const orderIdParam = searchParams.get('orderId')
+  const ticketParam = searchParams.get('ticket')
   const restaurantIdParam = searchParams.get('restaurantId')
   const initialOrderId = orderIdParam && /^\d+$/.test(orderIdParam) ? Number(orderIdParam) : undefined
+  const initialTicketId = ticketParam && /^\d+$/.test(ticketParam) ? Number(ticketParam) : undefined
   const initialRestaurantId = restaurantIdParam && /^\d+$/.test(restaurantIdParam) ? Number(restaurantIdParam) : undefined
 
   const [list, setList] = useState<MySupportTicketRow[] | null>(null)
@@ -53,17 +55,31 @@ export default function SupportPage() {
 
   const chatEndRef = useRef<HTMLDivElement>(null)
 
+  const [listError, setListError] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     if (!token) return
-    const rows = await fetchMySupportTickets(token)
-    setList(rows)
+    setListError(null)
+    try {
+      const rows = await fetchMySupportTickets(token)
+      setList(rows)
+    } catch (e: unknown) {
+      setList([])
+      setListError(e instanceof Error ? e.message : 'Gabim ngarkimi të tiketave.')
+    }
   }, [token])
 
   useEffect(() => {
     if (!token) return
     setUnreadCount(0)
-    void load().catch(() => setList([]))
+    void load()
   }, [token, load, setUnreadCount])
+
+  useEffect(() => {
+    if (!token || initialTicketId == null) return
+    setActiveId(initialTicketId)
+    setShowNewForm(false)
+  }, [token, initialTicketId])
 
   useEffect(() => {
     if (!token || activeId == null) { setThread(null); return }
@@ -105,11 +121,14 @@ export default function SupportPage() {
     setFormMsg(null)
     setFormBusy(true)
     try {
-      const oid = linkOrderId.trim() ? Number(linkOrderId.trim()) : undefined
+      const orderRef = linkOrderId.trim()
+      const oid = orderRef && /^\d+$/.test(orderRef) ? Number(orderRef) : undefined
+      const orderNumber = orderRef && !/^\d+$/.test(orderRef) ? orderRef : undefined
       const rid = linkRestaurantId.trim() ? Number(linkRestaurantId.trim()) : undefined
       const r = await createSupportTicket(token, {
         subject, body, category,
-        orderId: Number.isFinite(oid) ? oid : undefined,
+        orderId: oid !== undefined && Number.isFinite(oid) ? oid : undefined,
+        orderNumber,
         restaurantId: Number.isFinite(rid) ? rid : undefined,
       })
       if (!r.ok) { setFormMsg(r.message); return }
@@ -171,6 +190,8 @@ export default function SupportPage() {
         <div className="flex-1 space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
           {!list ? (
             <p className="py-8 text-center text-sm text-zinc-500">Duke ngarkuar…</p>
+          ) : listError ? (
+            <p className="py-8 text-center text-sm text-amber-200/90">{listError}</p>
           ) : list.length === 0 ? (
             <p className="py-8 text-center text-sm text-zinc-500">Nuk ka tiketa ende.</p>
           ) : list.map((t) => (
@@ -221,8 +242,8 @@ export default function SupportPage() {
                 placeholder="Përshkruaj problemin…"
                 className="w-full rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/50" />
               <div className="grid gap-3 sm:grid-cols-2">
-                <input value={linkOrderId} onChange={(e) => setLinkOrderId(e.target.value)} inputMode="numeric"
-                  placeholder="ID porosie (opsional)"
+                <input value={linkOrderId} onChange={(e) => setLinkOrderId(e.target.value)}
+                  placeholder="Nr. porosie FD-... ose ID (opsional)"
                   className="rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none" />
                 <input value={linkRestaurantId} onChange={(e) => setLinkRestaurantId(e.target.value)} inputMode="numeric"
                   placeholder="ID restoranti (opsional)"

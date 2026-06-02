@@ -16,7 +16,7 @@ import {
   type CustomerOrderDetail,
   type CustomerOrderSummary,
 } from '../lib/ordersApi'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import { useAuthStore } from '../store/authStore'
 
 function pickActiveOrder(list: CustomerOrderSummary[]): CustomerOrderSummary | null {
@@ -133,10 +133,9 @@ export function CustomerOrderFloatWidget() {
     let stopped = false
     ;(async () => {
       try {
-        await conn.start()
-        if (!stopped) await conn.invoke('JoinOrder', orderId)
+        await startOrdersHub(conn, [{ kind: 'order', orderId }])
       } catch {
-        /* SignalR */
+        /* SignalR — widget përdor edhe polling nga refresh */
       }
     })()
     return () => {

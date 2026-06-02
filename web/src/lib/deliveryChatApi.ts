@@ -28,6 +28,23 @@ export function normalizeDeliveryChatMessage(raw: unknown): DeliveryChatMessage 
   return { id, orderId, senderUserId, senderRole, body, createdAtUtc, isDelivered, seenAtUtc }
 }
 
+/** Shton mesazh pa dyfishim (SignalR dy herë nga grupe order+driver, ose optimistic + hub). */
+export function upsertDeliveryChatMessage(
+  prev: DeliveryChatMessage[],
+  incoming: DeliveryChatMessage,
+  removeTempId?: number,
+): DeliveryChatMessage[] {
+  let next = removeTempId != null ? prev.filter((x) => x.id !== removeTempId) : prev
+  if (next.some((x) => x.id === incoming.id)) return next
+  next = next.filter(
+    (x) =>
+      x.id >= 0 ||
+      x.body !== incoming.body ||
+      Math.abs(new Date(x.createdAtUtc).getTime() - new Date(incoming.createdAtUtc).getTime()) > 10_000,
+  )
+  return [...next, incoming]
+}
+
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
 }

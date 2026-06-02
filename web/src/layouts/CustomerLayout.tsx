@@ -2,7 +2,8 @@ import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
 import { CustomerOrderFloatWidget } from '../components/CustomerOrderFloatWidget'
 import { hasAdminRole, hasCustomerRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { customerShellBg } from '../lib/customerTheme'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
@@ -46,10 +47,14 @@ export default function CustomerLayout() {
     const hub = createOrdersHubConnection(token)
     hubRef.current = hub
 
-    hub.on('customerNotification', (data: { title?: string; message?: string; type?: string }) => {
+    hub.on('customerNotification', (data: { title?: string; message?: string; type?: string; ticketId?: number }) => {
       useCustomerNotificationsStore.getState().bumpUnread()
       if (data.type === 'support_reply') {
-        useCustomerNotificationsStore.getState().showSupportToast({ title: data.title ?? 'Mbështetja', message: data.message ?? 'Përgjigje e re nga stafi.' })
+        useCustomerNotificationsStore.getState().showSupportToast({
+          title: data.title ?? 'Mbështetja',
+          message: data.message ?? 'Përgjigje e re nga stafi.',
+          ticketId: data.ticketId,
+        })
       }
     })
 
@@ -60,9 +65,15 @@ export default function CustomerLayout() {
       useCustomerNotificationsStore.getState().pushSupportMessage(data)
     })
 
-    hub.start()
-      .then(() => hub.invoke('JoinCustomer'))
-      .catch((err:any) => console.warn('[CustomerHub] connection/join failed', err))
+    hub.on('deliveryChatMessage', (raw: unknown) => {
+      const m = normalizeDeliveryChatMessage(raw)
+      if (!m || m.senderRole !== 'driver') return
+      useCustomerNotificationsStore.getState().bumpUnread()
+    })
+
+    void startOrdersHub(hub, [{ kind: 'customer' }]).catch((err: unknown) =>
+      console.warn('[CustomerHub] connection/join failed', err),
+    )
     return () => { hub.stop().catch(() => {}) }
   }, [token])
 
@@ -145,14 +156,35 @@ export default function CustomerLayout() {
       </header>
       <CustomerOrderFloatWidget />
       {supportToast && (
-        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50">
+        <div
+          role={supportToast.ticketId != null ? 'button' : undefined}
+          tabIndex={supportToast.ticketId != null ? 0 : undefined}
+          onClick={() => {
+            if (supportToast.ticketId != null) {
+              clearSupportToast()
+              navigate(`/app/support?ticket=${supportToast.ticketId}`)
+            }
+          }}
+          className={`fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50 ${
+            supportToast.ticketId != null ? 'cursor-pointer hover:border-violet-400/50' : ''
+          }`}
+        >
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm">💬</span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-violet-200">{supportToast.title}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{supportToast.message}</p>
+              {supportToast.ticketId != null ? (
+                <p className="mt-1 text-[10px] font-medium text-violet-400/80">Kliko për të hapur tiketën →</p>
+              ) : null}
             </div>
-            <button type="button" onClick={clearSupportToast} className="shrink-0 text-zinc-500 hover:text-zinc-300">✕</button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); clearSupportToast() }}
+              className="shrink-0 text-zinc-500 hover:text-zinc-300"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

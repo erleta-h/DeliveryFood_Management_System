@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchDriverStatus, postDriverLocation } from '../lib/driverApi'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { useAuthStore } from '../store/authStore'
 import { useDriverAlertsStore } from '../store/driverAlertsStore'
@@ -104,10 +104,9 @@ export default function DriverLayout() {
     let stopped = false
     ;(async () => {
       try {
-        await conn.start()
-        if (!stopped) await conn.invoke('JoinDriver')
-      } catch {
-        /* SignalR — dev */
+        await startOrdersHub(conn, [{ kind: 'driver' }])
+      } catch (err) {
+        console.warn('[DriverHub] SignalR nuk u lidh.', err)
       }
     })()
     return () => {

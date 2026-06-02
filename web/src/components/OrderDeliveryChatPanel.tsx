@@ -4,9 +4,10 @@ import {
   normalizeDeliveryChatMessage,
   postDeliveryChatMessage,
   markChatSeen,
+  upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 
 function formatTime(utc: string): string {
   return new Date(utc).toLocaleTimeString('sq-AL', {
@@ -75,7 +76,7 @@ export function OrderDeliveryChatPanel({
     conn.on('deliveryChatMessage', (raw: unknown) => {
       const msg = normalizeDeliveryChatMessage(raw)
       if (!msg || msg.orderId !== orderId) return
-      setItems((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]))
+      setItems((prev) => upsertDeliveryChatMessage(prev, msg))
     })
     conn.on('deliveryChatSeen', (raw: unknown) => {
       if (!raw || typeof raw !== 'object') return
@@ -88,11 +89,15 @@ export function OrderDeliveryChatPanel({
     let stopped = false
     ;(async () => {
       try {
-        await conn.start()
-        if (!stopped) await conn.invoke('JoinOrder', orderId)
-      } catch { /* SignalR fallback */ }
+        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+      } catch (err) {
+        console.warn('[Chat] SignalR nuk u lidh — përdoret polling çdo 12s.', err)
+      }
     })()
-    return () => { stopped = true; void conn.stop() }
+    return () => {
+      stopped = true
+      void conn.stop()
+    }
   }, [token, orderId, useOwnHubConnection])
 
   useEffect(() => {
@@ -136,7 +141,7 @@ export function OrderDeliveryChatPanel({
       setError(r.message)
       return
     }
-    setItems((prev) => prev.map((x) => x.id === tempId ? r.message : x))
+    setItems((prev) => upsertDeliveryChatMessage(prev, r.message, tempId))
     inputRef.current?.focus()
   }
 

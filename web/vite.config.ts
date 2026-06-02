@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   /** Duhet të përputhet me `applicationUrl` http në `FoodDelivery.Api/Properties/launchSettings.json` (Kestrel). */
   const apiProxyTarget =
-    env.VITE_DEV_API_PROXY?.trim() || 'http://localhost:5183'
+    env.VITE_DEV_API_PROXY?.trim() ||   'http://localhost:5183'
 
   /**
    * HTTPS vetëm nëse e aktivizon me VITE_DEV_HTTPS=true në web/.env.

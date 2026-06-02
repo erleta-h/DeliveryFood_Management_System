@@ -5,9 +5,10 @@ import {
   normalizeDeliveryChatMessage,
   postDeliveryChatMessage,
   markChatSeen,
+  upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import { fetchDriverOrderDetail, DRIVER_LEG, type DriverOrderDetail } from '../lib/driverApi'
 import { ORDER_STATUS_CANCELLED, ORDER_STATUS_DELIVERED } from '../lib/orderStatusLabels'
 import { useAuthStore } from '../store/authStore'
@@ -87,7 +88,7 @@ export default function DriverChatPage() {
     conn.on('deliveryChatMessage', (raw: unknown) => {
       const msg = normalizeDeliveryChatMessage(raw)
       if (!msg || msg.orderId !== orderId) return
-      setMessages((prev) => (prev.some((x) => x.id === msg.id) ? prev : [...prev, msg]))
+      setMessages((prev) => upsertDeliveryChatMessage(prev, msg))
     })
     conn.on('deliveryChatSeen', (raw: unknown) => {
       if (!raw || typeof raw !== 'object') return
@@ -100,10 +101,9 @@ export default function DriverChatPage() {
     let stopped = false
     ;(async () => {
       try {
-        await conn.start()
-        if (!stopped) await conn.invoke('JoinOrder', orderId)
-      } catch {
-        /* SignalR fallback to polling */
+        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+      } catch (err) {
+        console.warn('[DriverChat] SignalR nuk u lidh — polling 12s.', err)
       }
     })()
     return () => {
@@ -153,7 +153,7 @@ export default function DriverChatPage() {
       setError(r.message)
       return
     }
-    setMessages((prev) => prev.map((x) => x.id === tempId ? r.message : x))
+    setMessages((prev) => upsertDeliveryChatMessage(prev, r.message, tempId))
     inputRef.current?.focus()
   }
 
