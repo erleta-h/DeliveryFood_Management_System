@@ -334,6 +334,7 @@ public sealed class DriverDeliveryService : IDriverDeliveryService
             order.RestaurantId,
             order.UserId,
             order.OrderNumber,
+            null,
             cancellationToken);
 
         return null;
@@ -384,6 +385,7 @@ public sealed class DriverDeliveryService : IDriverDeliveryService
             order.RestaurantId,
             order.UserId,
             order.OrderNumber,
+            null,
             cancellationToken);
 
         return null;

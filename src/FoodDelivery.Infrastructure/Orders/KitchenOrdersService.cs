@@ -159,6 +159,7 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             order.RestaurantId,
             order.UserId,
             order.OrderNumber,
+            newStatus == OrderStatus.Cancelled ? noteTrimmed : null,
             cancellationToken);
 
         await AdminDashboardCacheInvalidation.InvalidateAsync(_cache, cancellationToken).ConfigureAwait(false);
@@ -381,6 +382,7 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
                 order.RestaurantId,
                 order.UserId,
                 order.OrderNumber,
+                null,
                 cancellationToken);
             await _realtime.NotifyDriverDirectDeliveryAssignedAsync(
                 driverUserId,

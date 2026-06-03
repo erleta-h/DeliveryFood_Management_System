@@ -9,6 +9,7 @@ public interface IOrderRealtimeNotifier
         long restaurantId,
         long customerUserId,
         string orderNumber,
+        string? statusNote = null,
         CancellationToken cancellationToken = default);
 
     Task NotifyRestaurantNewOrderAsync(long orderId, long restaurantId, CancellationToken cancellationToken = default);

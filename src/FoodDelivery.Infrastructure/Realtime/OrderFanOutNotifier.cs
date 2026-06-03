@@ -38,11 +38,15 @@ public sealed class OrderFanOutNotifier : IOrderRealtimeNotifier
         long restaurantId,
         long customerUserId,
         string orderNumber,
+        string? statusNote = null,
         CancellationToken cancellationToken = default)
     {
         var num = string.IsNullOrWhiteSpace(orderNumber) ? $"#{orderId}" : orderNumber.Trim();
-        var (pushTitle, pushBody) = BuildCustomerStatusMessageSq(status, num);
-        var hubPayload = new { orderId, status, orderNumber = num };
+        var cancellationReason = status == OrderStatus.Cancelled && !string.IsNullOrWhiteSpace(statusNote)
+            ? statusNote.Trim()
+            : null;
+        var (pushTitle, pushBody) = BuildCustomerStatusMessageSq(status, num, cancellationReason);
+        var hubPayload = new { orderId, status, orderNumber = num, cancellationReason };
         var customerPayload = new
         {
             orderId,
@@ -50,6 +54,7 @@ public sealed class OrderFanOutNotifier : IOrderRealtimeNotifier
             orderNumber = num,
             title = pushTitle,
             message = pushBody,
+            cancellationReason,
         };
 
         try
@@ -92,7 +97,10 @@ public sealed class OrderFanOutNotifier : IOrderRealtimeNotifier
         }
     }
 
-    private static (string Title, string Body) BuildCustomerStatusMessageSq(int status, string orderNumber)
+    private static (string Title, string Body) BuildCustomerStatusMessageSq(
+        int status,
+        string orderNumber,
+        string? cancellationReason = null)
     {
         return status switch
         {
@@ -116,7 +124,9 @@ public sealed class OrderFanOutNotifier : IOrderRealtimeNotifier
                 $"Faleminderit! {orderNumber} mbërriti."),
             OrderStatus.Cancelled => (
                 "Porosia u anulua",
-                $"{orderNumber} u anulua. Kontakto support nëse ke pyetje."),
+                string.IsNullOrWhiteSpace(cancellationReason)
+                    ? $"{orderNumber} u anulua."
+                    : $"{orderNumber} u anulua. {cancellationReason.Trim()}"),
             _ => (
                 "Përditësim porosie",
                 $"{orderNumber} ka një status të ri."),

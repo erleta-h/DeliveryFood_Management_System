@@ -73,7 +73,9 @@ public record CustomerOrderDetailDto(
     /// <summary>True kur ekziston pagesë Stripe në gjendje «pending» (nuk është kapur ende).</summary>
     bool PendingStripePayment,
     /// <summary>Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende.</summary>
-    CustomerOrderDriverDto? Driver);
+    CustomerOrderDriverDto? Driver,
+    /// <summary>Arsye e anulimit nga restoranti — vetëm kur <see cref="Status"/> është anuluar.</summary>
+    string? CancellationReason);
 
 public record DeliveryChatMessageDto(
     long Id,

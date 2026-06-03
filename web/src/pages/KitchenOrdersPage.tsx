@@ -303,10 +303,12 @@ export function DeliverWoltRailCard({
 }
 
 const REJECT_PRESETS = [
-  { id: 'stock', label: 'Produkti nuk është në stok' },
-  { id: 'busy', label: 'Kuzhina shumë e ngarkuar' },
+  { id: 'stock', label: 'Artikulli nuk është në stok' },
+  { id: 'closing', label: 'Restoranti po mbyllet' },
+  { id: 'staff', label: 'Mungesë e stafit' },
+  { id: 'zone', label: 'Zonë jashtë mbulimit' },
   { id: 'tech', label: 'Problem teknik' },
-  { id: 'other', label: 'Tjetër (shkruaj më poshtë)' },
+  { id: 'other', label: 'Tjetër' },
 ] as const
 
 /** Butona kryesorë si Wolt Partner (cyan). */
@@ -1545,7 +1547,7 @@ export default function KitchenOrdersPage() {
               Refuzo porosinë
             </h2>
             <p className="mt-1 text-xs text-zinc-500">
-              Arsyeja regjistrohet për histori dhe audit (admin); klienti e sheh në UI kur të lidhet njoftimi.
+              Zgjidh arsyen — klienti e sheh te detajet e porosisë dhe në njoftim.
             </p>
             <div className="mt-4 space-y-2">
               {REJECT_PRESETS.map((p) => (
