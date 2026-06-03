@@ -6,6 +6,7 @@ export type RestaurantMenuItem = {
   description: string | null
   price: number
   isAvailable: boolean
+  isFeatured?: boolean
   imageUrl?: string | null
 }
 

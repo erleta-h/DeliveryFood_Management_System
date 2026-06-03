@@ -13,6 +13,7 @@ type Props = {
   onEditItem: (item: KitchenMenuItemRow) => void
   onDeleteItem: (itemId: number) => void
   onToggleAvailable: (item: KitchenMenuItemRow) => void
+  onToggleFeatured: (item: KitchenMenuItemRow) => void
 }
 
 const ghostBtn =
@@ -29,6 +30,7 @@ export function MenuSectionAccordion({
   onEditItem,
   onDeleteItem,
   onToggleAvailable,
+  onToggleFeatured,
 }: Props) {
   const count = category.items.length
 
@@ -86,20 +88,21 @@ export function MenuSectionAccordion({
       {expanded ? (
         <div className="px-4 pb-4">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-left text-sm">
+            <table className="w-full min-w-[40rem] text-left text-sm">
               <thead>
                 <tr className="border-b border-[#30363d] text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                   <th className="w-14 py-3 pr-2" aria-hidden />
                   <th className="py-3 pr-2">Artikulli</th>
                   <th className="w-24 py-3 pr-2">Çmimi (€)</th>
                   <th className="w-28 py-3 pr-2">Në ofertë</th>
+                  <th className="w-32 py-3 pr-2">Preferuar</th>
                   <th className="w-36 py-3 text-right">Veprime</th>
                 </tr>
               </thead>
               <tbody>
                 {count === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-sm text-zinc-500">
+                    <td colSpan={6} className="py-8 text-center text-sm text-zinc-500">
                       Nuk ka artikuj — shto artikullin më poshtë.
                     </td>
                   </tr>
@@ -139,6 +142,21 @@ export function MenuSectionAccordion({
                           />
                           <span className={it.isAvailable ? 'text-sky-300' : 'text-zinc-500'}>
                             {it.isAvailable ? 'Po' : 'Jo'}
+                          </span>
+                        </label>
+                      </td>
+                      <td className="py-3 pr-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-zinc-300">
+                          <input
+                            type="checkbox"
+                            checked={it.isFeatured}
+                            disabled={busy}
+                            onChange={() => onToggleFeatured(it)}
+                            className="h-4 w-4 rounded accent-violet-500"
+                            title="Po = shfaqet te «Të preferuarat» për klientin"
+                          />
+                          <span className={it.isFeatured ? 'text-violet-300' : 'text-zinc-500'}>
+                            {it.isFeatured ? 'Po' : 'Jo'}
                           </span>
                         </label>
                       </td>

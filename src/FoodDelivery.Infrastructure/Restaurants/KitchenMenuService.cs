@@ -65,6 +65,7 @@ public sealed class KitchenMenuService : IKitchenMenuService
                         i.Description,
                         i.Price,
                         i.IsAvailable,
+                        i.IsFeatured,
                         MenuItemImageUrls.KitchenItemImageUrl(i.Id, i.ImageFileId)))
                     .ToList()))
             .ToListAsync(cancellationToken);
@@ -211,6 +212,7 @@ public sealed class KitchenMenuService : IKitchenMenuService
             Description = desc,
             Price = decimal.Round(request.Price, 2, MidpointRounding.AwayFromZero),
             IsAvailable = request.IsAvailable,
+            IsFeatured = request.IsFeatured,
             CreatedAt = now,
             CreatedById = staffUserId,
         };
@@ -238,7 +240,8 @@ public sealed class KitchenMenuService : IKitchenMenuService
         if (item.MenuCategory.RestaurantId != restaurantId.Value)
             return "Artikulli nuk i përket restorantit tënd.";
 
-        if (request.Name is null && request.Description is null && request.Price is null && request.IsAvailable is null)
+        if (request.Name is null && request.Description is null && request.Price is null
+            && request.IsAvailable is null && request.IsFeatured is null)
             return "Dërgo të paktën një fushë për përditësim.";
 
         if (request.Name is not null)
@@ -263,6 +266,9 @@ public sealed class KitchenMenuService : IKitchenMenuService
 
         if (request.IsAvailable is { } av)
             item.IsAvailable = av;
+
+        if (request.IsFeatured is { } feat)
+            item.IsFeatured = feat;
 
         var now = DateTime.UtcNow;
         item.UpdatedAt = now;

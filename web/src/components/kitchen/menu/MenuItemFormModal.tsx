@@ -6,6 +6,7 @@ export type MenuItemFormValues = {
   price: string
   description: string
   isAvailable: boolean
+  isFeatured: boolean
   imageFile: File | null
 }
 
@@ -124,6 +125,19 @@ export function MenuItemFormModal({
             <span>
               Në ofertë{' '}
               <span className="text-zinc-500">(klienti e sheh në menu)</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-zinc-200">
+            <input
+              type="checkbox"
+              checked={form.isFeatured}
+              disabled={busy}
+              onChange={(e) => setForm((f) => ({ ...f, isFeatured: e.target.checked }))}
+              className="h-4 w-4 rounded border-[#30363d] accent-violet-500"
+            />
+            <span>
+              Te të preferuarat{' '}
+              <span className="text-zinc-500">(shfaqet te skeda «Të preferuarat» për klientin)</span>
             </span>
           </label>
           <div>

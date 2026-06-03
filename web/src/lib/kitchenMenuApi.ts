@@ -6,6 +6,7 @@ export type KitchenMenuItemRow = {
   description: string | null
   price: number
   isAvailable: boolean
+  isFeatured: boolean
   imageUrl?: string | null
 }
 
@@ -84,6 +85,7 @@ export async function createKitchenMenuItem(
     price: number
     description?: string | null
     isAvailable?: boolean
+    isFeatured?: boolean
   },
 ): Promise<{ ok: true; id: number } | { ok: false; message: string }> {
   const res = await fetch(apiPath('/api/kitchen/menu/items'), {
@@ -95,6 +97,7 @@ export async function createKitchenMenuItem(
       price: body.price,
       description: body.description ?? null,
       isAvailable: body.isAvailable ?? true,
+      isFeatured: body.isFeatured ?? false,
     }),
   })
   if (res.status === 201) {
@@ -110,7 +113,13 @@ export async function createKitchenMenuItem(
 export async function updateKitchenMenuItem(
   token: string,
   id: number,
-  body: { name?: string; description?: string | null; price?: number; isAvailable?: boolean },
+  body: {
+    name?: string
+    description?: string | null
+    price?: number
+    isAvailable?: boolean
+    isFeatured?: boolean
+  },
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/kitchen/menu/items/${id}`), {
     method: 'PATCH',

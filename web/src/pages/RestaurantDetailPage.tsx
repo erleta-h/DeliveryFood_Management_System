@@ -44,10 +44,9 @@ const FEATURED_LIMIT = 8
 const MENU_PAGE_SIZE = 4
 
 function featuredItems(categories: EnrichedMenuCategory[]): MenuItemWithMeta[] {
-  const all = categories.flatMap((c) => c.items.filter((i) => i.isAvailable))
-  const withImg = all.filter((i) => i.imageUrl)
-  const rest = all.filter((i) => !i.imageUrl)
-  return [...withImg, ...rest].slice(0, FEATURED_LIMIT)
+  return categories
+    .flatMap((c) => c.items.filter((i) => i.isAvailable && i.isFeatured))
+    .slice(0, FEATURED_LIMIT)
 }
 
 export default function RestaurantDetailPage() {
@@ -441,10 +440,14 @@ export default function RestaurantDetailPage() {
                     Të preferuarat <span aria-hidden>🔥</span>
                   </h2>
                   <p className="mt-0.5 text-sm text-zinc-500">
-                    Zgjedhjet më të preferuara nga klientët tanë
+                    Artikujt që restoranti i ka shënuar si të preferuar
                   </p>
                   <div className="mt-4">
-                    {renderItemGrid(featured, categoryName, -1)}
+                    {featured.length === 0 ? (
+                      <p className="text-sm text-zinc-500">Restoranti nuk ka artikuj të shënuar si të preferuar ende.</p>
+                    ) : (
+                      renderItemGrid(featured, categoryName, -1)
+                    )}
                   </div>
                 </div>
               ) : (

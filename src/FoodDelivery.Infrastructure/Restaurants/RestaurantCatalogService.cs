@@ -284,6 +284,7 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                         i.Description,
                         i.Price,
                         i.IsAvailable,
+                        i.IsFeatured,
                         MenuItemImageUrls.PublicUrl(i.ImageFileId)))
                     .ToList()))
             .ToListAsync(cancellationToken)

@@ -6,6 +6,7 @@ public record RestaurantMenuItemDto(
     string? Description,
     decimal Price,
     bool IsAvailable,
+    bool IsFeatured,
     string? ImageUrl);
 
 public record RestaurantMenuCategoryDto(

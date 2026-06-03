@@ -62,6 +62,7 @@ export type EnrichedMenuCategory = Omit<RestaurantMenuCategory, 'items'> & {
 function normalizeMenuItem(
   item: RestaurantMenuItem & {
     IsAvailable?: boolean
+    IsFeatured?: boolean
     Name?: string
     Price?: number | string
     Description?: string | null
@@ -76,6 +77,7 @@ function normalizeMenuItem(
     description: raw.description ?? raw.Description ?? null,
     price: Number.isFinite(price) ? price : 0,
     isAvailable: raw.isAvailable ?? raw.IsAvailable ?? true,
+    isFeatured: raw.isFeatured ?? raw.IsFeatured ?? false,
     imageUrl: raw.imageUrl ?? raw.ImageUrl ?? null,
   }
 }

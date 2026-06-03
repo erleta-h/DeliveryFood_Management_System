@@ -8,6 +8,8 @@ public class MenuItem
     public string? Description { get; set; }
     public long? ImageFileId { get; set; }
     public bool IsAvailable { get; set; }
+    /// <summary>Shfaqet te «Të preferuarat» për klientin vetëm kur restoranti e aktivizon.</summary>
+    public bool IsFeatured { get; set; }
     public long MenuCategoryId { get; set; }
     public string Name { get; set; } = string.Empty;
     public decimal Price { get; set; }

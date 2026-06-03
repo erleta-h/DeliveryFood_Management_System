@@ -11,8 +11,8 @@ export function MenuHelpBox() {
         <p className="text-sm font-semibold text-white">Si funksionon?</p>
         <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">
           Krijo seksionet e menusë (p.sh. Pizza, Pije) dhe pastaj shto artikujt përkatës brenda secilit seksion.
-          «Në ofertë» do të thotë që klienti e sheh dhe mund ta porosisë; nëse e çaktivizon, artikulli fshihet nga
-          menuja publike.
+          «Në ofertë» = klienti e sheh në menu; «Preferuar» = shfaqet vetëm te skeda «Të preferuarat» kur e aktivizon
+          restoranti (artikujt e rinj nuk shkojnë atje vetvetiu).
         </p>
       </div>
     </div>

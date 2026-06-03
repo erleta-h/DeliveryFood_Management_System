@@ -9,11 +9,13 @@ public sealed record KitchenMenuCreateItemRequest(
     string Name,
     decimal Price,
     string? Description,
-    bool IsAvailable);
+    bool IsAvailable,
+    bool IsFeatured = false);
 
 public sealed record KitchenMenuUpdateItemRequest(
     string? Name,
     string? Description,
     decimal? Price,
-    bool? IsAvailable);
+    bool? IsAvailable,
+    bool? IsFeatured);
 

@@ -502,6 +502,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsFeatured")
+                        .HasColumnType("bit");
+
                     b.Property<long>("MenuCategoryId")
                         .HasColumnType("bigint");
 

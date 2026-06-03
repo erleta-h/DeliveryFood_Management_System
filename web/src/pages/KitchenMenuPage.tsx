@@ -26,6 +26,7 @@ const emptyItemForm = (): MenuItemFormValues => ({
   price: '',
   description: '',
   isAvailable: true,
+  isFeatured: false,
   imageFile: null,
 })
 
@@ -114,6 +115,7 @@ export default function KitchenMenuPage() {
         price: String(it.price),
         description: it.description ?? '',
         isAvailable: it.isAvailable,
+        isFeatured: it.isFeatured,
         imageFile: null,
       },
       imageUrl: it.imageUrl,
@@ -210,6 +212,15 @@ export default function KitchenMenuPage() {
     else await load()
   }
 
+  async function toggleItemFeatured(item: KitchenMenuItemRow) {
+    if (!token) return
+    const r = await run(async () =>
+      updateKitchenMenuItem(token, item.id, { isFeatured: !item.isFeatured }),
+    )
+    if (r && !r.ok) setError(r.message)
+    else await load()
+  }
+
   async function removeItem(itemId: number) {
     if (!token) return
     if (!window.confirm('Fshi artikullin? Nëse ka pasur porosi, operacioni dështon.')) return
@@ -239,6 +250,7 @@ export default function KitchenMenuPage() {
           price,
           description: values.description.trim() || null,
           isAvailable: values.isAvailable,
+          isFeatured: values.isFeatured,
         })
         if (!created.ok) return created
         if (values.imageFile) {
@@ -273,12 +285,19 @@ export default function KitchenMenuPage() {
     }
 
     const it = itemModal.item
-    const body: { name?: string; description?: string | null; price?: number; isAvailable?: boolean } = {}
+    const body: {
+      name?: string
+      description?: string | null
+      price?: number
+      isAvailable?: boolean
+      isFeatured?: boolean
+    } = {}
     if (name !== it.name) body.name = name
     if (values.description.trim() !== (it.description ?? ''))
       body.description = values.description.trim() === '' ? null : values.description.trim()
     if (price !== it.price) body.price = price
     if (values.isAvailable !== it.isAvailable) body.isAvailable = values.isAvailable
+    if (values.isFeatured !== it.isFeatured) body.isFeatured = values.isFeatured
     const hasImage = values.imageFile instanceof File
 
     const r = await run(async () => {
@@ -395,6 +414,7 @@ export default function KitchenMenuPage() {
             onEditItem={(it) => setItemModal({ mode: 'edit', item: it })}
             onDeleteItem={(id) => void removeItem(id)}
             onToggleAvailable={(it) => void toggleItemAvailable(it)}
+            onToggleFeatured={(it) => void toggleItemFeatured(it)}
           />
         ))}
       </div>
