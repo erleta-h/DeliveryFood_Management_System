@@ -110,7 +110,15 @@ export default function KitchenLayout() {
               )}
             </p>
             <p className="mt-0.5 text-xs text-zinc-500">
-              {kitchenLabel} / Porositë hyrëse (merchant)
+              {location.pathname.startsWith('/kitchen/menu')
+                ? `${kitchenLabel} / Menaxho seksionet e menusë`
+                : location.pathname.startsWith('/kitchen/history')
+                  ? `${kitchenLabel} / Historiku i porosive`
+                  : location.pathname.startsWith('/kitchen/account')
+                    ? `${kitchenLabel} / Llogaria`
+                    : location.pathname.startsWith('/kitchen/support')
+                      ? `${kitchenLabel} / Mbështetja`
+                      : `${kitchenLabel} / Porositë hyrëse`}
             </p>
           </div>
           <nav className="flex flex-wrap items-center gap-1 sm:gap-4">
