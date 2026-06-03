@@ -6,13 +6,6 @@ type Props = {
   section: BrowseSection
 }
 
-function badgeForIndex(sectionId: string, index: number): 'trending' | 'top' | 'sponsored' | null {
-  if (sectionId === 'featured' && index === 0) return 'top'
-  if (sectionId === 'popular' && index < 2) return 'trending'
-  if (sectionId === 'offers' && index === 0) return 'sponsored'
-  return null
-}
-
 export function RestaurantSection({ section }: Props) {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const isCarousel = section.layout === 'carousel' || section.layout === 'carousel-compact'
@@ -62,24 +55,14 @@ export function RestaurantSection({ section }: Props) {
           className="-mx-1 flex gap-3 overflow-x-auto pb-2 pt-0.5 scrollbar-thin [scrollbar-color:rgba(255,255,255,0.12)_transparent]"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
-          {section.items.map((r, i) => (
-            <RestaurantCard
-              key={r.id}
-              restaurant={r}
-              variant={variant}
-              badge={badgeForIndex(section.id, i)}
-            />
+          {section.items.map((r) => (
+            <RestaurantCard key={r.id} restaurant={r} variant={variant} />
           ))}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {section.items.map((r, i) => (
-            <RestaurantCard
-              key={r.id}
-              restaurant={r}
-              variant="default"
-              badge={badgeForIndex(section.id, i)}
-            />
+          {section.items.map((r) => (
+            <RestaurantCard key={r.id} restaurant={r} variant="default" />
           ))}
         </div>
       )}

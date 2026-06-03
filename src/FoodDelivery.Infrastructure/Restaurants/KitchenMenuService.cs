@@ -264,11 +264,11 @@ public sealed class KitchenMenuService : IKitchenMenuService
             item.Price = decimal.Round(p, 2, MidpointRounding.AwayFromZero);
         }
 
-        if (request.IsAvailable is { } av)
-            item.IsAvailable = av;
+        if (request.IsAvailable.HasValue)
+            item.IsAvailable = request.IsAvailable.Value;
 
-        if (request.IsFeatured is { } feat)
-            item.IsFeatured = feat;
+        if (request.IsFeatured.HasValue)
+            item.IsFeatured = request.IsFeatured.Value;
 
         var now = DateTime.UtcNow;
         item.UpdatedAt = now;

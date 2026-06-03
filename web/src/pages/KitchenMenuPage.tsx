@@ -214,11 +214,15 @@ export default function KitchenMenuPage() {
 
   async function toggleItemFeatured(item: KitchenMenuItemRow) {
     if (!token) return
-    const r = await run(async () =>
-      updateKitchenMenuItem(token, item.id, { isFeatured: !item.isFeatured }),
-    )
-    if (r && !r.ok) setError(r.message)
-    else await load()
+    const next = !item.isFeatured
+    const r = await run(async () => updateKitchenMenuItem(token, item.id, { isFeatured: next }))
+    if (r && !r.ok) {
+      const hint =
+        r.message.includes('paktën një fushë') || r.message.includes('paktën nje fushe')
+          ? ' Rinis API-n (ndalo dotnet run dhe nis përsëri) që të funksionojë «Preferuar».'
+          : ''
+      setError(r.message + hint)
+    } else await load()
   }
 
   async function removeItem(itemId: number) {
@@ -301,6 +305,9 @@ export default function KitchenMenuPage() {
     const hasImage = values.imageFile instanceof File
 
     const r = await run(async () => {
+      if (Object.keys(body).length === 0 && !hasImage) {
+        return { ok: false as const, message: 'Nuk ka ndryshime për të ruajtur.' }
+      }
       if (Object.keys(body).length > 0) {
         const up = await updateKitchenMenuItem(token, it.id, body)
         if (!up.ok) return up

@@ -7,21 +7,11 @@ export type RestaurantCardVariant = 'featured' | 'default' | 'compact'
 type Props = {
   restaurant: RestaurantListItem
   variant?: RestaurantCardVariant
-  badge?: 'trending' | 'top' | 'sponsored' | null
 }
 
-function trustLabel(r: RestaurantListItem): string | null {
-  if (r.reviewCount >= 50) return `${r.reviewCount}+ porosi`
-  if (r.reviewCount >= 10) return 'Shumë i porositur'
-  if (r.averageRating >= 4.7 && r.reviewCount >= 3) return 'Top Rated'
-  if (r.estimatedDeliveryMinutes <= 25) return 'Dërgesë e shpejtë'
-  return null
-}
-
-export function RestaurantCard({ restaurant: r, variant = 'default', badge }: Props) {
+export function RestaurantCard({ restaurant: r, variant = 'default' }: Props) {
   const cover = coverImageForRestaurant(r)
   const free = isFreeDelivery(r.deliveryFee)
-  const trust = trustLabel(r)
   const isFeatured = variant === 'featured'
   const isCompact = variant === 'compact'
 
@@ -59,11 +49,6 @@ export function RestaurantCard({ restaurant: r, variant = 'default', badge }: Pr
           <span className="rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
             Hapur
           </span>
-          {badge === 'sponsored' ? (
-            <span className="rounded-full bg-violet-500/85 px-2 py-0.5 text-[10px] font-semibold text-white">
-              Sponsorizuar
-            </span>
-          ) : null}
           {free ? (
             <span className="rounded-full bg-orange-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
               Dërgesë falas
@@ -121,12 +106,6 @@ export function RestaurantCard({ restaurant: r, variant = 'default', badge }: Pr
               </>
             ) : null}
           </div>
-        ) : null}
-
-        {trust || badge === 'trending' || badge === 'top' ? (
-          <p className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-orange-300/90">
-            {badge === 'trending' ? '🔥 Trending' : badge === 'top' ? '★ Top Rated' : trust}
-          </p>
         ) : null}
 
         {!isCompact && r.previewItems.length > 0 ? (

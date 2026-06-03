@@ -32,10 +32,39 @@ async function readMessage(res: Response): Promise<string> {
   return `HTTP ${res.status}`
 }
 
+function normalizeKitchenItem(raw: KitchenMenuItemRow & { IsAvailable?: boolean; IsFeatured?: boolean }): KitchenMenuItemRow {
+  return {
+    id: raw.id,
+    name: raw.name,
+    description: raw.description ?? null,
+    price: Number(raw.price),
+    isAvailable: raw.isAvailable ?? raw.IsAvailable ?? true,
+    isFeatured: Boolean(raw.isFeatured ?? raw.IsFeatured ?? false),
+    imageUrl: raw.imageUrl ?? null,
+  }
+}
+
+function normalizeKitchenMenu(
+  rows: (KitchenMenuCategoryRow & { Items?: KitchenMenuItemRow[] })[]
+): KitchenMenuCategoryRow[] {
+  return rows.map((cat) => {
+    const items = (cat.items ?? cat.Items ?? []).map((it) =>
+      normalizeKitchenItem(it as KitchenMenuItemRow & { IsAvailable?: boolean; IsFeatured?: boolean }),
+    )
+    return {
+      id: cat.id,
+      name: cat.name,
+      sortOrder: cat.sortOrder,
+      items,
+    }
+  })
+}
+
 export async function fetchKitchenMenu(token: string): Promise<KitchenMenuCategoryRow[]> {
   const res = await fetch(apiPath('/api/kitchen/menu'), { headers: { ...authHeader(token) } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json() as Promise<KitchenMenuCategoryRow[]>
+  const raw = (await res.json()) as (KitchenMenuCategoryRow & { Items?: KitchenMenuItemRow[] })[]
+  return normalizeKitchenMenu(raw)
 }
 
 export async function createKitchenCategory(
