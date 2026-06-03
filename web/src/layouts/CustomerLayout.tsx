@@ -5,6 +5,7 @@ import { hasAdminRole, hasCustomerRole, hasRestaurantStaffRole } from '../lib/jw
 import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { customerShellBg } from '../lib/customerTheme'
+import { ORDER_STATUS_CANCELLED } from '../lib/orderStatusLabels'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
 import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
@@ -31,6 +32,8 @@ export default function CustomerLayout() {
   const favoritesLoaded = useFavoriteRestaurantsStore((s) => s.loaded)
   const supportToast = useCustomerNotificationsStore((s) => s.supportToast)
   const clearSupportToast = useCustomerNotificationsStore((s) => s.clearSupportToast)
+  const orderToast = useCustomerNotificationsStore((s) => s.orderToast)
+  const clearOrderToast = useCustomerNotificationsStore((s) => s.clearOrderToast)
 
   const hubRef = useRef<ReturnType<typeof createOrdersHubConnection> | null>(null)
 
@@ -46,6 +49,26 @@ export default function CustomerLayout() {
     if (!token) return
     const hub = createOrdersHubConnection(token)
     hubRef.current = hub
+
+    hub.on('customerOrderStatus', (data: {
+      orderId?: number
+      status?: number
+      title?: string
+      message?: string
+      cancellationReason?: string | null
+    }) => {
+      useCustomerNotificationsStore.getState().bumpUnread()
+      if (data.status !== ORDER_STATUS_CANCELLED) return
+      const reason = data.cancellationReason?.trim()
+      useCustomerNotificationsStore.getState().showOrderToast({
+        title: data.title ?? 'Porosia u anulua',
+        message: reason
+          ? reason
+          : (data.message ?? 'Restoranti e anuloi porosinë tuaj.'),
+        orderId: data.orderId,
+      })
+      window.dispatchEvent(new CustomEvent('fd-refresh-active-order'))
+    })
 
     hub.on('customerNotification', (data: { title?: string; message?: string; type?: string; ticketId?: number }) => {
       useCustomerNotificationsStore.getState().bumpUnread()
@@ -82,6 +105,12 @@ export default function CustomerLayout() {
     const t = setTimeout(() => clearSupportToast(), 6000)
     return () => clearTimeout(t)
   }, [supportToast, clearSupportToast])
+
+  useEffect(() => {
+    if (!orderToast) return
+    const t = setTimeout(() => clearOrderToast(), 8000)
+    return () => clearTimeout(t)
+  }, [orderToast, clearOrderToast])
 
   if (token && hasAdminRole(token)) return <Navigate to="/admin" replace />
 
@@ -155,6 +184,41 @@ export default function CustomerLayout() {
         </div>
       </header>
       <CustomerOrderFloatWidget />
+      {orderToast && (
+        <div
+          role="status"
+          onClick={() => {
+            clearOrderToast()
+            if (orderToast.orderId != null) navigate(`/app/orders/${orderToast.orderId}`)
+          }}
+          className={`fixed bottom-6 left-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-red-500/35 bg-[#1a1214] px-4 py-3 shadow-2xl shadow-black/50 ${
+            orderToast.orderId != null ? 'cursor-pointer hover:border-red-400/50' : ''
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-sm">
+              ✕
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-red-200">{orderToast.title}</p>
+              <p className="mt-0.5 line-clamp-3 text-xs text-zinc-300">{orderToast.message}</p>
+              {orderToast.orderId != null ? (
+                <p className="mt-1 text-[10px] font-medium text-red-400/80">Kliko për detajet e porosisë →</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                clearOrderToast()
+              }}
+              className="shrink-0 text-zinc-500 hover:text-zinc-300"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       {supportToast && (
         <div
           role={supportToast.ticketId != null ? 'button' : undefined}

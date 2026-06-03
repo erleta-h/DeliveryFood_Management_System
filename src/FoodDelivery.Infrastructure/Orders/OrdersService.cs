@@ -245,6 +245,16 @@ public sealed class OrdersService : IOrdersService
                 i.UnitPrice * i.Quantity))
             .ToList();
 
+        string? cancellationReason = null;
+        if (order.Status == OrderStatus.Cancelled)
+        {
+            cancellationReason = await _uow.Repository<OrderStatusHistory, long>().Query.AsNoTracking()
+                .Where(h => h.OrderId == order.Id && h.Status == OrderStatus.Cancelled && h.Note != null)
+                .OrderByDescending(h => h.CreatedAt)
+                .Select(h => h.Note)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         return new CustomerOrderDetailDto(
             order.Id,
             order.OrderNumber,
@@ -271,7 +281,8 @@ public sealed class OrdersService : IOrdersService
             chatAvailable,
             delivery?.Status,
             pendingStripePayment,
-            driverDto);
+            driverDto,
+            cancellationReason);
     }
 
     public async Task<(bool Ok, string? Error)> CancelUnpaidStripeOrderAsync(

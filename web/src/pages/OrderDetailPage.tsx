@@ -258,7 +258,14 @@ export default function OrderDetailPage() {
     ? { ...driverForMap, title: liveDriver ? 'Korrieri (live)' : 'Korrieri', label: 'D', color: '#34d399' } : null
   const canMap = !!(rPt || cPt || dPt) && phase !== 'cancelled'
 
-  const ringColor = phase === 'pending' ? 'sky' : phase === 'preparing' ? 'amber' : 'emerald'
+  const ringColor =
+    phase === 'cancelled'
+      ? 'red'
+      : phase === 'pending'
+        ? 'sky'
+        : phase === 'preparing'
+          ? 'amber'
+          : 'emerald'
 
   return (
     <div className="-mx-4 -mt-6 sm:-mt-8">
@@ -293,12 +300,21 @@ export default function OrderDetailPage() {
             {/* Progress ring — clean, no background map */}
             <div className="relative flex h-36 w-36 shrink-0 items-center justify-center">
               <svg className="absolute inset-0 -rotate-90" viewBox="0 0 120 120" aria-hidden>
-                <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r="54"
+                  fill="none"
+                  stroke={phase === 'cancelled' ? 'rgba(239,68,68,0.28)' : 'rgba(255,255,255,0.06)'}
+                  strokeWidth="6"
+                />
                 <circle cx="60" cy="60" r="54" fill="none" stroke={`url(#${gradId})`} strokeWidth="6" strokeLinecap="round"
                   strokeDasharray={`${(pct / 100) * circ} ${circ}`} className="transition-[stroke-dasharray] duration-700" />
                 <defs>
                   <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-                    {ringColor === 'sky'
+                    {ringColor === 'red'
+                      ? <><stop offset="0%" stopColor="#f87171" /><stop offset="100%" stopColor="#ef4444" /></>
+                      : ringColor === 'sky'
                       ? <><stop offset="0%" stopColor="#38bdf8" /><stop offset="100%" stopColor="#0ea5e9" /></>
                       : ringColor === 'amber'
                       ? <><stop offset="0%" stopColor="#fbbf24" /><stop offset="100%" stopColor="#f59e0b" /></>
@@ -309,6 +325,8 @@ export default function OrderDetailPage() {
               <div className="relative z-10 flex flex-col items-center">
                 {phase === 'delivered' ? (
                   <svg className="h-12 w-12 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                ) : phase === 'cancelled' ? (
+                  <div className="h-4 w-4 rounded-full bg-red-500 shadow-[0_0_14px_rgba(239,68,68,0.65)]" />
                 ) : displayEta != null ? (
                   <>
                     <span className="text-3xl font-bold leading-none tracking-tight text-white tabular-nums drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">{Math.round(displayEta)}</span>
@@ -328,6 +346,14 @@ export default function OrderDetailPage() {
               </span>
               <h2 className="mt-2.5 text-xl font-bold text-white">{phaseTitle(phase)}</h2>
               <p className="mt-1 text-sm text-zinc-400">{phaseDesc(phase)}</p>
+              {phase === 'cancelled' && order.cancellationReason?.trim() ? (
+                <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-red-300/90">
+                    Arsyeja e anulimit
+                  </p>
+                  <p className="mt-1 text-sm leading-relaxed text-red-100/95">{order.cancellationReason.trim()}</p>
+                </div>
+              ) : null}
               {arrivalTime && (
                 <div className="mt-3">
                   <p className="text-xs text-zinc-500">Estimated delivery time</p>

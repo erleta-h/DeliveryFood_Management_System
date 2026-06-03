@@ -69,6 +69,8 @@ export type CustomerOrderDetail = {
   deliveryLegStatus?: number | null
   /** Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende. */
   driver?: CustomerOrderDriver | null
+  /** Arsye e anulimit nga restoranti — vetëm kur statusi është anuluar. */
+  cancellationReason?: string | null
 }
 
 const STRIPE_CHECKOUT_ORDER_KEY = 'fdStripeCheckoutOrderId'
