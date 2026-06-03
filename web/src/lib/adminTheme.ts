@@ -3,7 +3,14 @@
  * Emrat e eksporteve përputhen me customerTheme që faqet admin të importojnë këtu.
  */
 
-export const customerShellBg = 'min-h-screen bg-[#f5f6f8] text-gray-900 antialiased font-sans'
+export const customerShellBg = 'h-[100dvh] overflow-hidden bg-[#f3f4f6] text-gray-900 antialiased font-sans'
+
+/** Karta e përmbajtjes së faqes admin */
+export const adminContentCard =
+  'rounded-2xl border border-gray-200/80 bg-white shadow-sm ring-1 ring-black/[0.02]'
+
+/** Zona scroll brenda faqes (tabela, lista) — shiriti fshihet nga CSS .admin-panel */
+export const adminScrollPane = 'overflow-y-auto overscroll-contain'
 
 export const customerCard =
   'rounded-2xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm sm:rounded-2xl sm:p-8'

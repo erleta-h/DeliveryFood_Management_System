@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AdminPageShell } from '../components/admin/AdminPageShell'
 import { AdminStatCard } from '../components/admin/AdminStatCard'
 import { AdminStatCardsSkeleton } from '../components/admin/AdminSkeleton'
 import { fetchAdminDashboard, type AdminDashboardData } from '../lib/adminApi'
@@ -66,18 +67,19 @@ export default function AdminDashboardPage() {
     (data?.pendingPartnerApplications ?? 0) + (data?.pendingDriverApplications ?? 0)
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">
+    <AdminPageShell
+      title="Dashboard"
+      intro={
+        <>
           Përmbledhje operacionale (UTC). Raporte të plota në{' '}
           <Link to="/admin/reports" className="text-violet-600 hover:underline">
             Raporte
           </Link>
           .
-        </p>
-      </div>
-
+        </>
+      }
+    >
+      <div className="space-y-8">
       {error ? (
         <div
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
@@ -192,6 +194,7 @@ export default function AdminDashboardPage() {
           </div>
         </>
       ) : null}
-    </div>
+      </div>
+    </AdminPageShell>
   )
 }

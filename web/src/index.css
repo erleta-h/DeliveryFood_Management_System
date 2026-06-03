@@ -24,6 +24,28 @@ body {
   background-color: #171820;
 }
 
+/* Panel admin — sfond i njëtrajtshëm, scroll vetëm në përmbajtje (jo në body) */
+html.admin-panel,
+html.admin-panel body {
+  height: 100%;
+  overflow: hidden;
+  background-color: #f3f4f6 !important;
+}
+
+/* Panel admin — pa shirit scroll vizual (scroll me maus/trackpad mbetet) */
+html.admin-panel,
+html.admin-panel * {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+html.admin-panel::-webkit-scrollbar,
+html.admin-panel *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Select / option në forma të errëta (partner, etj.) — shmang tekst të padukshëm */
 /* në listën e sistemit (bardhë mbi bardhë në Windows/Chrome).                    */

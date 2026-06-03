@@ -1,5 +1,6 @@
 /** Seksione plani produkti — UI + përmbajtje; API përveç dashboard & partner-applications vjen më vonë. */
 
+import type { AdminNavIconName } from '../components/admin/adminIcons'
 import { getPermissionsFromToken, hasAdminRole } from './jwtRoles'
 
 export type AdminSectionDef = {
@@ -197,7 +198,10 @@ export const ADMIN_SECTIONS: Record<string, AdminSectionDef> = {
 
 export const ADMIN_SECTION_IDS = Object.keys(ADMIN_SECTIONS) as (keyof typeof ADMIN_SECTIONS)[]
 
-export type AdminNavGroup = { title: string; items: { to: string; label: string; icon: string }[] }
+export type AdminNavGroup = {
+  title: string
+  items: { to: string; label: string; icon: AdminNavIconName }[]
+}
 
 /** Leja RBAC e nevojshme për çdo rrugë paneli (për përdorues me rol Support — Admin sheh gjithçka). */
 export const ADMIN_ROUTE_PERMISSION: Record<string, string> = {
@@ -236,46 +240,46 @@ export function getVisibleAdminNavGroups(token: string | null): AdminNavGroup[] 
 export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   {
     title: 'Përmbledhje',
-    items: [{ to: '/admin', label: 'Dashboard', icon: '📈' }],
+    items: [{ to: '/admin', label: 'Dashboard', icon: 'dashboard' }],
   },
   {
     title: 'Operacionet',
     items: [
-      { to: '/admin/partner-applications', label: 'Aplikimet partner', icon: '📝' },
-      { to: '/admin/driver-applications', label: 'Aplikimet Deliver', icon: '🛵' },
-      { to: '/admin/restaurants', label: 'Restorantet', icon: '🏪' },
-      { to: '/admin/food-categories', label: 'Kategoritë e ushqimit', icon: '🍽️' },
-      { to: '/admin/orders', label: 'Porositë', icon: '📦' },
-      { to: '/admin/riders', label: 'Delivera', icon: '🛵' },
-      { to: '/admin/zones', label: 'Zonat & tarifat', icon: '🗺️' },
+      { to: '/admin/partner-applications', label: 'Aplikimet partner', icon: 'partner' },
+      { to: '/admin/driver-applications', label: 'Aplikimet Deliver', icon: 'driver' },
+      { to: '/admin/restaurants', label: 'Restorantet', icon: 'restaurant' },
+      { to: '/admin/food-categories', label: 'Kategoritë e ushqimit', icon: 'food' },
+      { to: '/admin/orders', label: 'Porositë', icon: 'orders' },
+      { to: '/admin/riders', label: 'Delivera', icon: 'riders' },
+      { to: '/admin/zones', label: 'Zonat & tarifat', icon: 'zones' },
     ],
   },
   {
     title: 'Klientë & mbështetja',
     items: [
-      { to: '/admin/users', label: 'Klientët', icon: '👥' },
-      { to: '/admin/support', label: 'Support', icon: '🆘' },
+      { to: '/admin/users', label: 'Klientët', icon: 'users' },
+      { to: '/admin/support', label: 'Support', icon: 'support' },
     ],
   },
   {
     title: 'Financa & marketing',
     items: [
-      { to: '/admin/finance', label: 'Financa', icon: '💰' },
-      { to: '/admin/promotions', label: 'Promocione', icon: '🎟️' },
+      { to: '/admin/finance', label: 'Financa', icon: 'finance' },
+      { to: '/admin/promotions', label: 'Promocione', icon: 'promotions' },
     ],
   },
   {
     title: 'Cilësia',
-    items: [{ to: '/admin/reviews', label: 'Vlerësime', icon: '⭐' }],
+    items: [{ to: '/admin/reviews', label: 'Vlerësime', icon: 'reviews' }],
   },
   {
     title: 'Analiza & sistemi',
     items: [
-      { to: '/admin/reports', label: 'Raporte', icon: '📊' },
-      { to: '/admin/data-port', label: 'Eksport / import', icon: '📥' },
-      { to: '/admin/cms', label: 'CMS (faqja kryesore)', icon: '📄' },
-      { to: '/admin/security', label: 'Siguria', icon: '🔐' },
-      { to: '/admin/settings', label: 'Konfigurime', icon: '⚙️' },
+      { to: '/admin/reports', label: 'Raporte', icon: 'reports' },
+      { to: '/admin/data-port', label: 'Eksport / import', icon: 'import' },
+      { to: '/admin/cms', label: 'CMS (faqja kryesore)', icon: 'cms' },
+      { to: '/admin/security', label: 'Siguria', icon: 'security' },
+      { to: '/admin/settings', label: 'Konfigurime', icon: 'settings' },
     ],
   },
 ]
