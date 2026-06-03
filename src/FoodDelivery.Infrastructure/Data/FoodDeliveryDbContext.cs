@@ -27,6 +27,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<SupportTicketMessage> SupportTicketMessages => Set<SupportTicketMessage>();
 
     public DbSet<SupportTicketAudit> SupportTicketAudits => Set<SupportTicketAudit>();
+    public DbSet<SupportTicketAttachment> SupportTicketAttachments => Set<SupportTicketAttachment>();
 
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
@@ -371,6 +372,29 @@ public class FoodDeliveryDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(x => x.SupportTicketId);
             e.HasIndex(x => x.CreatedAt);
+        });
+
+        modelBuilder.Entity<SupportTicketAttachment>(e =>
+        {
+            e.ToTable("SupportTicketAttachments");
+            e.HasOne(x => x.SupportTicket)
+                .WithMany()
+                .HasForeignKey(x => x.SupportTicketId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Message)
+                .WithMany()
+                .HasForeignKey(x => x.MessageId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.StoredFile)
+                .WithMany()
+                .HasForeignKey(x => x.StoredFileId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.UploadedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UploadedByUserId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasIndex(x => x.SupportTicketId);
+            e.HasIndex(x => x.MessageId);
         });
 
         modelBuilder.Entity<SupportTicketAudit>(e =>

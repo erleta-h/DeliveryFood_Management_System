@@ -67,6 +67,13 @@ export const PRIORITY_OPTIONS = Object.entries(PRIORITY_LABELS).map(([v, l]) => 
   label: l === 'Mesatar' ? 'Normal' : l,
 }))
 
+export type SupportTicketAttachmentRow = {
+  id: number
+  messageId: number | null
+  fileName: string
+  createdAtUtc: string
+}
+
 export type SupportTicketMessageRow = {
   id: number
   authorUserId: number
@@ -74,6 +81,7 @@ export type SupportTicketMessageRow = {
   isStaffReply: boolean
   body: string
   createdAtUtc: string
+  attachments: SupportTicketAttachmentRow[]
 }
 
 export type SupportTicketThread = {
@@ -97,7 +105,33 @@ export type SupportTicketThread = {
   driverName: string | null
   assignedToUserId: number | null
   assignedToEmail: string | null
+  initialAttachments: SupportTicketAttachmentRow[]
   messages: SupportTicketMessageRow[]
+}
+
+function normalizeThread(raw: SupportTicketThread & {
+  InitialAttachments?: SupportTicketAttachmentRow[]
+  Messages?: SupportTicketMessageRow[]
+}): SupportTicketThread {
+  const initial = (raw.initialAttachments ?? raw.InitialAttachments ?? []).map(normalizeAttachment)
+  const messages = (raw.messages ?? raw.Messages ?? []).map((m) => ({
+    ...m,
+    attachments: (m.attachments ?? (m as { Attachments?: SupportTicketAttachmentRow[] }).Attachments ?? []).map(
+      normalizeAttachment,
+    ),
+  }))
+  return { ...raw, initialAttachments: initial, messages }
+}
+
+function normalizeAttachment(
+  a: SupportTicketAttachmentRow & { FileName?: string; MessageId?: number | null },
+): SupportTicketAttachmentRow {
+  return {
+    id: a.id,
+    messageId: a.messageId ?? a.MessageId ?? null,
+    fileName: a.fileName ?? a.FileName ?? 'foto',
+    createdAtUtc: a.createdAtUtc,
+  }
 }
 
 /* ---------- Client API ---------- */
@@ -119,7 +153,8 @@ export async function fetchSupportTicketThread(
   })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json() as Promise<SupportTicketThread>
+  const raw = (await res.json()) as SupportTicketThread
+  return normalizeThread(raw)
 }
 
 export async function createSupportTicket(
@@ -160,13 +195,18 @@ export async function postSupportTicketMessage(
   token: string,
   ticketId: number,
   body: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; messageId: number } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/support/tickets/${ticketId}/messages`), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ body }),
   })
-  if (res.status === 204) return { ok: true }
+  if (res.status === 201 || res.status === 204) {
+    if (res.status === 204) return { ok: true, messageId: 0 }
+    const j = (await res.json()) as { messageId?: number; MessageId?: number }
+    const messageId = j.messageId ?? j.MessageId ?? 0
+    return { ok: true, messageId }
+  }
   let message = `Gabim ${res.status}`
   try {
     const j = (await res.json()) as { message?: string }

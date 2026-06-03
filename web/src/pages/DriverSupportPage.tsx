@@ -14,6 +14,9 @@ import {
   type MySupportTicketRow,
   type SupportTicketThread,
 } from '../lib/supportApi'
+import { SupportAttachmentList } from '../components/support/SupportAttachmentImage'
+import { SupportPhotoPicker } from '../components/support/SupportPhotoPicker'
+import { uploadSupportAttachment, validateSupportPhotos } from '../lib/supportAttachments'
 import { useAuthStore } from '../store/authStore'
 
 const btnPrimary =
@@ -35,6 +38,8 @@ export default function DriverSupportPage() {
   const [threadLoading, setThreadLoading] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyBusy, setReplyBusy] = useState(false)
+  const [createPhotos, setCreatePhotos] = useState<File[]>([])
+  const [replyPhotos, setReplyPhotos] = useState<File[]>([])
 
   const load = useCallback(async () => {
     if (!token) return
@@ -65,6 +70,11 @@ export default function DriverSupportPage() {
     setMsg(null)
     setBusy(true)
     try {
+      const photoErr = validateSupportPhotos(createPhotos)
+      if (photoErr) {
+        setMsg(photoErr)
+        return
+      }
       const orderRef = linkOrderId.trim()
       const oid = orderRef && /^\d+$/.test(orderRef) ? Number(orderRef) : undefined
       const orderNumber = orderRef && !/^\d+$/.test(orderRef) ? orderRef : undefined
@@ -79,10 +89,19 @@ export default function DriverSupportPage() {
         setMsg(r.message)
         return
       }
+      for (const file of createPhotos) {
+        const up = await uploadSupportAttachment(token, r.id, file)
+        if (!up.ok) {
+          setMsg(`Tiketa u krijua, por fotoja «${file.name}»: ${up.message}`)
+          await load()
+          return
+        }
+      }
       setSubject('')
       setBody('')
       setCategory(6)
       setLinkOrderId('')
+      setCreatePhotos([])
       setMsg(`Tiketa #${r.id} u dërgua.`)
       await load()
     } catch (e: unknown) {
@@ -98,12 +117,27 @@ export default function DriverSupportPage() {
     setReplyBusy(true)
     setMsg(null)
     try {
+      const photoErr = validateSupportPhotos(replyPhotos)
+      if (photoErr) {
+        setMsg(photoErr)
+        return
+      }
       const r = await postSupportTicketMessage(token, expandedId, replyDraft)
       if (!r.ok) {
         setMsg(r.message)
         return
       }
+      if (r.messageId > 0) {
+        for (const file of replyPhotos) {
+          const up = await uploadSupportAttachment(token, expandedId, file, r.messageId)
+          if (!up.ok) {
+            setMsg(`Mesazhi u dërgua, por fotoja «${file.name}»: ${up.message}`)
+            return
+          }
+        }
+      }
       setReplyDraft('')
+      setReplyPhotos([])
       const t = await fetchSupportTicketThread(token, expandedId)
       setThread(t)
       await load()
@@ -179,6 +213,7 @@ export default function DriverSupportPage() {
             className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
           />
         </label>
+        <SupportPhotoPicker files={createPhotos} onChange={setCreatePhotos} disabled={busy} />
         {msg ? <p className="text-sm text-amber-200/90">{msg}</p> : null}
         <button type="submit" disabled={busy} className={btnPrimary}>
           {busy ? 'Duke dërguar…' : 'Dërgo tiketën'}
@@ -203,6 +238,7 @@ export default function DriverSupportPage() {
                     onClick={() => {
                       setExpandedId(open ? null : t.id)
                       setReplyDraft('')
+                      setReplyPhotos([])
                     }}
                   >
                     <p className="text-sm font-medium text-zinc-100">{t.subject}</p>
@@ -237,6 +273,11 @@ export default function DriverSupportPage() {
                           <div className="rounded-lg border border-white/10 bg-zinc-950/50 p-3">
                             <p className="text-xs text-emerald-300/90">Mesazhi fillestar</p>
                             <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
+                            <SupportAttachmentList
+                              token={token}
+                              ticketId={thread.id}
+                              attachments={thread.initialAttachments}
+                            />
                           </div>
                           {thread.messages.map((m) => (
                             <div
@@ -252,6 +293,11 @@ export default function DriverSupportPage() {
                                 {new Date(m.createdAtUtc).toLocaleString('sq-AL')}
                               </p>
                               <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{m.body}</p>
+                              <SupportAttachmentList
+                                token={token}
+                                ticketId={thread.id}
+                                attachments={m.attachments}
+                              />
                             </div>
                           ))}
                           {thread.status !== 3 ? (
@@ -268,6 +314,7 @@ export default function DriverSupportPage() {
                                   className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100"
                                 />
                               </label>
+                              <SupportPhotoPicker files={replyPhotos} onChange={setReplyPhotos} disabled={replyBusy} />
                               <button type="submit" disabled={replyBusy} className={btnPrimary}>
                                 {replyBusy ? 'Duke dërguar…' : 'Dërgo'}
                               </button>

@@ -82,10 +82,60 @@ public sealed class SupportTicketsController : ControllerBase
         if (userId is null)
             return Unauthorized();
 
-        var err = await _svc.PostCustomerMessageAsync(userId.Value, id, body.Body, cancellationToken);
+        var (messageId, err) = await _svc.PostCustomerMessageAsync(userId.Value, id, body.Body, cancellationToken);
         if (err is not null)
             return BadRequest(new { message = err });
 
-        return NoContent();
+        return StatusCode(StatusCodes.Status201Created, new SupportTicketMessageCreatedDto(messageId!.Value));
+    }
+
+    [HttpPost("{ticketId:long}/attachments")]
+    [RequestSizeLimit(6_291_456)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 6_291_456)]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(SupportTicketAttachmentCreatedDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UploadAttachment(
+        long ticketId,
+        IFormFile? file,
+        [FromQuery] long? messageId,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "Zgjidh një foto." });
+
+        await using var stream = file.OpenReadStream();
+        var (attachmentId, err) = await _svc.AddAttachmentAsync(
+            userId.Value,
+            ticketId,
+            messageId,
+            stream,
+            file.FileName,
+            cancellationToken);
+        if (err is not null)
+            return BadRequest(new { message = err });
+
+        return StatusCode(StatusCodes.Status201Created, new SupportTicketAttachmentCreatedDto(attachmentId!.Value));
+    }
+
+    [HttpGet("{ticketId:long}/attachments/{attachmentId:long}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAttachment(
+        long ticketId,
+        long attachmentId,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var (path, contentType, err) = await _svc.GetAttachmentFileAsync(
+            userId.Value, ticketId, attachmentId, allowPlatformStaff: false, cancellationToken);
+        if (err is not null || path is null)
+            return NotFound();
+
+        return PhysicalFile(path, contentType ?? "application/octet-stream");
     }
 }

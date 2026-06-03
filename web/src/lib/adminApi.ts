@@ -699,6 +699,13 @@ export async function patchAdminSupportTicket(
   return { ok: false, message }
 }
 
+export type AdminSupportAttachmentRow = {
+  id: number
+  messageId: number | null
+  fileName: string
+  createdAtUtc: string
+}
+
 export type AdminSupportTicketMessageRow = {
   id: number
   authorUserId: number
@@ -706,6 +713,7 @@ export type AdminSupportTicketMessageRow = {
   isStaffReply: boolean
   body: string
   createdAtUtc: string
+  attachments: AdminSupportAttachmentRow[]
 }
 
 export type AdminSupportTicketThread = {
@@ -729,7 +737,35 @@ export type AdminSupportTicketThread = {
   driverName: string | null
   assignedToUserId: number | null
   assignedToEmail: string | null
+  initialAttachments: AdminSupportAttachmentRow[]
   messages: AdminSupportTicketMessageRow[]
+}
+
+function normalizeAdminThread(
+  raw: AdminSupportTicketThread & {
+    InitialAttachments?: AdminSupportAttachmentRow[]
+    Messages?: AdminSupportTicketMessageRow[]
+  },
+): AdminSupportTicketThread {
+  const initial = (raw.initialAttachments ?? raw.InitialAttachments ?? []).map(normalizeAdminAttachment)
+  const messages = (raw.messages ?? raw.Messages ?? []).map((m) => ({
+    ...m,
+    attachments: (m.attachments ?? (m as { Attachments?: AdminSupportAttachmentRow[] }).Attachments ?? []).map(
+      normalizeAdminAttachment,
+    ),
+  }))
+  return { ...raw, initialAttachments: initial, messages }
+}
+
+function normalizeAdminAttachment(
+  a: AdminSupportAttachmentRow & { FileName?: string; MessageId?: number | null },
+): AdminSupportAttachmentRow {
+  return {
+    id: a.id,
+    messageId: a.messageId ?? a.MessageId ?? null,
+    fileName: a.fileName ?? a.FileName ?? 'foto',
+    createdAtUtc: a.createdAtUtc,
+  }
 }
 
 export async function fetchAdminSupportTicketThread(
@@ -741,7 +777,8 @@ export async function fetchAdminSupportTicketThread(
   })
   if (res.status === 404) return null
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json() as Promise<AdminSupportTicketThread>
+  const raw = (await res.json()) as AdminSupportTicketThread
+  return normalizeAdminThread(raw)
 }
 
 export async function postAdminSupportTicketMessage(

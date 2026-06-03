@@ -1,11 +1,14 @@
-﻿using FoodDelivery.Application.Notifications;
+﻿using FoodDelivery.Application.Configuration;
+using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Support;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Realtime;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace FoodDelivery.Infrastructure.Support;
 
@@ -14,15 +17,21 @@ public sealed class SupportTicketService : ISupportTicketService
     private readonly IUnitOfWork _uow;
     private readonly IHubContext<OrderTrackingHub> _hub;
     private readonly ILogger<SupportTicketService> _log;
+    private readonly IWebHostEnvironment _env;
+    private readonly SupportAttachmentStorageOptions _attachOpt;
 
     public SupportTicketService(
         IUnitOfWork uow,
         IHubContext<OrderTrackingHub> hub,
-        ILogger<SupportTicketService> log)
+        ILogger<SupportTicketService> log,
+        IWebHostEnvironment env,
+        IOptions<SupportAttachmentStorageOptions> attachOpt)
     {
         _uow = uow;
         _hub = hub;
         _log = log;
+        _env = env;
+        _attachOpt = attachOpt.Value;
     }
 
     public async Task<(long? Id, string? Error)> CreateAsync(
@@ -220,10 +229,11 @@ public sealed class SupportTicketService : ISupportTicketService
             .Include(x => x.Driver)
             .Include(x => x.AssignedTo)
             .FirstOrDefaultAsync(x => x.Id == ticketId && x.UserId == userId, cancellationToken);
-        return t is null ? null : MapThread(t);
+        var attachments = await LoadAttachmentsAsync(ticketId, cancellationToken);
+        return MapThread(t, attachments);
     }
 
-    public async Task<string?> PostCustomerMessageAsync(
+    public async Task<(long? MessageId, string? Error)> PostCustomerMessageAsync(
         long userId,
         long ticketId,
         string body,
@@ -231,24 +241,25 @@ public sealed class SupportTicketService : ISupportTicketService
     {
         var trimmed = body.Trim();
         if (trimmed.Length is < 1 or > 4000)
-            return "Mesazhi: 1–4000 karaktere.";
+            return (null, "Mesazhi: 1–4000 karaktere.");
 
         var t = await _uow.Repository<SupportTicket, long>().Query
             .FirstOrDefaultAsync(x => x.Id == ticketId && x.UserId == userId, cancellationToken);
         if (t is null)
-            return "Tiketa nuk u gjet.";
+            return (null, "Tiketa nuk u gjet.");
         if (t.Status == SupportTicketStatus.Closed)
-            return "Tiketa është e mbyllur.";
+            return (null, "Tiketa është e mbyllur.");
 
         var now = DateTime.UtcNow;
-        _uow.Repository<SupportTicketMessage, long>().Add(new SupportTicketMessage
+        var msg = new SupportTicketMessage
         {
             SupportTicketId = ticketId,
             AuthorUserId = userId,
             Body = trimmed,
             IsStaffReply = false,
             CreatedAt = now,
-        });
+        };
+        _uow.Repository<SupportTicketMessage, long>().Add(msg);
         t.UpdatedAt = now;
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -263,15 +274,194 @@ public sealed class SupportTicketService : ISupportTicketService
             NotificationTypes.SupportClientReply,
             cancellationToken);
 
-        return null;
+        return (msg.Id, null);
     }
 
-    internal static SupportTicketThreadDto MapThread(SupportTicket t)
+    public async Task<(long? AttachmentId, string? Error)> AddAttachmentAsync(
+        long userId,
+        long ticketId,
+        long? messageId,
+        Stream fileStream,
+        string originalFileName,
+        CancellationToken cancellationToken = default)
     {
+        var extErr = SupportTicketFileHelper.ValidateExtension(originalFileName);
+        if (extErr is not null)
+            return (null, extErr);
+
+        var t = await _uow.Repository<SupportTicket, long>().Query
+            .FirstOrDefaultAsync(x => x.Id == ticketId && x.UserId == userId, cancellationToken);
+        if (t is null)
+            return (null, "Tiketa nuk u gjet.");
+        if (t.Status == SupportTicketStatus.Closed)
+            return (null, "Tiketa është e mbyllur.");
+
+        if (messageId is { } mid)
+        {
+            var msgOk = await _uow.Repository<SupportTicketMessage, long>().Query.AsNoTracking()
+                .AnyAsync(m => m.Id == mid && m.SupportTicketId == ticketId, cancellationToken);
+            if (!msgOk)
+                return (null, "Mesazhi nuk u gjet.");
+        }
+
+        var count = await _uow.Repository<SupportTicketAttachment, long>().Query.AsNoTracking()
+            .CountAsync(a => a.SupportTicketId == ticketId, cancellationToken);
+        if (count >= _attachOpt.MaxAttachmentsPerTicket)
+            return (null, $"Maksimum {_attachOpt.MaxAttachmentsPerTicket} foto për tiketë.");
+
+        var root = Path.GetFullPath(Path.Combine(_env.ContentRootPath, _attachOpt.RelativeRoot));
+        Directory.CreateDirectory(root);
+        var ext = Path.GetExtension(originalFileName);
+        var safeName = $"{ticketId}_{Guid.NewGuid():N}{ext}";
+        var fullPath = Path.Combine(root, safeName);
+
+        long totalWritten = 0;
+        try
+        {
+            await using (var fs = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                var buffer = new byte[81920];
+                int read;
+                while ((read = await fileStream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)) > 0)
+                {
+                    totalWritten += read;
+                    if (totalWritten > _attachOpt.MaxFileBytes)
+                    {
+                        SupportTicketFileHelper.TryDeletePhysical(fullPath);
+                        return (null, $"Fotoja duhet të jetë maksimum {_attachOpt.MaxFileBytes / 1024 / 1024} MB.");
+                    }
+
+                    await fs.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                }
+            }
+        }
+        catch
+        {
+            SupportTicketFileHelper.TryDeletePhysical(fullPath);
+            return (null, "Ngarkimi i fotos dështoi.");
+        }
+
+        if (totalWritten == 0)
+        {
+            SupportTicketFileHelper.TryDeletePhysical(fullPath);
+            return (null, "Skedari i fotos është bosh.");
+        }
+
+        var displayName = string.IsNullOrWhiteSpace(originalFileName) ? safeName : originalFileName.Trim();
+        if (displayName.Length > 500)
+            displayName = displayName[..500];
+
+        var now = DateTime.UtcNow;
+        var stored = new StoredFile
+        {
+            Entity = "SupportTicket",
+            EntityId = ticketId.ToString(),
+            Filename = displayName,
+            FilePath = fullPath,
+            FileSize = totalWritten,
+            UploaderId = userId,
+            CreatedAt = now,
+        };
+        _uow.Repository<StoredFile, long>().Add(stored);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var row = new SupportTicketAttachment
+        {
+            SupportTicketId = ticketId,
+            MessageId = messageId,
+            StoredFileId = stored.Id,
+            UploadedByUserId = userId,
+            CreatedAt = now,
+        };
+        _uow.Repository<SupportTicketAttachment, long>().Add(row);
+        t.UpdatedAt = now;
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return (row.Id, null);
+    }
+
+    public async Task<(string? PhysicalPath, string? ContentType, string? Error)> GetAttachmentFileAsync(
+        long userId,
+        long ticketId,
+        long attachmentId,
+        bool allowPlatformStaff,
+        CancellationToken cancellationToken = default)
+    {
+        var att = await _uow.Repository<SupportTicketAttachment, long>().Query.AsNoTracking()
+            .Include(a => a.StoredFile)
+            .Include(a => a.SupportTicket)
+            .FirstOrDefaultAsync(a => a.Id == attachmentId && a.SupportTicketId == ticketId, cancellationToken);
+        if (att is null)
+            return (null, null, "Bashkëngjitja nuk u gjet.");
+
+        if (att.SupportTicket.UserId == userId)
+        {
+            /* owner */
+        }
+        else if (allowPlatformStaff)
+        {
+            var isStaff = await (
+                from ur in _uow.Repository<UserRole, long>().Query.AsNoTracking()
+                join r in _uow.Repository<Role, long>().Query.AsNoTracking() on ur.RoleId equals r.Id
+                where ur.UserId == userId && (r.Name == "Admin" || r.Name == "Support")
+                select ur.UserId)
+                .AnyAsync(cancellationToken);
+            if (!isStaff)
+                return (null, null, "Nuk ke akses.");
+        }
+        else
+        {
+            return (null, null, "Nuk ke akses.");
+        }
+
+        var path = att.StoredFile.FilePath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return (null, null, "Skedari mungon në disk.");
+
+        return (path, SupportTicketFileHelper.GuessContentType(att.StoredFile.Filename), null);
+    }
+
+    internal static async Task<List<SupportTicketAttachment>> LoadAttachmentsAsync(
+        IUnitOfWork uow,
+        long ticketId,
+        CancellationToken cancellationToken)
+    {
+        return await uow.Repository<SupportTicketAttachment, long>().Query.AsNoTracking()
+            .Include(a => a.StoredFile)
+            .Where(a => a.SupportTicketId == ticketId)
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<List<SupportTicketAttachment>> LoadAttachmentsAsync(
+        long ticketId,
+        CancellationToken cancellationToken) =>
+        await LoadAttachmentsAsync(_uow, ticketId, cancellationToken);
+
+    internal static SupportTicketThreadDto MapThread(
+        SupportTicket t,
+        IReadOnlyList<SupportTicketAttachment> attachments)
+    {
+        var initialAttachments = attachments
+            .Where(a => a.MessageId is null)
+            .Select(ToAttachmentDto)
+            .ToList();
+
+        var byMessage = attachments
+            .Where(a => a.MessageId is not null)
+            .GroupBy(a => a.MessageId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(ToAttachmentDto).ToList());
+
         var messages = t.Messages
             .OrderBy(m => m.CreatedAt)
             .Select(m => new SupportTicketMessageDto(
-                m.Id, m.AuthorUserId, m.Author.Email, m.IsStaffReply, m.Body, m.CreatedAt))
+                m.Id,
+                m.AuthorUserId,
+                m.Author.Email,
+                m.IsStaffReply,
+                m.Body,
+                m.CreatedAt,
+                byMessage.TryGetValue(m.Id, out var ma) ? ma : Array.Empty<SupportTicketAttachmentDto>()))
             .ToList();
 
         return new SupportTicketThreadDto(
@@ -282,6 +472,10 @@ public sealed class SupportTicketService : ISupportTicketService
             t.RestaurantId, t.Restaurant?.Name,
             t.DriverId, t.Driver != null ? $"{t.Driver.FirstName} {t.Driver.LastName}".Trim() : null,
             t.AssignedToUserId, t.AssignedTo?.Email,
+            initialAttachments,
             messages);
     }
+
+    private static SupportTicketAttachmentDto ToAttachmentDto(SupportTicketAttachment a) =>
+        new(a.Id, a.MessageId, a.StoredFile.Filename, a.CreatedAt);
 }

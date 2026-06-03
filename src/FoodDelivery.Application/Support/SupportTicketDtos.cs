@@ -27,13 +27,22 @@ public sealed record CreateSupportTicketRequest(
 
 public sealed record PostSupportTicketMessageRequest(string Body);
 
+public sealed record SupportTicketMessageCreatedDto(long MessageId);
+
+public sealed record SupportTicketAttachmentDto(
+    long Id,
+    long? MessageId,
+    string FileName,
+    DateTime CreatedAtUtc);
+
 public sealed record SupportTicketMessageDto(
     long Id,
     long AuthorUserId,
     string AuthorEmail,
     bool IsStaffReply,
     string Body,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    IReadOnlyList<SupportTicketAttachmentDto> Attachments);
 
 public sealed record SupportTicketThreadDto(
     long Id,
@@ -56,7 +65,10 @@ public sealed record SupportTicketThreadDto(
     string? DriverName,
     long? AssignedToUserId,
     string? AssignedToEmail,
+    IReadOnlyList<SupportTicketAttachmentDto> InitialAttachments,
     IReadOnlyList<SupportTicketMessageDto> Messages);
+
+public sealed record SupportTicketAttachmentCreatedDto(long AttachmentId);
 
 public sealed record AdminSupportTicketItemDto(
     long Id,

@@ -107,7 +107,10 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
             .Include(x => x.Driver)
             .Include(x => x.AssignedTo)
             .FirstOrDefaultAsync(x => x.Id == ticketId, cancellationToken);
-        return t is null ? null : SupportTicketService.MapThread(t);
+        if (t is null)
+            return null;
+        var attachments = await SupportTicketService.LoadAttachmentsAsync(_uow, ticketId, cancellationToken);
+        return SupportTicketService.MapThread(t, attachments);
     }
 
     public async Task<string?> PostStaffReplyAsync(

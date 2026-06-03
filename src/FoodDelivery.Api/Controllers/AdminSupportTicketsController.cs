@@ -13,11 +13,16 @@ namespace FoodDelivery.Api.Controllers;
 public sealed class AdminSupportTicketsController : ControllerBase
 {
     private readonly IAdminSupportTicketService _svc;
+    private readonly ISupportTicketService _supportTickets;
     private readonly ILogger<AdminSupportTicketsController> _log;
 
-    public AdminSupportTicketsController(IAdminSupportTicketService svc, ILogger<AdminSupportTicketsController> log)
+    public AdminSupportTicketsController(
+        IAdminSupportTicketService svc,
+        ISupportTicketService supportTickets,
+        ILogger<AdminSupportTicketsController> log)
     {
         _svc = svc;
+        _supportTickets = supportTickets;
         _log = log;
     }
 
@@ -184,5 +189,24 @@ public sealed class AdminSupportTicketsController : ControllerBase
             _log.LogError(ex, "GetAudit dështoi për tiketën {TicketId}.", id);
             return Ok(Array.Empty<SupportTicketAuditDto>());
         }
+    }
+
+    [HttpGet("{ticketId:long}/attachments/{attachmentId:long}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetAttachment(
+        long ticketId,
+        long attachmentId,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var (path, contentType, err) = await _supportTickets.GetAttachmentFileAsync(
+            userId.Value, ticketId, attachmentId, allowPlatformStaff: true, cancellationToken);
+        if (err is not null || path is null)
+            return NotFound();
+
+        return PhysicalFile(path, contentType ?? "application/octet-stream");
     }
 }

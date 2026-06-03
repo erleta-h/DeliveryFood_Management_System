@@ -15,7 +15,10 @@ import {
   type SupportTicketThread,
   type SupportTicketMessageRow,
 } from '../lib/supportApi'
+import { SupportAttachmentList } from '../components/support/SupportAttachmentImage'
+import { SupportPhotoPicker } from '../components/support/SupportPhotoPicker'
 import { customerBtnPrimary, customerCard, customerCardMuted } from '../lib/customerTheme'
+import { uploadSupportAttachment, validateSupportPhotos } from '../lib/supportAttachments'
 import { useAuthStore } from '../store/authStore'
 import { useCustomerNotificationsStore } from '../store/customerNotificationsStore'
 
@@ -47,6 +50,8 @@ export default function SupportPage() {
   const [linkRestaurantId, setLinkRestaurantId] = useState(initialRestaurantId != null ? String(initialRestaurantId) : '')
   const [formMsg, setFormMsg] = useState<string | null>(null)
   const [formBusy, setFormBusy] = useState(false)
+  const [createPhotos, setCreatePhotos] = useState<File[]>([])
+  const [replyPhotos, setReplyPhotos] = useState<File[]>([])
   const [chatMsg, setChatMsg] = useState<string | null>(null)
 
   const setUnreadCount = useCustomerNotificationsStore((s) => s.setUnreadCount)
@@ -101,6 +106,7 @@ export default function SupportPage() {
           isStaffReply: lastSupportMessage.isStaffReply,
           body: lastSupportMessage.body,
           createdAtUtc: lastSupportMessage.createdAtUtc,
+          attachments: [],
         }
         setThread((prev) => prev ? { ...prev, messages: [...prev.messages, newMsg] } : prev)
       }
@@ -121,6 +127,11 @@ export default function SupportPage() {
     setFormMsg(null)
     setFormBusy(true)
     try {
+      const photoErr = validateSupportPhotos(createPhotos)
+      if (photoErr) {
+        setFormMsg(photoErr)
+        return
+      }
       const orderRef = linkOrderId.trim()
       const oid = orderRef && /^\d+$/.test(orderRef) ? Number(orderRef) : undefined
       const orderNumber = orderRef && !/^\d+$/.test(orderRef) ? orderRef : undefined
@@ -132,7 +143,18 @@ export default function SupportPage() {
         restaurantId: Number.isFinite(rid) ? rid : undefined,
       })
       if (!r.ok) { setFormMsg(r.message); return }
+      for (const file of createPhotos) {
+        const up = await uploadSupportAttachment(token, r.id, file)
+        if (!up.ok) {
+          setFormMsg(`Tiketa u krijua, por fotoja «${file.name}»: ${up.message}`)
+          await load()
+          setActiveId(r.id)
+          setShowNewForm(false)
+          return
+        }
+      }
       setSubject(''); setBody(''); setCategory(6); setLinkOrderId(''); setLinkRestaurantId('')
+      setCreatePhotos([])
       setShowNewForm(false)
       await load()
       setActiveId(r.id)
@@ -147,9 +169,24 @@ export default function SupportPage() {
     setReplyBusy(true)
     setChatMsg(null)
     try {
+      const photoErr = validateSupportPhotos(replyPhotos)
+      if (photoErr) {
+        setChatMsg(photoErr)
+        return
+      }
       const r = await postSupportTicketMessage(token, activeId, replyDraft.trim())
       if (!r.ok) { setChatMsg(r.message); return }
+      if (r.messageId > 0) {
+        for (const file of replyPhotos) {
+          const up = await uploadSupportAttachment(token, activeId, file, r.messageId)
+          if (!up.ok) {
+            setChatMsg(`Mesazhi u dërgua, por fotoja «${file.name}»: ${up.message}`)
+            return
+          }
+        }
+      }
       setReplyDraft('')
+      setReplyPhotos([])
       const t = await fetchSupportTicketThread(token, activeId)
       setThread(t)
       await load()
@@ -249,6 +286,7 @@ export default function SupportPage() {
                   placeholder="ID restoranti (opsional)"
                   className="rounded-lg border border-white/10 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none" />
               </div>
+              <SupportPhotoPicker files={createPhotos} onChange={setCreatePhotos} disabled={formBusy} />
               {formMsg && <p className="text-sm text-amber-200/90">{formMsg}</p>}
               <button type="submit" disabled={formBusy} className={customerBtnPrimary}>
                 {formBusy ? 'Duke dërguar…' : 'Dërgo tiketën'}
@@ -301,6 +339,11 @@ export default function SupportPage() {
                   <div className="flex justify-start">
                     <div className="max-w-[80%] rounded-2xl rounded-bl-md border border-white/[0.08] bg-[#1e2438] px-3.5 py-2.5">
                       <p className="whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
+                      <SupportAttachmentList
+                        token={token}
+                        ticketId={thread.id}
+                        attachments={thread.initialAttachments}
+                      />
                       <p className="mt-1 text-right text-[10px] text-zinc-500">{timeLabel(thread.createdAtUtc)}</p>
                     </div>
                   </div>
@@ -316,6 +359,11 @@ export default function SupportPage() {
                           <p className="mb-0.5 text-[10px] font-medium text-violet-300/80">Support</p>
                         )}
                         <p className="whitespace-pre-wrap text-sm text-zinc-200">{m.body}</p>
+                        <SupportAttachmentList
+                          token={token}
+                          ticketId={thread.id}
+                          attachments={m.attachments}
+                        />
                         <p className={`mt-1 text-[10px] ${m.isStaffReply ? 'text-left text-violet-400/50' : 'text-right text-zinc-500'}`}>
                           {timeLabel(m.createdAtUtc)}
                         </p>
@@ -333,20 +381,23 @@ export default function SupportPage() {
             {thread && thread.status !== 3 ? (
               <div className="shrink-0 border-t border-white/[0.08] p-3">
                 {chatMsg && <p className="mb-2 text-xs text-amber-300">{chatMsg}</p>}
-                <form onSubmit={(e) => void sendReply(e)} className="flex items-end gap-2">
-                  <textarea
-                    value={replyDraft}
-                    onChange={(e) => setReplyDraft(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                    maxLength={4000}
-                    placeholder="Shkruaj përgjigje…"
-                    className="flex-1 resize-none rounded-xl border border-white/10 bg-[#141928] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/40"
-                  />
-                  <button type="submit" disabled={replyBusy || !replyDraft.trim()}
-                    className="shrink-0 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-40">
-                    {replyBusy ? '…' : 'Dërgo'}
-                  </button>
+                <form onSubmit={(e) => void sendReply(e)} className="space-y-2">
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={replyDraft}
+                      onChange={(e) => setReplyDraft(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      rows={1}
+                      maxLength={4000}
+                      placeholder="Shkruaj përgjigje…"
+                      className="flex-1 resize-none rounded-xl border border-white/10 bg-[#141928] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-violet-500/40"
+                    />
+                    <button type="submit" disabled={replyBusy || !replyDraft.trim()}
+                      className="shrink-0 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:opacity-40">
+                      {replyBusy ? '…' : 'Dërgo'}
+                    </button>
+                  </div>
+                  <SupportPhotoPicker files={replyPhotos} onChange={setReplyPhotos} disabled={replyBusy} />
                 </form>
                 <p className="mt-2 text-[10px] text-zinc-600 text-center">Support-i zakonisht përgjigjet brenda disa minutave</p>
               </div>

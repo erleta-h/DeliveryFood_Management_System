@@ -21,6 +21,8 @@ import {
 import { ticketHasNewActivity } from '../lib/kitchenSupportRead'
 import { useAuthStore } from '../store/authStore'
 import { useKitchenNotificationsStore } from '../store/kitchenNotificationsStore'
+import { SupportPhotoPicker } from '../components/support/SupportPhotoPicker'
+import { uploadSupportAttachment, validateSupportPhotos } from '../lib/supportAttachments'
 
 const cardClass = 'rounded-xl border border-violet-500/20 bg-[#161b22] ring-1 ring-[#21262d]'
 const fieldClass =
@@ -79,6 +81,8 @@ export default function KitchenSupportPage() {
   const [threadLoading, setThreadLoading] = useState(false)
   const [replyDraft, setReplyDraft] = useState('')
   const [replyBusy, setReplyBusy] = useState(false)
+  const [createPhotos, setCreatePhotos] = useState<File[]>([])
+  const [replyPhotos, setReplyPhotos] = useState<File[]>([])
 
   const load = useCallback(async () => {
     if (!token) return
@@ -126,6 +130,7 @@ export default function KitchenSupportPage() {
   function openTicket(id: number) {
     setSearchParams({ ticket: String(id) })
     setReplyDraft('')
+    setReplyPhotos([])
   }
 
   function closeTicket() {
@@ -140,6 +145,7 @@ export default function KitchenSupportPage() {
     setCategory(6)
     setPriority(1)
     setLinkOrderId('')
+    setCreatePhotos([])
     setMsg(null)
   }
 
@@ -162,10 +168,24 @@ export default function KitchenSupportPage() {
       if (oid !== undefined && Number.isFinite(oid)) payload.orderId = oid
       if (orderNumber) payload.orderNumber = orderNumber
       if (restaurantId != null) payload.restaurantId = restaurantId
+      const photoErr = validateSupportPhotos(createPhotos)
+      if (photoErr) {
+        setMsg(photoErr)
+        return
+      }
       const r = await createSupportTicket(token, payload)
       if (!r.ok) {
         setMsg(r.message)
         return
+      }
+      for (const file of createPhotos) {
+        const up = await uploadSupportAttachment(token, r.id, file)
+        if (!up.ok) {
+          setMsg(`Tiketa u krijua, por fotoja «${file.name}»: ${up.message}`)
+          await load()
+          openTicket(r.id)
+          return
+        }
       }
       clearForm()
       setMsg(`Tiketa ${formatKitchenTicketId(r.id)} u dërgua te supporti i platformës.`)
@@ -184,15 +204,30 @@ export default function KitchenSupportPage() {
     setReplyBusy(true)
     setMsg(null)
     try {
+      const photoErr = validateSupportPhotos(replyPhotos)
+      if (photoErr) {
+        setMsg(photoErr)
+        return
+      }
       const r = await postSupportTicketMessage(token, selectedId, replyDraft)
       if (!r.ok) {
         setMsg(r.message)
         return
       }
+      if (r.messageId > 0) {
+        for (const file of replyPhotos) {
+          const up = await uploadSupportAttachment(token, selectedId, file, r.messageId)
+          if (!up.ok) {
+            setMsg(`Mesazhi u dërgua, por fotoja «${file.name}»: ${up.message}`)
+            return
+          }
+        }
+      }
       setReplyDraft('')
+      setReplyPhotos([])
       const t = await fetchSupportTicketThread(token, selectedId)
       setThread(t)
-      markTicketRead(selectedId, 1 + t.messages.length)
+      if (t) markTicketRead(selectedId, 1 + t.messages.length)
       await load()
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : 'Gabim.')
@@ -303,12 +338,7 @@ export default function KitchenSupportPage() {
                 className={`${fieldClass} mt-1.5 min-h-[7rem] resize-y`}
               />
             </label>
-            <div className="rounded-lg border border-dashed border-[#30363d] bg-[#0d1117]/80 px-4 py-6 text-center">
-              <p className="text-xs text-zinc-500">Shto foto (opsional)</p>
-              <p className="mt-1 text-[11px] text-zinc-600">
-                Ngarkimi i fotove aktivizohet së shpejti — për tani përshkruaj problemin në mesazh.
-              </p>
-            </div>
+            <SupportPhotoPicker files={createPhotos} onChange={setCreatePhotos} disabled={busy} />
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="submit"
@@ -447,15 +477,18 @@ export default function KitchenSupportPage() {
       </div>
 
       {selectedId != null ? (
-        <KitchenSupportThreadPanel
-          thread={thread}
-          loading={threadLoading}
-          busy={replyBusy}
-          replyDraft={replyDraft}
-          onReplyDraftChange={setReplyDraft}
-          onClose={closeTicket}
-          onSendReply={(e) => void sendReply(e)}
-        />
+      <KitchenSupportThreadPanel
+        token={token}
+        thread={thread}
+        loading={threadLoading}
+        busy={replyBusy}
+        replyDraft={replyDraft}
+        replyPhotos={replyPhotos}
+        onReplyPhotosChange={setReplyPhotos}
+        onReplyDraftChange={setReplyDraft}
+        onClose={closeTicket}
+        onSendReply={(e) => void sendReply(e)}
+      />
       ) : null}
     </div>
   )

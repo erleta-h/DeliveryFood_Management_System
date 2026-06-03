@@ -16,9 +16,24 @@ public interface ISupportTicketService
         long ticketId,
         CancellationToken cancellationToken = default);
 
-    Task<string?> PostCustomerMessageAsync(
+    Task<(long? MessageId, string? Error)> PostCustomerMessageAsync(
         long userId,
         long ticketId,
         string body,
+        CancellationToken cancellationToken = default);
+
+    Task<(long? AttachmentId, string? Error)> AddAttachmentAsync(
+        long userId,
+        long ticketId,
+        long? messageId,
+        Stream fileStream,
+        string originalFileName,
+        CancellationToken cancellationToken = default);
+
+    Task<(string? PhysicalPath, string? ContentType, string? Error)> GetAttachmentFileAsync(
+        long userId,
+        long ticketId,
+        long attachmentId,
+        bool allowPlatformStaff,
         CancellationToken cancellationToken = default);
 }

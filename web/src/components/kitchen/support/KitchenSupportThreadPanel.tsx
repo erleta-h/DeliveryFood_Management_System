@@ -1,4 +1,6 @@
 import type { FormEvent } from 'react'
+import { SupportAttachmentList } from '../../support/SupportAttachmentImage'
+import { SupportPhotoPicker } from '../../support/SupportPhotoPicker'
 import {
   CATEGORY_LABELS,
   PRIORITY_LABELS,
@@ -14,20 +16,26 @@ export function formatKitchenTicketId(id: number): string {
 }
 
 type Props = {
+  token: string
   thread: SupportTicketThread | null
   loading: boolean
   busy: boolean
   replyDraft: string
+  replyPhotos: File[]
+  onReplyPhotosChange: (files: File[]) => void
   onReplyDraftChange: (v: string) => void
   onClose: () => void
   onSendReply: (e: FormEvent) => void
 }
 
 export function KitchenSupportThreadPanel({
+  token,
   thread,
   loading,
   busy,
   replyDraft,
+  replyPhotos,
+  onReplyPhotosChange,
   onReplyDraftChange,
   onClose,
   onSendReply,
@@ -84,6 +92,11 @@ export function KitchenSupportThreadPanel({
                   Mesazhi fillestar
                 </p>
                 <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{thread.initialBody}</p>
+                <SupportAttachmentList
+                  token={token}
+                  ticketId={thread.id}
+                  attachments={thread.initialAttachments}
+                />
               </div>
               {thread.messages.map((m) => (
                 <div
@@ -99,6 +112,11 @@ export function KitchenSupportThreadPanel({
                     {new Date(m.createdAtUtc).toLocaleString('sq-AL')}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-200">{m.body}</p>
+                  <SupportAttachmentList
+                    token={token}
+                    ticketId={thread.id}
+                    attachments={m.attachments}
+                  />
                 </div>
               ))}
             </div>
@@ -121,6 +139,11 @@ export function KitchenSupportThreadPanel({
                   className={`${fieldClass} mt-1.5`}
                 />
               </label>
+              <SupportPhotoPicker
+                files={replyPhotos}
+                onChange={onReplyPhotosChange}
+                disabled={busy}
+              />
               <button
                 type="submit"
                 disabled={busy || !replyDraft.trim()}

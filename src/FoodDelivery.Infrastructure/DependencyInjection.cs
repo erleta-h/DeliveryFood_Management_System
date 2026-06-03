@@ -95,6 +95,8 @@ public static class DependencyInjection
         services.Configure<StripeSettings>(configuration.GetSection(StripeSettings.SectionName));
         services.Configure<WebPushSettings>(configuration.GetSection(WebPushSettings.SectionName));
         services.Configure<MenuImageStorageOptions>(configuration.GetSection(MenuImageStorageOptions.SectionName));
+        services.Configure<SupportAttachmentStorageOptions>(
+            configuration.GetSection(SupportAttachmentStorageOptions.SectionName));
 
         services.AddDistributedMemoryCache();
         services.AddMongoDb(configuration);

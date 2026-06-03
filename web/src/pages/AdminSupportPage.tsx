@@ -23,6 +23,7 @@ import {
 } from '../lib/supportApi'
 import { adminTicketHasNewActivity } from '../lib/adminSupportRead'
 import { customerBtnPrimary, customerBtnGhost, customerBtnGhostSm } from '../lib/adminTheme'
+import { SupportAttachmentList } from '../components/support/SupportAttachmentImage'
 import { useAuthStore } from '../store/authStore'
 import { useAdminNotificationsStore } from '../store/adminNotificationsStore'
 
@@ -417,6 +418,14 @@ export default function AdminSupportPage() {
                 <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <p className="text-[10px] font-semibold uppercase text-gray-400">Mesazhi fillestar</p>
                   <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{thread.initialBody}</p>
+                  {token ? (
+                    <SupportAttachmentList
+                      token={token}
+                      ticketId={thread.id}
+                      attachments={thread.initialAttachments}
+                      admin
+                    />
+                  ) : null}
                 </div>
                 {thread.messages.map((m) => (
                   <div
@@ -431,6 +440,14 @@ export default function AdminSupportPage() {
                       {m.isStaffReply ? 'Staf' : 'Klient'} · {m.authorEmail} · {new Date(m.createdAtUtc).toLocaleString('sq-AL')}
                     </p>
                     <p className="mt-1 whitespace-pre-wrap text-sm text-gray-800">{m.body}</p>
+                    {token ? (
+                      <SupportAttachmentList
+                        token={token}
+                        ticketId={thread.id}
+                        attachments={m.attachments}
+                        admin
+                      />
+                    ) : null}
                   </div>
                 ))}
               </div>
