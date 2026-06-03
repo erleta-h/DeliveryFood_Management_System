@@ -58,7 +58,7 @@ const DriverHistoryPage = lazy(() => import('./pages/DriverHistoryPage'))
 const DriverProfilePage = lazy(() => import('./pages/DriverProfilePage'))
 const DriverNotificationsPage = lazy(() => import('./pages/DriverNotificationsPage'))
 const DriverSupportPage = lazy(() => import('./pages/DriverSupportPage'))
-const DriverPerformancePage = lazy(() => import('./pages/DriverPerformancePage.TSX'))
+const DriverPerformancePage = lazy(() => import('./pages/DriverPerformancePage'))
 
 
 

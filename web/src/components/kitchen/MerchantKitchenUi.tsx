@@ -22,12 +22,17 @@ export function formatOrderClock(placedAtUtc: string): string {
   }
 }
 
+/** Kohë relative nga `placedAtUtc`: min → orë (≥60) → ditë (≥24h). */
 export function minutesAgoLabel(placedAtUtc: string, nowMs = Date.now()): string {
   const t = Date.parse(placedAtUtc)
   if (!Number.isFinite(t)) return ''
   const m = Math.max(0, Math.floor((nowMs - t) / 60_000))
   if (m < 1) return 'tani'
-  return `${m} min më parë`
+  if (m < 60) return `${m} min më parë`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} orë më parë`
+  const d = Math.floor(h / 24)
+  return `${d} ditë më parë`
 }
 
 function customerFullName(o: KitchenOrder): string {
@@ -182,7 +187,22 @@ export function StatsRow({
 }
 
 const merchantCardShell =
-  'rounded-xl border border-[#30363d] bg-[#21262d] p-3 shadow-[0_2px_8px_rgba(0,0,0,0.25)]'
+  'rounded-xl border border-[#30363d] bg-[#21262d] p-3.5 shadow-[0_2px_10px_rgba(0,0,0,0.22)]'
+
+function InfoLine({
+  icon,
+  children,
+}: {
+  icon: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <p className="flex items-start gap-2 text-[11px] leading-snug text-zinc-400">
+      <span className="mt-px flex h-4 w-4 shrink-0 items-center justify-center text-zinc-500">{icon}</span>
+      <span className="min-w-0 break-words">{children}</span>
+    </p>
+  )
+}
 
 export function MerchantOrderCard({
   o,
@@ -201,61 +221,70 @@ export function MerchantOrderCard({
   const orderLabel = o.orderNumber.startsWith('#') ? o.orderNumber : `#${o.orderNumber}`
   const address = [o.addressLine1, o.city].filter(Boolean).join(', ')
 
+  const pinIcon = (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
+  )
+  const phoneIcon = (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  )
+  const clockIcon = (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  )
+
   return (
-    <article className={`${merchantCardShell} ${highlight ? 'ring-1 ring-amber-400/40' : ''}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate font-mono text-[13px] font-semibold text-white">{orderLabel}</p>
-          <p className="mt-0.5 text-[11px] tabular-nums text-zinc-500">{formatOrderClock(o.placedAtUtc)}</p>
+    <article
+      className={`${merchantCardShell} ${highlight ? 'border-sky-500/40 ring-1 ring-sky-400/40' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="break-all font-mono text-[12px] font-semibold leading-tight text-white">{orderLabel}</p>
+          <p className="mt-1 text-[11px] tabular-nums text-zinc-500">{formatOrderClock(o.placedAtUtc)}</p>
         </div>
-        <p className="shrink-0 text-sm font-bold tabular-nums text-white">{o.total.toFixed(2)} €</p>
+        <p className="shrink-0 text-[15px] font-bold tabular-nums text-white">{o.total.toFixed(2)} €</p>
       </div>
 
-      <p className="mt-2 text-sm font-semibold text-zinc-100">{customerFullName(o)}</p>
+      <p className="mt-2.5 text-[14px] font-semibold text-zinc-50">{customerFullName(o)}</p>
 
-      {isDelivery ? (
-        <span className="mt-1.5 inline-block rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-300">
-          Delivery
-        </span>
-      ) : (
-        <span className="mt-1.5 inline-block rounded bg-zinc-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">
-          Pickup
-        </span>
-      )}
+      <span
+        className={`mt-1.5 inline-block rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+          isDelivery ? 'bg-sky-500/20 text-sky-300' : 'bg-zinc-500/20 text-zinc-400'
+        }`}
+      >
+        {isDelivery ? 'Delivery' : 'Pickup'}
+      </span>
 
-      {address ? (
-        <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-zinc-400">
-          <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 21s7-4.5 7-11a7 7 0 1 0-14 0c0 6.5 7 11 7 11z" />
-            <circle cx="12" cy="10" r="2.5" />
-          </svg>
-          <span>{address}</span>
-        </p>
+      <div className="mt-2.5 space-y-1.5">
+        {address ? <InfoLine icon={pinIcon}>{address}</InfoLine> : null}
+        {o.contactPhone ? (
+          <InfoLine icon={phoneIcon}>
+            <a href={`tel:${o.contactPhone.replace(/\s/g, '')}`} className="hover:text-sky-300">
+              {o.contactPhone}
+            </a>
+          </InfoLine>
+        ) : null}
+        {statusLine ? (
+          <InfoLine icon={clockIcon}>
+            {statusLine}
+            {nowMs != null ? (
+              <span className="text-zinc-500"> · {minutesAgoLabel(o.placedAtUtc, nowMs)}</span>
+            ) : null}
+          </InfoLine>
+        ) : null}
+      </div>
+
+      {footer ? (
+        <div className="mt-3.5 border-t border-white/[0.06] bg-[#1a1f26]/40 pt-3.5 -mx-0.5 px-0.5 pb-0.5">
+          {footer}
+        </div>
       ) : null}
-
-      {o.contactPhone ? (
-        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-400">
-          <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" />
-          </svg>
-          <a href={`tel:${o.contactPhone.replace(/\s/g, '')}`} className="hover:text-sky-300">
-            {o.contactPhone}
-          </a>
-        </p>
-      ) : null}
-
-      {statusLine ? (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-400">
-          <svg className="h-3.5 w-3.5 shrink-0 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 2" />
-          </svg>
-          {statusLine}
-          {nowMs != null ? <span className="text-zinc-500"> · {minutesAgoLabel(o.placedAtUtc, nowMs)}</span> : null}
-        </p>
-      ) : null}
-
-      {footer ? <div className="mt-3">{footer}</div> : null}
     </article>
   )
 }
@@ -272,21 +301,9 @@ export function MerchantAssignDriverBtn({
       type="button"
       disabled={busy}
       onClick={onClick}
-      className="w-full rounded-lg bg-emerald-500 py-2.5 text-center text-sm font-semibold text-[#0d1117] transition hover:bg-emerald-400 disabled:opacity-45"
+      className="w-full rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-semibold text-[#0d1117] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-45"
     >
       Cakto driver
-    </button>
-  )
-}
-
-export function MerchantDetailsBtn({ onClick }: { onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full rounded-lg border border-[#30363d] bg-[#161b22] py-2 text-center text-sm font-medium text-zinc-300 transition hover:bg-[#21262d]"
-    >
-      Detaje
     </button>
   )
 }
@@ -305,7 +322,7 @@ export function MerchantPrimaryBtn({
       type="button"
       disabled={busy}
       onClick={onClick}
-      className="w-full rounded-lg bg-[#009fe3] py-2.5 text-center text-sm font-semibold text-white transition hover:bg-[#1aacf0] disabled:opacity-45"
+      className="w-full rounded-xl bg-[#009fe3] py-2.5 text-center text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition hover:bg-[#1aacf0] active:scale-[0.98] disabled:opacity-45"
     >
       {children}
     </button>

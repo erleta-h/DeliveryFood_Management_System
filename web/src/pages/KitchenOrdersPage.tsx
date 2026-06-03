@@ -17,10 +17,14 @@ import { DRIVER_LEG } from '../lib/driverApi'
 import { distanceKmBetween, type LatLng } from '../lib/geo'
 import { createOrdersHubConnection } from '../lib/orderHub'
 import {
+  KitchenOrderDetailsDrawer,
+  MerchantCardFooterActions,
+  MerchantDetailsBtn,
+} from '../components/kitchen/KitchenOrderDetailsDrawer'
+import {
   ColumnEmptyState,
   KanbanColumn,
   MerchantAssignDriverBtn,
-  MerchantDetailsBtn,
   MerchantGhostBtn,
   MerchantOrderCard,
   MerchantPrimaryBtn,
@@ -1081,10 +1085,26 @@ export default function KitchenOrdersPage() {
   const nowMs = useNowTick(needKitchenClock)
 
   const [confirmAcceptOrderId, setConfirmAcceptOrderId] = useState<number | null>(null)
+  const [detailsOrderId, setDetailsOrderId] = useState<number | null>(null)
+  const [detailsFocusPrep, setDetailsFocusPrep] = useState(false)
   const acceptPreviewOrder = useMemo(
     () => (confirmAcceptOrderId == null ? null : orders.find((x) => x.id === confirmAcceptOrderId) ?? null),
     [confirmAcceptOrderId, orders],
   )
+  const detailsOrder = useMemo(
+    () => (detailsOrderId == null ? null : orders.find((x) => x.id === detailsOrderId) ?? null),
+    [detailsOrderId, orders],
+  )
+
+  function openOrderDetails(orderId: number, focusPrep = false) {
+    setDetailsOrderId(orderId)
+    setDetailsFocusPrep(focusPrep)
+  }
+
+  function closeOrderDetails() {
+    setDetailsOrderId(null)
+    setDetailsFocusPrep(false)
+  }
 
   async function runAssignDriver(
     orderId: number,
@@ -1107,8 +1127,8 @@ export default function KitchenOrdersPage() {
     } else void refresh()
   }
 
-  async function runPrepUpdate(orderId: number, minutes: number) {
-    if (!token || !Number.isFinite(minutes)) return
+  async function runPrepUpdate(orderId: number, minutes: number): Promise<boolean> {
+    if (!token || !Number.isFinite(minutes)) return false
     setActionError(null)
     setBusyId(orderId)
     const r = await patchKitchenPrepMinutes(token, orderId, Math.round(minutes))
@@ -1116,14 +1136,17 @@ export default function KitchenOrdersPage() {
     if (!r.ok) {
       if (r.message.includes('401')) {
         setSessionExpired(true)
-        return
+        return false
       }
       setActionError(r.message)
-    } else void refresh()
+      return false
+    }
+    void refresh()
+    return true
   }
 
-  async function runAction(orderId: number, status: number, note?: string | null) {
-    if (!token) return
+  async function runAction(orderId: number, status: number, note?: string | null): Promise<boolean> {
+    if (!token) return false
     setActionError(null)
     const orderBefore = orders.find((o) => o.id === orderId)
     setBusyId(orderId)
@@ -1132,10 +1155,10 @@ export default function KitchenOrdersPage() {
     if (!r.ok) {
       if (r.message.includes('401')) {
         setSessionExpired(true)
-        return
+        return false
       }
       setActionError(r.message)
-      return
+      return false
     }
 
     const shouldAutoAssignDeliver =
@@ -1147,11 +1170,12 @@ export default function KitchenOrdersPage() {
       const driverId = pickNearestAssignableDriverUserId(orderBefore, assignableDrivers)
       if (driverId != null) {
         await runAssignDriver(orderId, driverId, { immediateHandoff: false })
-        return
+        return true
       }
     }
 
     void refresh()
+    return true
   }
 
   async function manualPull() {
@@ -1305,28 +1329,13 @@ export default function KitchenOrdersPage() {
               <MerchantOrderCard
                 key={o.id}
                 o={o}
-                statusLine={o.status === S.Confirmed ? 'E konfirmuar' : 'Në përgatitje'}
+                highlight={detailsOrderId === o.id}
+                statusLine={`Min. përgatitje: ${o.estimatedPrepMinutes} min`}
                 footer={
-                  <div className="space-y-1">
-                    <PrepMinutesEditor
-                      orderId={o.id}
-                      minutes={o.estimatedPrepMinutes}
-                      busy={busyId === o.id}
-                      onSave={(oid, m) => void runPrepUpdate(oid, m)}
-                    />
-                    {o.status === S.Confirmed ? (
-                      <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.Preparing)}>
-                        Fillo përgatitjen
-                      </MerchantPrimaryBtn>
-                    ) : (
-                      <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.ReadyForPickup)}>
-                        Gati për marrje
-                      </MerchantPrimaryBtn>
-                    )}
-                    <MerchantGhostBtn busy={busyId === o.id} danger onClick={() => setRejectForId(o.id)}>
-                      Refuzo porosinë
-                    </MerchantGhostBtn>
-                  </div>
+                  <MerchantCardFooterActions
+                    onDetails={() => openOrderDetails(o.id)}
+                    onPrep={() => openOrderDetails(o.id, true)}
+                  />
                 }
               />
             ))
@@ -1395,10 +1404,14 @@ export default function KitchenOrdersPage() {
                 key={o.id}
                 o={o}
                 nowMs={nowMs}
+                highlight={detailsOrderId === o.id}
                 statusLine={
                   o.assignedDriverDisplay
                     ? `Deliver: ${o.assignedDriverDisplay}`
                     : 'Në rrugë për klientin'
+                }
+                footer={
+                  <MerchantDetailsBtn onClick={() => openOrderDetails(o.id)} />
                 }
               />
             ))
@@ -1423,7 +1436,7 @@ export default function KitchenOrdersPage() {
                 o={o}
                 nowMs={nowMs}
                 statusLine="Dorëzuar"
-                footer={<MerchantDetailsBtn />}
+                footer={<MerchantDetailsBtn onClick={() => openOrderDetails(o.id)} />}
               />
             ))
           )}
@@ -1431,6 +1444,23 @@ export default function KitchenOrdersPage() {
       </div>
 
       <RecentHistorySection rows={history} historyLink="/kitchen/history" />
+
+      <KitchenOrderDetailsDrawer
+        order={detailsOrder}
+        busy={detailsOrder != null && busyId === detailsOrder.id}
+        focusPrep={detailsFocusPrep}
+        onClose={closeOrderDetails}
+        onPrepSave={async (oid, m) => {
+          const ok = await runPrepUpdate(oid, m)
+          if (ok) setDetailsFocusPrep(false)
+          return ok
+        }}
+        onStatusAction={(oid, st) => runAction(oid, st)}
+        onReject={(oid) => {
+          closeOrderDetails()
+          setRejectForId(oid)
+        }}
+      />
 
       {acceptPreviewOrder && acceptPreviewOrder.status === S.Pending ? (
         <div
