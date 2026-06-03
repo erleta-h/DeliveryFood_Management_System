@@ -48,6 +48,16 @@ public sealed class SupportTicketService : ISupportTicketService
         if (orderErr is not null)
             return (null, orderErr);
 
+        if (restaurantId is null)
+        {
+            var staffRestaurantId = await _uow.Repository<RestaurantStaff, long>().Query.AsNoTracking()
+                .Where(s => s.UserId == userId)
+                .Select(s => (long?)s.RestaurantId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (staffRestaurantId is { } sr)
+                restaurantId = sr;
+        }
+
         if (orderId is null && restaurantId is { } restId)
         {
             var exists = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
@@ -57,7 +67,9 @@ public sealed class SupportTicketService : ISupportTicketService
         }
 
         var now = DateTime.UtcNow;
-        var priority = SupportTicketPriority.AutoFromCategory(request.Category);
+        var priority = request.Priority is { } p && SupportTicketPriority.IsValid(p)
+            ? p
+            : SupportTicketPriority.AutoFromCategory(request.Category);
 
         var t = new SupportTicket
         {
@@ -73,6 +85,36 @@ public sealed class SupportTicketService : ISupportTicketService
             DriverId = driverId,
         };
         _uow.Repository<SupportTicket, long>().Add(t);
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        var creator = await _uow.Repository<User, long>().Query.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.Email, u.FirstName, u.LastName })
+            .FirstOrDefaultAsync(cancellationToken);
+        string? restaurantName = null;
+        if (restaurantId is { } rid)
+        {
+            restaurantName = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
+                .Where(r => r.Id == rid)
+                .Select(r => r.Name)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var creatorLabel = !string.IsNullOrWhiteSpace(restaurantName)
+            ? restaurantName.Trim()
+            : creator is null
+                ? "Përdorues"
+                : $"{creator.FirstName} {creator.LastName}".Trim();
+        if (string.IsNullOrWhiteSpace(creatorLabel) && creator is not null)
+            creatorLabel = creator.Email;
+
+        _uow.Repository<SupportTicketAudit, long>().Add(new SupportTicketAudit
+        {
+            SupportTicketId = t.Id,
+            ActorUserId = userId,
+            Action = $"Tiketa u krijua nga {creatorLabel}",
+            CreatedAt = now,
+        });
         await _uow.SaveChangesAsync(cancellationToken);
 
         await AdminSupportNotificationHelper.NotifyAdminsAsync(
@@ -105,11 +147,10 @@ public sealed class SupportTicketService : ISupportTicketService
                     .Where(o => o.OrderNumber == refText)
                     .Select(o => (long?)o.Id)
                     .FirstOrDefaultAsync(cancellationToken);
-                if (resolvedOrderId is null)
-                    return (null, restaurantId, null, "Porosia nuk u gjet — kontrollo nr. porosisë (FD-...) ose ID-në numerike.");
             }
         }
 
+        // ID / nr. porosie është opsional — nëse nuk lidhet, tiketa krijohet pa OrderId.
         if (resolvedOrderId is not { } oid)
             return (null, restaurantId, null, null);
 
@@ -118,7 +159,7 @@ public sealed class SupportTicketService : ISupportTicketService
             .Select(o => new { o.RestaurantId, o.UserId })
             .FirstOrDefaultAsync(cancellationToken);
         if (orderRow is null)
-            return (null, restaurantId, null, "Porosia nuk u gjet.");
+            return (null, restaurantId, null, null);
 
         var canLink = orderRow.UserId == userId
             || await _uow.Repository<Delivery, long>().Query.AsNoTracking()
@@ -129,7 +170,7 @@ public sealed class SupportTicketService : ISupportTicketService
                 select s.Id).AnyAsync(cancellationToken);
 
         if (!canLink)
-            return (null, restaurantId, null, "Porosia nuk u gjet ose nuk ke akses për ta lidhur me tiketën.");
+            return (null, restaurantId, null, null);
 
         restaurantId ??= orderRow.RestaurantId;
 
@@ -145,10 +186,13 @@ public sealed class SupportTicketService : ISupportTicketService
         long userId,
         CancellationToken cancellationToken = default)
     {
-        return await _uow.Repository<SupportTicket, long>().Query.AsNoTracking()
-            .Where(x => x.UserId == userId)
-            .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new SupportTicketMineItemDto(
+        return await (
+            from x in _uow.Repository<SupportTicket, long>().Query.AsNoTracking()
+            where x.UserId == userId
+            join o in _uow.Repository<Order, long>().Query.AsNoTracking() on x.OrderId equals o.Id into og
+            from o in og.DefaultIfEmpty()
+            orderby x.CreatedAt descending
+            select new SupportTicketMineItemDto(
                 x.Id,
                 x.Subject,
                 x.Status,
@@ -157,7 +201,8 @@ public sealed class SupportTicketService : ISupportTicketService
                 x.CreatedAt,
                 x.UpdatedAt,
                 x.ResolvedAt,
-                1 + x.Messages.Count))
+                1 + x.Messages.Count,
+                o != null ? o.OrderNumber : null))
             .ToListAsync(cancellationToken);
     }
 

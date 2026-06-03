@@ -8,10 +8,12 @@ import {
   adminChangeTicketPriority,
   adminAssignTicket,
   fetchAdminTicketAudit,
+  fetchAdminSupportAgents,
   patchAdminSupportTicket,
   type AdminSupportTicketRow,
   type AdminSupportTicketThread,
   type AdminTicketAuditRow,
+  type SupportAgentRow,
 } from '../lib/adminApi'
 import { ADMIN_SECTIONS } from '../lib/adminNav'
 import {
@@ -19,8 +21,10 @@ import {
   PRIORITY_LABELS,
   CATEGORY_LABELS,
 } from '../lib/supportApi'
+import { adminTicketHasNewActivity } from '../lib/adminSupportRead'
 import { customerBtnPrimary, customerBtnGhost, customerBtnGhostSm } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
+import { useAdminNotificationsStore } from '../store/adminNotificationsStore'
 
 const STATUS_COLORS_LIGHT: Record<number, string> = {
   0: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -40,6 +44,11 @@ export default function AdminSupportPage() {
   const token = useAuthStore((s) => s.token)
   const [searchParams, setSearchParams] = useSearchParams()
   const def = ADMIN_SECTIONS.support
+  const unreadTicketIds = useAdminNotificationsStore((s) => s.unreadTicketIds)
+  const supportUnreadCount = useAdminNotificationsStore((s) => s.supportUnreadCount)
+  const syncSupportUnreadFromList = useAdminNotificationsStore((s) => s.syncSupportUnreadFromList)
+  const markSupportTicketRead = useAdminNotificationsStore((s) => s.markSupportTicketRead)
+  const hydrateSupportUnread = useAdminNotificationsStore((s) => s.hydrateSupportUnread)
 
   const [tickets, setTickets] = useState<AdminSupportTicketRow[]>([])
   const [total, setTotal] = useState(0)
@@ -64,7 +73,8 @@ export default function AdminSupportPage() {
   const [auditTrail, setAuditTrail] = useState<AdminTicketAuditRow[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
 
-  const [assignInput, setAssignInput] = useState('')
+  const [agents, setAgents] = useState<SupportAgentRow[]>([])
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('')
   const [actionBusy, setActionBusy] = useState(false)
 
   const loadTickets = useCallback(async () => {
@@ -81,15 +91,27 @@ export default function AdminSupportPage() {
         priority: fPriority,
       })
       setTickets(d.items)
+      syncSupportUnreadFromList(d.items)
       setTotal(d.total)
     } catch {
       setTickets([])
     } finally {
       setLoading(false)
     }
-  }, [token, page, pageSize, appliedSearch, sort, fStatus, fCategory, fPriority])
+  }, [token, page, pageSize, appliedSearch, sort, fStatus, fCategory, fPriority, syncSupportUnreadFromList])
+
+  useEffect(() => {
+    hydrateSupportUnread()
+  }, [hydrateSupportUnread])
 
   useEffect(() => { void loadTickets() }, [loadTickets])
+
+  useEffect(() => {
+    if (!token) return
+    void fetchAdminSupportAgents(token)
+      .then(setAgents)
+      .catch(() => setAgents([]))
+  }, [token])
 
   const loadThread = useCallback(async (id: number) => {
     if (!token) return
@@ -105,6 +127,7 @@ export default function AdminSupportPage() {
         return
       }
       setThread(t)
+      setSelectedAgentId(t.assignedToUserId != null ? String(t.assignedToUserId) : '')
       try {
         const a = await fetchAdminTicketAudit(token, id)
         setAuditTrail(a)
@@ -132,6 +155,11 @@ export default function AdminSupportPage() {
   }, [selectedId, loadThread])
 
   useEffect(() => {
+    if (!thread || selectedId == null) return
+    markSupportTicketRead(selectedId, 1 + thread.messages.length)
+  }, [thread, selectedId, markSupportTicketRead])
+
+  useEffect(() => {
     const q = searchParams.get('ticket')
     if (!q || !/^\d+$/.test(q)) return
     const id = Number(q)
@@ -147,7 +175,13 @@ export default function AdminSupportPage() {
     if (!r.ok) { setMsg(r.message); setReplyBusy(false); return }
     setReplyDraft('')
     setReplyBusy(false)
-    await loadThread(selectedId)
+    const t = await fetchAdminSupportTicketThread(token, selectedId)
+    if (t) {
+      setThread(t)
+      markSupportTicketRead(selectedId, 1 + t.messages.length)
+    } else {
+      await loadThread(selectedId)
+    }
     await loadTickets()
   }
 
@@ -172,13 +206,20 @@ export default function AdminSupportPage() {
   }
 
   async function doAssign() {
-    if (!token || !selectedId || !assignInput.trim()) return
-    const id = Number(assignInput.trim())
-    if (!Number.isFinite(id) || id < 1) { setMsg('ID i pavlefshëm'); return }
-    setActionBusy(true); setMsg(null)
+    if (!token || !selectedId || !selectedAgentId) return
+    const id = Number(selectedAgentId)
+    if (!Number.isFinite(id) || id < 1) {
+      setMsg('Zgjidh një agjent.')
+      return
+    }
+    setActionBusy(true)
+    setMsg(null)
     const r = await adminAssignTicket(token, selectedId, id)
-    if (!r.ok) { setMsg(r.message); setActionBusy(false); return }
-    setAssignInput('')
+    if (!r.ok) {
+      setMsg(r.message)
+      setActionBusy(false)
+      return
+    }
     setActionBusy(false)
     await loadThread(selectedId)
     await loadTickets()
@@ -207,7 +248,7 @@ export default function AdminSupportPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Subjekt, email"
+            placeholder="Subjekt, email, ID tikete…"
             className="mt-1 block w-48 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
             onKeyDown={(e) => { if (e.key === 'Enter') { setAppliedSearch(search.trim()); setPage(1) } }}
           />
@@ -271,7 +312,14 @@ export default function AdminSupportPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[340px_1fr_300px] xl:grid-cols-[380px_1fr_340px]">
         <div className="flex max-h-[80vh] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="shrink-0 border-b border-gray-200 px-3 py-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{total} tiketa</p>
+            <p className="flex items-center justify-between gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              <span>{total} tiketa</span>
+              {supportUnreadCount > 0 ? (
+                <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold normal-case text-white">
+                  {supportUnreadCount} të reja
+                </span>
+              ) : null}
+            </p>
           </div>
           <div className="flex-1 overflow-y-auto">
             {loading ? (
@@ -280,7 +328,9 @@ export default function AdminSupportPage() {
               <p className="p-4 text-sm text-gray-400">Nuk ka tiketa.</p>
             ) : (
               <ul className="divide-y divide-gray-100">
-                {tickets.map((t) => (
+                {tickets.map((t) => {
+                  const hasNew = adminTicketHasNewActivity(t.id, t.messageCount, t.status, unreadTicketIds)
+                  return (
                   <li key={t.id}>
                     <button
                       type="button"
@@ -289,11 +339,22 @@ export default function AdminSupportPage() {
                         setReplyDraft('')
                         setSearchParams({ ticket: String(t.id) }, { replace: true })
                       }}
-                      className={`w-full px-3 py-3 text-left transition ${
-                        selectedId === t.id ? 'bg-violet-50' : 'hover:bg-gray-50'
+                      className={`w-full border-l-4 px-3 py-3 text-left transition ${
+                        selectedId === t.id
+                          ? 'border-violet-500 bg-violet-50'
+                          : hasNew
+                            ? 'border-violet-500 bg-violet-50/80 hover:bg-violet-100'
+                            : 'border-transparent hover:bg-gray-50'
                       }`}
                     >
-                      <p className="truncate text-sm font-medium text-gray-900">{t.subject}</p>
+                      <p className="flex items-center gap-2 truncate text-sm font-medium text-gray-900">
+                        <span className="truncate">{t.subject}</span>
+                        {hasNew ? (
+                          <span className="shrink-0 rounded-full bg-violet-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                            1
+                          </span>
+                        ) : null}
+                      </p>
                       <p className="mt-0.5 truncate text-xs text-gray-500">{t.userEmail}</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS_LIGHT[t.status] ?? 'bg-gray-100 text-gray-500 border-gray-200'}`}>
@@ -311,7 +372,8 @@ export default function AdminSupportPage() {
                       </div>
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
           </div>
@@ -407,22 +469,39 @@ export default function AdminSupportPage() {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Info</p>
-                <InfoRow label="Klient" value={thread.userEmail} />
-                {thread.orderNumber && <InfoRow label="Porosi" value={thread.orderNumber} />}
-                {thread.restaurantName && <InfoRow label="Restorant" value={thread.restaurantName} />}
-                {thread.driverName && <InfoRow label="Driver" value={thread.driverName} />}
-                {thread.assignedToEmail && <InfoRow label="Caktuar te" value={thread.assignedToEmail} />}
-                {thread.resolvedAtUtc && (
-                  <InfoRow label="Zgjidhur" value={new Date(thread.resolvedAtUtc).toLocaleString('sq-AL')} />
-                )}
-                {thread.adminNote && (
-                  <div>
-                    <p className="text-[10px] font-semibold text-gray-400">Shënimi</p>
-                    <p className="text-xs text-gray-600">{thread.adminNote}</p>
-                  </div>
-                )}
+                <InfoRow label="ID tikete" value={`#${thread.id}`} />
+                <InfoRow
+                  label="Krijuar"
+                  value={new Date(thread.createdAtUtc).toLocaleString('sq-AL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                />
+                <InfoRow label="Dërguesi" value={thread.userEmail} />
+                {thread.restaurantName ? <InfoRow label="Restoranti" value={thread.restaurantName} /> : null}
+                <InfoRow label="Kategoria" value={CATEGORY_LABELS[thread.category] ?? 'Tjetër'} />
+                {thread.orderNumber ? (
+                  <InfoRow label="Lidhur me porosi" value={thread.orderNumber} />
+                ) : null}
+                {thread.driverName ? <InfoRow label="Driver" value={thread.driverName} /> : null}
+                {thread.assignedToEmail ? <InfoRow label="Agjenti" value={thread.assignedToEmail} /> : null}
+                {thread.status === 2 && thread.resolvedAtUtc ? (
+                  <InfoRow
+                    label="Data e zgjidhjes"
+                    value={new Date(thread.resolvedAtUtc).toLocaleString('sq-AL', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  />
+                ) : null}
               </div>
 
               <div className="space-y-1.5">
@@ -432,7 +511,9 @@ export default function AdminSupportPage() {
                     const val = Number(v)
                     return (
                       <button
-                        key={v} type="button" disabled={actionBusy || thread.status === val}
+                        key={v}
+                        type="button"
+                        disabled={actionBusy || thread.status === val}
                         onClick={() => void doChangeStatus(val)}
                         className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
                           thread.status === val
@@ -447,45 +528,51 @@ export default function AdminSupportPage() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Prioriteti</p>
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Prioriteti</p>
                 <div className="flex flex-wrap gap-1">
                   {Object.entries(PRIORITY_LABELS).map(([v, l]) => {
                     const val = Number(v)
+                    const label = l === 'Mesatar' ? 'Normal' : l
                     return (
                       <button
-                        key={v} type="button" disabled={actionBusy || thread.priority === val}
+                        key={v}
+                        type="button"
+                        disabled={actionBusy || thread.priority === val}
                         onClick={() => void doChangePriority(val)}
-                        className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
+                        className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold transition ${
                           thread.priority === val
                             ? PRIORITY_COLORS_LIGHT[val] ?? ''
-                            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                            : 'border-gray-200 text-gray-400 hover:bg-gray-50'
                         }`}
                       >
-                        {l}
+                        {label}
                       </button>
                     )
                   })}
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Kategoria</p>
-                <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                  {CATEGORY_LABELS[thread.category] ?? 'Tjetër'}
-                </span>
-              </div>
-
               <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Cakto agjentin</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Agjenti</p>
                 <div className="flex gap-1.5">
-                  <input
-                    value={assignInput}
-                    onChange={(e) => setAssignInput(e.target.value)}
-                    placeholder="User ID"
-                    className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-900"
-                  />
-                  <button type="button" disabled={actionBusy} className={customerBtnGhostSm}
+                  <select
+                    value={selectedAgentId}
+                    onChange={(e) => setSelectedAgentId(e.target.value)}
+                    disabled={actionBusy || agents.length === 0}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-900"
+                  >
+                    <option value="">— Zgjidh agjentin —</option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={String(a.id)}>
+                        {a.displayName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={actionBusy || !selectedAgentId}
+                    className={customerBtnGhostSm}
                     onClick={() => void doAssign()}
                   >
                     Cakto
@@ -494,7 +581,7 @@ export default function AdminSupportPage() {
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Shënim admin</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Shënim i brendshëm</p>
                 <AdminNoteEditor
                   current={thread.adminNote}
                   busy={actionBusy}
@@ -509,14 +596,19 @@ export default function AdminSupportPage() {
                 ) : auditTrail.length === 0 ? (
                   <p className="text-xs text-gray-400">Asnjë veprim ende.</p>
                 ) : (
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-2.5 border-l-2 border-violet-100 pl-3">
                     {auditTrail.map((a) => (
-                      <li key={a.id} className="text-[11px] leading-snug text-gray-600">
-                        <span className="text-gray-400">{new Date(a.createdAtUtc).toLocaleString('sq-AL')}</span>
-                        {' — '}
-                        <span>{a.action}</span>
-                        {' — '}
-                        <span className="text-gray-400">{a.actorEmail}</span>
+                      <li key={`${a.id}-${a.createdAtUtc}`} className="text-[11px] leading-snug">
+                        <p className="font-medium text-gray-500">
+                          {new Date(a.createdAtUtc).toLocaleString('sq-AL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                        <p className="mt-0.5 text-gray-700">{a.action}</p>
                       </li>
                     ))}
                   </ul>
@@ -559,7 +651,7 @@ function AdminNoteEditor({
         rows={2}
         maxLength={2000}
         className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-900 placeholder:text-gray-400 focus:border-violet-400 focus:outline-none"
-        placeholder="Shënim i brendshëm"
+        placeholder="Vetëm për ekipin e platformës — restoranti nuk e sheh"
       />
       <button
         type="button"

@@ -59,7 +59,13 @@ export type MySupportTicketRow = {
   updatedAtUtc: string | null
   resolvedAtUtc: string | null
   messageCount: number
+  orderNumber?: string | null
 }
+
+export const PRIORITY_OPTIONS = Object.entries(PRIORITY_LABELS).map(([v, l]) => ({
+  value: Number(v),
+  label: l === 'Mesatar' ? 'Normal' : l,
+}))
 
 export type SupportTicketMessageRow = {
   id: number
@@ -125,6 +131,7 @@ export async function createSupportTicket(
     orderId?: number | null
     orderNumber?: string | null
     restaurantId?: number | null
+    priority?: number | null
   },
 ): Promise<{ ok: true; id: number } | { ok: false; message: string }> {
   const res = await fetch(apiPath('/api/support/tickets'), {
@@ -133,8 +140,11 @@ export async function createSupportTicket(
     body: JSON.stringify(body),
   })
   if (res.status === 201) {
-    const j = (await res.json()) as { id: number }
-    return { ok: true, id: j.id }
+    const j = (await res.json()) as { id?: number; Id?: number }
+    const id = typeof j === 'number' ? j : (j.id ?? j.Id)
+    if (id == null || !Number.isFinite(id))
+      return { ok: false, message: 'Tiketa u krijua por përgjigja e serverit ishte e paplotë.' }
+    return { ok: true, id }
   }
   let message = `Gabim ${res.status}`
   try {

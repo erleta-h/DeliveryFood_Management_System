@@ -20,4 +20,6 @@ public interface IAdminSupportTicketService
     Task<string?> ChangePriorityAsync(long ticketId, int newPriority, long actorUserId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<SupportTicketAuditDto>> GetAuditTrailAsync(long ticketId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<SupportAgentDto>> ListAgentsAsync(CancellationToken cancellationToken = default);
 }

@@ -195,12 +195,14 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
                 createdAtUtc = now,
             }, cancellationToken);
 
+            var kitchenNotified = new HashSet<long>();
             if (t.RestaurantId is { } restId)
             {
                 var staffIds = await _uow.Repository<RestaurantStaff, long>().Query.AsNoTracking()
                     .Where(s => s.RestaurantId == restId).Select(s => s.UserId).ToListAsync(cancellationToken);
                 foreach (var sid in staffIds)
                 {
+                    kitchenNotified.Add(sid);
                     try
                     {
                         await _hub.Clients.Group($"kitchen-user-{sid}")
@@ -208,6 +210,16 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
                     }
                     catch { /* best effort */ }
                 }
+            }
+
+            if (!kitchenNotified.Contains(t.UserId))
+            {
+                try
+                {
+                    await _hub.Clients.Group($"kitchen-user-{t.UserId}")
+                        .SendAsync("kitchenNotification", new { title = pushTitle, message = pushBody, type = "support_reply", ticketId, createdAtUtc = now }, cancellationToken);
+                }
+                catch { /* best effort */ }
             }
         }
         catch (Exception ex) { _log.LogWarning(ex, "SignalR për {UserId} dështoi.", t.UserId); }
@@ -224,8 +236,14 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
         if (t is null) return "Tiketa nuk u gjet.";
 
         var agent = await _uow.Repository<User, long>().Query.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == agentUserId, cancellationToken);
+            .Where(u => u.Id == agentUserId)
+            .Select(u => new { u.Email, u.FirstName, u.LastName })
+            .FirstOrDefaultAsync(cancellationToken);
         if (agent is null) return "Agjenti nuk u gjet.";
+
+        var agentName = $"{agent.FirstName} {agent.LastName}".Trim();
+        if (string.IsNullOrWhiteSpace(agentName))
+            agentName = agent.Email;
 
         t.AssignedToUserId = agentUserId;
         t.UpdatedAt = DateTime.UtcNow;
@@ -234,7 +252,7 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
         {
             SupportTicketId = ticketId,
             ActorUserId = actorUserId,
-            Action = $"Caktuar te {agent.Email}",
+            Action = $"U caktua te {agentName}",
             CreatedAt = DateTime.UtcNow,
         });
 
@@ -262,11 +280,17 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
         if (newStatus is SupportTicketStatus.Resolved or SupportTicketStatus.Closed)
             t.ResolvedAt ??= DateTime.UtcNow;
 
+        var statusAction = oldLabel == newLabel
+            ? $"Statusi: {newLabel}"
+            : $"Statusi u ndryshua në \"{newLabel}\"";
+        if (newStatus == SupportTicketStatus.Resolved && t.ResolvedAt is { } resolvedAt)
+            statusAction += $" ({resolvedAt:dd/MM/yyyy HH:mm} UTC)";
+
         _uow.Repository<SupportTicketAudit, long>().Add(new SupportTicketAudit
         {
             SupportTicketId = ticketId,
             ActorUserId = actorUserId,
-            Action = $"Statusi: {oldLabel} → {newLabel}",
+            Action = statusAction,
             CreatedAt = DateTime.UtcNow,
         });
 
@@ -310,11 +334,65 @@ public sealed class AdminSupportTicketService : IAdminSupportTicketService
             .Where(a => a.SupportTicketId == ticketId);
         var users = _uow.Repository<User, long>().Query.AsNoTracking();
 
-        return await (
+        var list = await (
             from a in audits
             join u in users on a.ActorUserId equals u.Id
-            orderby a.CreatedAt descending
+            orderby a.CreatedAt ascending
             select new SupportTicketAuditDto(a.Id, a.ActorUserId, u.Email, a.Action, a.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        if (list.Count == 0 || list.All(a => !a.Action.Contains("krijua", StringComparison.OrdinalIgnoreCase)))
+        {
+            var ticket = await (
+                from t in _uow.Repository<SupportTicket, long>().Query.AsNoTracking()
+                join u in _uow.Repository<User, long>().Query.AsNoTracking() on t.UserId equals u.Id
+                join r in _uow.Repository<Restaurant, long>().Query.AsNoTracking() on t.RestaurantId equals r.Id into rg
+                from r in rg.DefaultIfEmpty()
+                where t.Id == ticketId
+                select new
+                {
+                    t.CreatedAt,
+                    t.UserId,
+                    UserEmail = u.Email,
+                    RestaurantName = r != null ? r.Name : null,
+                })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (ticket is not null)
+            {
+                var label = !string.IsNullOrWhiteSpace(ticket.RestaurantName)
+                    ? ticket.RestaurantName
+                    : ticket.UserEmail;
+                list.Insert(0, new SupportTicketAuditDto(
+                    0,
+                    ticket.UserId,
+                    ticket.UserEmail,
+                    $"Tiketa u krijua nga {label}",
+                    ticket.CreatedAt));
+            }
+        }
+
+        return list;
+    }
+
+    public async Task<IReadOnlyList<SupportAgentDto>> ListAgentsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var roleNames = new[] { "Admin", "Support" };
+
+        return await (
+            from ur in _uow.Repository<UserRole, long>().Query.AsNoTracking()
+            join r in _uow.Repository<Role, long>().Query.AsNoTracking() on ur.RoleId equals r.Id
+            join u in _uow.Repository<User, long>().Query.AsNoTracking() on ur.UserId equals u.Id
+            where roleNames.Contains(r.Name)
+            orderby u.FirstName, u.LastName, u.Email
+            select new SupportAgentDto(
+                u.Id,
+                u.Email,
+                (u.FirstName + " " + u.LastName).Trim() == ""
+                    ? u.Email
+                    : (u.FirstName + " " + u.LastName).Trim()))
+            .Distinct()
             .ToListAsync(cancellationToken);
     }
 }

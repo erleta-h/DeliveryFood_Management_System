@@ -55,14 +55,28 @@ export default function KitchenLayout() {
   }, [token])
 
   useEffect(() => {
+    useKitchenNotificationsStore.getState().hydrateUnread()
+  }, [])
+
+  useEffect(() => {
     if (!token) return
     const hub = createOrdersHubConnection(token)
     hubRef.current = hub
 
-    hub.on('kitchenNotification', (data: { title?: string; message?: string }) => {
-      useKitchenNotificationsStore.getState().bumpUnread()
-      useKitchenNotificationsStore.getState().showToast({ title: data.title ?? 'Njoftim', message: data.message ?? '' })
-    })
+    hub.on(
+      'kitchenNotification',
+      (data: { title?: string; message?: string; ticketId?: number; type?: string }) => {
+        const store = useKitchenNotificationsStore.getState()
+        if (data.type === 'support_reply' && typeof data.ticketId === 'number') {
+          store.markTicketUnread(data.ticketId)
+        }
+        store.showToast({
+          title: data.title ?? 'Përgjigje nga supporti',
+          message: data.message ?? '',
+          ticketId: typeof data.ticketId === 'number' ? data.ticketId : undefined,
+        })
+      },
+    )
 
     hub.start()
       .then(() => hub.invoke('JoinKitchen'))
@@ -134,16 +148,26 @@ export default function KitchenLayout() {
             <NavLink to="/kitchen/account" className={({ isActive }) => navClass(isActive)}>
               Llogaria
             </NavLink>
-            <NavLink to="/kitchen/support" className={({ isActive }) => navClass(isActive)}>
-              <span className="relative inline-flex items-center gap-1">
-                Mbështetja
-                {kitchenUnread > 0 ? (
-                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white">
-                    {kitchenUnread > 9 ? '9+' : kitchenUnread}
-                  </span>
-                ) : null}
-              </span>
-            </NavLink>
+            <Link
+              to="/kitchen/support"
+              className={`relative inline-flex items-center gap-1.5 px-2 py-2 text-sm transition-colors ${
+                location.pathname.startsWith('/kitchen/support')
+                  ? 'font-medium text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-white'
+                  : 'text-zinc-500 hover:text-zinc-200'
+              }`}
+              title={kitchenUnread > 0 ? `${kitchenUnread} përgjigje të reja` : 'Mbështetja'}
+            >
+              <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+              <span className="hidden sm:inline">Mbështetja</span>
+              {kitchenUnread > 0 ? (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-bold text-white ring-2 ring-[#0d1117]">
+                  {kitchenUnread > 9 ? '9+' : kitchenUnread}
+                </span>
+              ) : null}
+            </Link>
             {token && hasCustomerRole(token) ? (
               <Link
                 to="/app/restaurants"
@@ -204,14 +228,47 @@ export default function KitchenLayout() {
       </main>
 
       {kitchenToast && (
-        <div className="fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50">
+        <div
+          role={kitchenToast.ticketId != null ? 'button' : undefined}
+          tabIndex={kitchenToast.ticketId != null ? 0 : undefined}
+          onClick={() => {
+            if (kitchenToast.ticketId != null) {
+              clearKitchenToast()
+              void navigate(`/kitchen/support?ticket=${kitchenToast.ticketId}`)
+            }
+          }}
+          onKeyDown={(e) => {
+            if (kitchenToast.ticketId != null && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              clearKitchenToast()
+              void navigate(`/kitchen/support?ticket=${kitchenToast.ticketId}`)
+            }
+          }}
+          className={`fixed bottom-6 right-6 z-[100] max-w-sm animate-[fadeSlideUp_0.3s_ease-out] rounded-xl border border-violet-500/30 bg-[#1a1030] px-4 py-3 shadow-2xl shadow-black/50 ${
+            kitchenToast.ticketId != null ? 'cursor-pointer hover:border-violet-400/50' : ''
+          }`}
+        >
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm">💬</span>
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-500/20 text-sm">
+              💬
+            </span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-violet-200">{kitchenToast.title}</p>
               <p className="mt-0.5 line-clamp-2 text-xs text-zinc-400">{kitchenToast.message}</p>
+              {kitchenToast.ticketId != null ? (
+                <p className="mt-1 text-[10px] text-violet-300/80">Kliko për të hapur tiketën</p>
+              ) : null}
             </div>
-            <button type="button" onClick={clearKitchenToast} className="shrink-0 text-zinc-500 hover:text-zinc-300">✕</button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                clearKitchenToast()
+              }}
+              className="shrink-0 text-zinc-500 hover:text-zinc-300"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

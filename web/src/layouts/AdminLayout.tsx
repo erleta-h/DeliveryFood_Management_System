@@ -9,6 +9,10 @@ import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 import { customerShellBg } from '../lib/adminTheme'
 
 import { useAuthStore } from '../store/authStore'
+import {
+  isAdminSupportNotificationType,
+  supportTicketIdFromNotification,
+} from '../lib/adminSupportRead'
 import { useAdminNotificationsStore } from '../store/adminNotificationsStore'
 
 
@@ -46,7 +50,13 @@ export default function AdminLayout() {
 
   const adminToast = useAdminNotificationsStore((s) => s.toast)
   const clearToast = useAdminNotificationsStore((s) => s.clearToast)
+  const supportUnreadCount = useAdminNotificationsStore((s) => s.supportUnreadCount)
+  const hydrateSupportUnread = useAdminNotificationsStore((s) => s.hydrateSupportUnread)
   const hubRef = useRef<ReturnType<typeof createOrdersHubConnection> | null>(null)
+
+  useEffect(() => {
+    hydrateSupportUnread()
+  }, [hydrateSupportUnread])
 
   useEffect(() => {
     if (!token) return
@@ -65,6 +75,10 @@ export default function AdminLayout() {
       const store = useAdminNotificationsStore.getState()
       const linkPath =
         data.linkPath ?? (data.ticketId != null ? `/admin/support?ticket=${data.ticketId}` : null)
+      if (isAdminSupportNotificationType(data.type)) {
+        const ticketId = supportTicketIdFromNotification(data)
+        if (ticketId != null) store.markSupportTicketUnread(ticketId)
+      }
       store.pushLive({
         id: data.id ?? 0,
         title: data.title ?? 'Njoftim',
@@ -224,7 +238,14 @@ export default function AdminLayout() {
 
                           </span>
 
-                          {item.label}
+                          <span className="flex flex-1 items-center justify-between gap-2">
+                            {item.label}
+                            {item.to === '/admin/support' && supportUnreadCount > 0 ? (
+                              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-bold text-white">
+                                {supportUnreadCount > 9 ? '9+' : supportUnreadCount}
+                              </span>
+                            ) : null}
+                          </span>
 
                         </NavLink>
 

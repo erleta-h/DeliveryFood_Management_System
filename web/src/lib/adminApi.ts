@@ -832,6 +832,20 @@ export async function fetchAdminTicketAudit(
   return res.json() as Promise<AdminTicketAuditRow[]>
 }
 
+export type SupportAgentRow = {
+  id: number
+  email: string
+  displayName: string
+}
+
+export async function fetchAdminSupportAgents(token: string): Promise<SupportAgentRow[]> {
+  const res = await fetch(apiPath('/api/admin/support/agents'), {
+    headers: { ...authHeader(token) },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<SupportAgentRow[]>
+}
+
 // --- Delivera ---
 
 export type AdminDriverRow = {

@@ -40,11 +40,18 @@ public sealed class SupportTicketsController : ControllerBase
         if (userId is null)
             return Unauthorized();
 
-        var (id, err) = await _svc.CreateAsync(userId.Value, body, cancellationToken);
-        if (id is null)
-            return BadRequest(new { message = err });
+        try
+        {
+            var (id, err) = await _svc.CreateAsync(userId.Value, body, cancellationToken);
+            if (id is null)
+                return BadRequest(new { message = err ?? "Tiketa nuk u krijua." });
 
-        return Created(string.Empty, new SupportTicketCreatedDto(id.Value));
+            return StatusCode(StatusCodes.Status201Created, new SupportTicketCreatedDto(id.Value));
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Gabim serveri gjatë krijimit të tiketës. Kontrollo migrimet e support-it në bazë." });
+        }
     }
 
     [HttpGet("{id:long}")]

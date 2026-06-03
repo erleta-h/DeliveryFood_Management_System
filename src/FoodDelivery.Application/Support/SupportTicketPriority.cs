@@ -21,4 +21,6 @@ public static class SupportTicketPriority
         SupportTicketCategory.PaymentIssue => High,
         _ => Medium,
     };
+
+    public static bool IsValid(int value) => value is >= Low and <= Urgent;
 }

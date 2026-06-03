@@ -11,7 +11,8 @@ public sealed record SupportTicketMineItemDto(
     DateTime CreatedAtUtc,
     DateTime? UpdatedAtUtc,
     DateTime? ResolvedAtUtc,
-    int MessageCount);
+    int MessageCount,
+    string? OrderNumber = null);
 
 public sealed record CreateSupportTicketRequest(
     string Subject,
@@ -20,7 +21,9 @@ public sealed record CreateSupportTicketRequest(
     long? OrderId = null,
     /// <summary>Nr. porosie si <c>FD-20260602-...</c> kur nuk dërgohet <see cref="OrderId"/> numerik.</summary>
     string? OrderNumber = null,
-    long? RestaurantId = null);
+    long? RestaurantId = null,
+    /// <summary>Opsional; nëse mungon ose është i pavlefshëm, përdoret auto nga kategoria.</summary>
+    int? Priority = null);
 
 public sealed record PostSupportTicketMessageRequest(string Body);
 
@@ -89,6 +92,8 @@ public sealed record AdminUpdateSupportTicketRequest(int Status, string? AdminNo
 public sealed record AssignTicketRequest(long AgentUserId);
 public sealed record ChangePriorityRequest(int Priority);
 public sealed record ChangeStatusRequest(int Status);
+
+public sealed record SupportAgentDto(long Id, string Email, string DisplayName);
 
 public sealed record SupportTicketAuditDto(
     long Id,
