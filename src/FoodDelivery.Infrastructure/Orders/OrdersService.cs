@@ -183,7 +183,7 @@ public sealed class OrdersService : IOrdersService
         CancellationToken cancellationToken = default)
     {
         return await _uow.Repository<Order, long>().Query.AsNoTracking()
-            .Where(o => o.UserId == userId)
+            .Where(o => o.UserId == userId && o.CustomerHiddenAt == null)
             .OrderByDescending(o => o.PlacedAt)
             .Select(o => new CustomerOrderSummaryDto(
                 o.Id,
@@ -320,11 +320,25 @@ public sealed class OrdersService : IOrdersService
         return (true, null);
     }
 
-    public Task<bool> HideOrderFromCustomerHistoryAsync(
+    public async Task<bool> HideOrderFromCustomerHistoryAsync(
         long userId,
         long orderId,
         CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(false);
+        var order = await _uow.Repository<Order, long>().Query
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
+
+        if (order is null)
+            return false;
+
+        if (order.CustomerHiddenAt is null)
+        {
+            order.CustomerHiddenAt = DateTime.UtcNow;
+            order.UpdatedAt = DateTime.UtcNow;
+            order.UpdatedById = userId;
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+
+        return true;
     }
 }
