@@ -1,0 +1,9 @@
+To: driver@gmail.com
+Subject: Aktivizo llogarinë Deliver — FoodDelivery
+
+Përshëndetje driver d,
+
+Aplikimi juaj është miratuar.
+Klikoni linkun më poshtë për të aktivizuar llogarinë dhe për të krijuar fjalëkalimin:
+
+http://localhost:5173/activate-account?token=7CKqb1LxLkSE6zpXlNRPe-zUzOCOBeA5wXqT95iK8iQ

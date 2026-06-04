@@ -129,7 +129,7 @@ export async function placeOrder(
       })),
       customerNotes: body.customerNotes ?? null,
       fulfillmentType: body.fulfillmentType ?? FULFILLMENT_DELIVERY,
-      paymentMethod: body.paymentMethod ?? PAYMENT_STRIPE,
+      paymentMethod: body.paymentMethod ?? PAYMENT_COD,
       oneTimeDeliveryAddress: body.oneTimeDeliveryAddress ?? null,
     }),
   })

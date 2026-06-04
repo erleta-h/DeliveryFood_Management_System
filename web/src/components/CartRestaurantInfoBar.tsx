@@ -69,7 +69,7 @@ export function CartRestaurantInfoBar({ summary, restaurantName, deliveryFee }: 
               <path d="M2 10h20" />
             </svg>
           }
-          text="Pagesë me kartë (Stripe)"
+          text="Pagesa Cash ose Kartë"
         />
 
         <InfoCell

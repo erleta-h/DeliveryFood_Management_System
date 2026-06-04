@@ -1,6 +1,6 @@
 import { loadStripe, type StripeCardCvcElement, type StripeCardExpiryElement, type StripeCardNumberElement } from '@stripe/stripe-js'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { PaymentLegalFooter } from '../components/payment/PaymentLegalFooter'
 import { PaymentMethodSelector } from '../components/payment/PaymentMethodSelector'
 import { PaymentSecurityBanner } from '../components/payment/PaymentSecurityBanner'
@@ -82,6 +82,7 @@ export default function OrderPaymentPage() {
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [backBusy, setBackBusy] = useState(false)
   const [stripeLoaded, setStripeLoaded] = useState(false)
   const [clientSecret, setClientSecret] = useState<string | null>(null)
 
@@ -158,6 +159,23 @@ export default function OrderPaymentPage() {
   useEffect(() => {
     if (Number.isFinite(orderId)) setStripeCheckoutOrderSession(orderId)
   }, [orderId])
+
+  async function onBackToPaymentChoice() {
+    if (!token) {
+      navigate('/app/checkout', { replace: true })
+      return
+    }
+    setBackBusy(true)
+    setError(null)
+    const c = await cancelUnpaidStripeOrder(token, orderId)
+    clearStripeCheckoutOrderSession()
+    setBackBusy(false)
+    if (!c.ok) {
+      setError(c.message)
+      return
+    }
+    navigate('/app/checkout', { replace: true })
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -238,13 +256,16 @@ export default function OrderPaymentPage() {
 
   return (
     <div className="mx-auto max-w-xl pb-10">
-      <Link
-        to={`/app/orders/${orderId}`}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold transition hover:underline"
+      <button
+        type="button"
+        onClick={() => void onBackToPaymentChoice()}
+        disabled={backBusy || busy}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold transition hover:underline disabled:opacity-50"
         style={{ color: '#FF7A18' }}
       >
-        <span aria-hidden>←</span> Kthehu te porosia
-      </Link>
+        <span aria-hidden>←</span>
+        {backBusy ? 'Duke u kthyer…' : 'Kthehu te mënyra e pagesës'}
+      </button>
 
       <h1 className="mt-5 text-3xl font-bold text-white">Pagesa</h1>
       <p className="mt-1 text-sm text-zinc-500">

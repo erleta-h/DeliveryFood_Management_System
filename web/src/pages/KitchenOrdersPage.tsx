@@ -24,6 +24,7 @@ import {
 import {
   ColumnEmptyState,
   KanbanColumn,
+  kitchenDriverStatusAtUtc,
   MerchantAssignDriverBtn,
   MerchantGhostBtn,
   MerchantOrderCard,
@@ -546,6 +547,8 @@ function pickNearestAssignableDriverUserId(
     const km = bestKmDriverToOrder(d, restaurantPos, deliveryDestPos)
     if (km != null) return d.userId
   }
+  // Online por pa GPS ende — cakto të parin (renditur sipas emrit)
+  if (top3.length > 0) return top3[0]!.userId
   return null
 }
 
@@ -591,7 +594,7 @@ function DriverProximityCouponsList({
   if (driversList.length === 0) {
     return (
       <p className="mt-3 px-1 text-[10px] leading-snug text-amber-200/90">
-        Nuk ka korrier online — lista rifreskohet me panelin (~12s).
+        Nuk ka Deliver «Online». Ndez Online te /driver, pastaj Rifresko (~12s).
       </p>
     )
   }
@@ -1373,7 +1376,13 @@ export default function KitchenOrdersPage() {
                         busy={busyId === o.id}
                         onClick={() => {
                           if (nearestId != null) void runAssignDriver(o.id, nearestId)
-                          else setActionError('Nuk ka driver online për caktim.')
+                          else {
+                            setActionError(
+                              assignableDrivers.length === 0
+                                ? 'Nuk ka Deliver «Online». Ndez çelësin Online te aplikacioni /driver (jo vetëm llogari aktive), pastaj Rifresko.'
+                                : 'Nuk u gjet Deliver për caktim automatik — provo përsëri pas Rifresko.',
+                            )
+                          }
                         }}
                       />
                     ) : o.fulfillmentType === 'pickup' ? (
@@ -1412,6 +1421,7 @@ export default function KitchenOrdersPage() {
                     ? `Deliver: ${o.assignedDriverDisplay}`
                     : 'Në rrugë për klientin'
                 }
+                statusAtUtc={kitchenDriverStatusAtUtc(o)}
                 footer={
                   <MerchantDetailsBtn onClick={() => openOrderDetails(o.id)} />
                 }

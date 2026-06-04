@@ -39,8 +39,16 @@ function FlagImg({ country }: { country: string }) {
   )
 }
 
-const shellBase =
-  'flex h-11 min-h-[44px] items-stretch overflow-visible rounded-xl border border-white/[0.12] bg-[#141a28] transition focus-within:border-violet-500/45 focus-within:ring-2 focus-within:ring-violet-500/15'
+function shellClass(variant: Variant) {
+  const focus =
+    variant === 'partner'
+      ? 'focus-within:border-amber-400/45 focus-within:ring-amber-400/15'
+      : 'focus-within:border-violet-500/45 focus-within:ring-violet-500/15'
+  return (
+    'flex h-11 min-h-[44px] items-stretch overflow-visible rounded-xl border border-white/[0.12] bg-[#1b2233] transition focus-within:ring-2 ' +
+    focus
+  )
+}
 
 const dialShell =
   'relative flex shrink-0 items-center border-r border-white/[0.08] bg-[#1a2030]'
@@ -88,13 +96,14 @@ export function PhoneInputField({
         {label}
       </label>
 
-      <div className={`${shellBase} mt-1.5 ${disabled ? 'opacity-55' : ''}`}>
+      <div className={`${shellClass(variant)} mt-1.5 ${disabled ? 'opacity-55' : ''}`}>
         <DialPicker
           id={`${id}-dial`}
           selected={selectedOpt}
           dial={dial}
           disabled={disabled}
           onDialChange={onDialChange}
+          variant={variant}
         />
         <input
           id={nationalId}
@@ -135,12 +144,14 @@ function DialPicker({
   dial,
   disabled,
   onDialChange,
+  variant,
 }: {
   id: string
   selected: PhoneDialOption
   dial: string
   disabled?: boolean
   onDialChange: (d: string) => void
+  variant: Variant
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -205,7 +216,9 @@ function DialPicker({
                   type="button"
                   className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm transition ${
                     active
-                      ? 'bg-violet-600/25 font-semibold text-white'
+                      ? variant === 'partner'
+                        ? 'bg-amber-500/20 font-semibold text-amber-50'
+                        : 'bg-violet-600/25 font-semibold text-white'
                       : 'text-zinc-200 hover:bg-white/[0.06]'
                   }`}
                   onClick={() => {

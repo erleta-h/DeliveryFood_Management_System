@@ -22,9 +22,9 @@ export function formatOrderClock(placedAtUtc: string): string {
   }
 }
 
-/** Kohë relative nga `placedAtUtc`: min → orë (≥60) → ditë (≥24h). */
-export function minutesAgoLabel(placedAtUtc: string, nowMs = Date.now()): string {
-  const t = Date.parse(placedAtUtc)
+/** Kohë relative nga një moment UTC: min → orë (≥60) → ditë (≥24h). */
+export function minutesAgoLabel(atUtc: string, nowMs = Date.now()): string {
+  const t = Date.parse(atUtc)
   if (!Number.isFinite(t)) return ''
   const m = Math.max(0, Math.floor((nowMs - t) / 60_000))
   if (m < 1) return 'tani'
@@ -33,6 +33,16 @@ export function minutesAgoLabel(placedAtUtc: string, nowMs = Date.now()): string
   if (h < 24) return `${h} orë më parë`
   const d = Math.floor(h / 24)
   return `${d} ditë më parë`
+}
+
+/** Për rreshtin «Deliver: …» — kohë e caktimit / pranimit, jo koha e porosisë. */
+export function kitchenDriverStatusAtUtc(o: KitchenOrder): string {
+  return (
+    o.deliveryAcceptedAtUtc ??
+    o.deliveryOfferedAtUtc ??
+    o.deliveryArrivedAtRestaurantUtc ??
+    o.placedAtUtc
+  )
 }
 
 function customerFullName(o: KitchenOrder): string {
@@ -208,15 +218,19 @@ export function MerchantOrderCard({
   o,
   nowMs,
   statusLine,
+  statusAtUtc,
   footer,
   highlight,
 }: {
   o: KitchenOrder
   nowMs?: number
   statusLine?: string
+  /** Momenti për «· X min më parë»; default = placedAtUtc. */
+  statusAtUtc?: string
   footer?: ReactNode
   highlight?: boolean
 }) {
+  const relativeAt = statusAtUtc ?? o.placedAtUtc
   const isDelivery = o.fulfillmentType !== 'pickup'
   const orderLabel = o.orderNumber.startsWith('#') ? o.orderNumber : `#${o.orderNumber}`
   const address = [o.addressLine1, o.city].filter(Boolean).join(', ')
@@ -274,7 +288,7 @@ export function MerchantOrderCard({
           <InfoLine icon={clockIcon}>
             {statusLine}
             {nowMs != null ? (
-              <span className="text-zinc-500"> · {minutesAgoLabel(o.placedAtUtc, nowMs)}</span>
+              <span className="text-zinc-500"> · {minutesAgoLabel(relativeAt, nowMs)}</span>
             ) : null}
           </InfoLine>
         ) : null}

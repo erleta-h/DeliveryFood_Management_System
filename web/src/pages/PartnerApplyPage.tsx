@@ -2,21 +2,20 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
 import {
-  customerBtnPrimary,
-  customerCard,
-  customerFieldPartner,
-  customerLabelForm,
-  customerPanelSubtitle,
-  customerSelect,
-  customerShellBg,
-} from '../lib/customerTheme'
+  PartnerCountryPicker,
+  PartnerIconInput,
+  PartnerIconSelect,
+  PartnerMessageField,
+  PartnerSubmitButton,
+  partnerIcons,
+} from '../components/partner/PartnerApplyFields'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
+import { customerPanelSubtitle, customerShellBg } from '../lib/customerTheme'
+import { submitPartnerApplication } from './../lib/partnerApi'
 
 const backIconBtnClass =
   'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.05] text-lg leading-none text-zinc-200 transition hover:border-amber-400/30 hover:bg-amber-500/10 hover:text-amber-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-amber-400/30'
-import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
-import { submitPartnerApplication } from './../lib/partnerApi'
 
-const countries = ['Kosovë', 'Shqipëri', 'Maqedoni e Veriut', 'Tjetër']
 const businessTypes = ['Restorant', 'Kafene / bar', 'Fast food', 'Tjetër']
 const venueCounts = [
   { value: '1', label: '1 lokacion' },
@@ -24,11 +23,21 @@ const venueCounts = [
   { value: '6+', label: '6 ose më shumë' },
 ]
 
+function buildOptionalMessage(businessNumber: string, message: string): string | undefined {
+  const parts: string[] = []
+  const nui = businessNumber.trim()
+  const msg = message.trim()
+  if (nui) parts.push(`NUI: ${nui}`)
+  if (msg) parts.push(msg)
+  return parts.length ? parts.join('\n\n') : undefined
+}
+
 export default function PartnerApplyPage() {
-  const [country, setCountry] = useState(countries[0])
-  const [businessType, setBusinessType] = useState(businessTypes[0])
+  const [country, setCountry] = useState('Kosovë')
+  const [businessType, setBusinessType] = useState(businessTypes[2])
   const [venueCountLabel, setVenueCountLabel] = useState(venueCounts[0].value)
   const [venueName, setVenueName] = useState('')
+  const [businessNumber, setBusinessNumber] = useState('')
   const [streetAddress, setStreetAddress] = useState('')
   const [postalCode, setPostalCode] = useState('')
   const [city, setCity] = useState('')
@@ -59,15 +68,15 @@ export default function PartnerApplyPage() {
       country,
       businessType,
       venueCountLabel,
-      venueName,
-      streetAddress,
-      postalCode,
-      city,
-      contactFirstName,
-      contactLastName,
-      phone,
-      email,
-      message: message.trim() || undefined,
+      venueName: venueName.trim(),
+      streetAddress: streetAddress.trim(),
+      postalCode: postalCode.trim(),
+      city: city.trim(),
+      contactFirstName: contactFirstName.trim(),
+      contactLastName: contactLastName.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      message: buildOptionalMessage(businessNumber, message),
     })
     setBusy(false)
     if (r.ok) setDone(true)
@@ -87,7 +96,7 @@ export default function PartnerApplyPage() {
         <header className="mx-auto mb-10 flex justify-center pt-1">
           <BrandLogo />
         </header>
-        <section className={`${customerCard} mx-auto max-w-lg text-center`}>
+        <section className="mx-auto max-w-lg rounded-2xl border border-white/[0.1] bg-[#222636]/80 p-8 text-center text-zinc-100 shadow-[0_20px_56px_-12px_rgba(15,18,30,0.55)] backdrop-blur-md">
           <h1 className="text-2xl font-bold text-zinc-100">Faleminderit!</h1>
           <p className={`${customerPanelSubtitle} mx-auto max-w-md`}>
             Aplikimi u regjistrua. Ekipi ynë do të shqyrtojë të dhënat dhe do t’ju kontaktojë për hapat e
@@ -112,7 +121,7 @@ export default function PartnerApplyPage() {
         <BrandLogo />
       </header>
 
-      <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-[1fr_minmax(0,28rem)] lg:items-start">
+      <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-[1fr_minmax(0,26rem)] lg:items-start">
         <div className="hidden lg:block">
           <p className="text-sm font-semibold uppercase tracking-wider text-amber-400/90">
             Për biznese të çdo madhësie
@@ -134,7 +143,7 @@ export default function PartnerApplyPage() {
           </p>
         </div>
 
-        <section className={`${customerCard} !p-5 sm:!p-7`}>
+        <section className="mx-auto w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#1c2030]/90 p-5 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.55)] sm:p-7 lg:mx-0">
           <h1 className="text-xl font-bold text-zinc-100 lg:hidden">Bëhu partner</h1>
           <p className={`${customerPanelSubtitle} lg:hidden`}>
             Plotëso formularin. Nuk krijohet llogari derisa të kontaktojmë dhe të finalizohet marrëveshja.
@@ -144,141 +153,112 @@ export default function PartnerApplyPage() {
             miratimit.
           </p>
 
-          <form onSubmit={onSubmit} className="partner-form space-y-5">
-            <div className="min-w-0">
-              <label htmlFor="pa-country" className={customerLabelForm}>
-                Vendi
-              </label>
-              <select
-                id="pa-country"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                className={customerSelect}
+          <form onSubmit={onSubmit} className="partner-form space-y-4">
+            <PartnerCountryPicker id="pa-country" value={country} onChange={setCountry} />
+
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <PartnerIconSelect
+                id="pa-type"
+                label="Lloji i biznesit"
+                icon={partnerIcons.utensils}
+                value={businessType}
+                onChange={setBusinessType}
+                required
               >
-                {countries.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {businessTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="min-w-0">
-                <label htmlFor="pa-type" className={customerLabelForm}>
-                  Lloji i biznesit
-                </label>
-                <select
-                  id="pa-type"
-                  value={businessType}
-                  onChange={(e) => setBusinessType(e.target.value)}
-                  className={customerSelect}
-                >
-                  {businessTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="min-w-0">
-                <label htmlFor="pa-venues" className={customerLabelForm}>
-                  Sa lokacione keni?
-                </label>
-                <select
-                  id="pa-venues"
-                  value={venueCountLabel}
-                  onChange={(e) => setVenueCountLabel(e.target.value)}
-                  className={customerSelect}
-                >
-                  {venueCounts.map((v) => (
-                    <option key={v.value} value={v.value}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="min-w-0">
-              <label htmlFor="pa-venue" className={customerLabelForm}>
-                Emri i lokacionit / biznesit
-              </label>
-              <input
-                id="pa-venue"
+              </PartnerIconSelect>
+              <PartnerIconSelect
+                id="pa-venues"
+                label="Sa lokacione keni?"
+                icon={partnerIcons.mapPin}
+                value={venueCountLabel}
+                onChange={setVenueCountLabel}
                 required
-                value={venueName}
-                onChange={(e) => setVenueName(e.target.value)}
-                className={customerFieldPartner}
-                placeholder="p.sh. Pizzeria Napoli"
+              >
+                {venueCounts.map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.label}
+                  </option>
+                ))}
+              </PartnerIconSelect>
+            </div>
+
+            <PartnerIconInput
+              id="pa-venue"
+              label="Emri i biznesit"
+              icon={partnerIcons.store}
+              required
+              value={venueName}
+              onChange={setVenueName}
+              placeholder="p.sh. OnBurger"
+            />
+
+            <PartnerIconInput
+              id="pa-nui"
+              label="Numri i biznesit / NUI"
+              icon={partnerIcons.card}
+              value={businessNumber}
+              onChange={setBusinessNumber}
+              placeholder="p.sh. 812345678"
+            />
+
+            <PartnerIconInput
+              id="pa-street"
+              label="Adresa"
+              icon={partnerIcons.mapPin}
+              required
+              value={streetAddress}
+              onChange={setStreetAddress}
+              placeholder="Rruga B, Nr. 12"
+              hint="p.sh. Rruga B, Nr. 12, Prishtinë"
+            />
+
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <PartnerIconInput
+                id="pa-post"
+                label="Kodi postar"
+                icon={partnerIcons.envelope}
+                required
+                value={postalCode}
+                onChange={setPostalCode}
+                placeholder="10000"
+              />
+              <PartnerIconInput
+                id="pa-city"
+                label="Qyteti"
+                icon={partnerIcons.building}
+                required
+                value={city}
+                onChange={setCity}
+                placeholder="Prishtinë"
               />
             </div>
-            <div className="min-w-0">
-              <label htmlFor="pa-street" className={customerLabelForm}>
-                Adresa (rruga)
-              </label>
-              <input
-                id="pa-street"
+
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+              <PartnerIconInput
+                id="pa-fn"
+                label="Emri i kontaktit"
+                icon={partnerIcons.user}
                 required
-                value={streetAddress}
-                onChange={(e) => setStreetAddress(e.target.value)}
-                className={customerFieldPartner}
-                placeholder="Rruga, numri"
+                value={contactFirstName}
+                onChange={setContactFirstName}
+                autoComplete="given-name"
+              />
+              <PartnerIconInput
+                id="pa-ln"
+                label="Mbiemri i kontaktit"
+                icon={partnerIcons.user}
+                required
+                value={contactLastName}
+                onChange={setContactLastName}
+                autoComplete="family-name"
               />
             </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="min-w-0">
-                <label htmlFor="pa-post" className={customerLabelForm}>
-                  Kodi postar
-                </label>
-                <input
-                  id="pa-post"
-                  required
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  className={customerFieldPartner}
-                />
-              </div>
-              <div className="min-w-0">
-                <label htmlFor="pa-city" className={customerLabelForm}>
-                  Qyteti
-                </label>
-                <input
-                  id="pa-city"
-                  required
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className={customerFieldPartner}
-                  placeholder="p.sh. Prishtinë"
-                />
-              </div>
-            </div>
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <div className="min-w-0">
-                <label htmlFor="pa-fn" className={customerLabelForm}>
-                  Emri
-                </label>
-                <input
-                  id="pa-fn"
-                  required
-                  value={contactFirstName}
-                  onChange={(e) => setContactFirstName(e.target.value)}
-                  className={customerFieldPartner}
-                  autoComplete="given-name"
-                />
-              </div>
-              <div className="min-w-0">
-                <label htmlFor="pa-ln" className={customerLabelForm}>
-                  Mbiemri
-                </label>
-                <input
-                  id="pa-ln"
-                  required
-                  value={contactLastName}
-                  onChange={(e) => setContactLastName(e.target.value)}
-                  className={customerFieldPartner}
-                  autoComplete="family-name"
-                />
-              </div>
-            </div>
+
             <PhoneInputField
               id="pa-phone"
               className="min-w-0"
@@ -288,33 +268,25 @@ export default function PartnerApplyPage() {
               value={phone}
               onChange={setPhone}
             />
-            <div className="min-w-0">
-              <label htmlFor="pa-email" className={customerLabelForm}>
-                Email
-              </label>
-              <input
-                id="pa-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={customerFieldPartner}
-                autoComplete="email"
-              />
-            </div>
-            <div className="min-w-0">
-              <label htmlFor="pa-msg" className={customerLabelForm}>
-                Mesazh (opsional)
-              </label>
-              <textarea
-                id="pa-msg"
-                rows={3}
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                className={`${customerFieldPartner} min-h-[88px]`}
-                placeholder="Çfarë dëshironi të na tregoni?"
-              />
-            </div>
+
+            <PartnerIconInput
+              id="pa-email"
+              label="Email"
+              icon={partnerIcons.envelope}
+              type="email"
+              required
+              value={email}
+              onChange={setEmail}
+              placeholder="onburger@gmail.com"
+              autoComplete="email"
+            />
+
+            <PartnerMessageField
+              id="pa-msg"
+              value={message}
+              onChange={setMessage}
+            />
+
             <label className="flex cursor-pointer gap-3 text-left text-xs leading-relaxed text-zinc-400">
               <input
                 type="checkbox"
@@ -336,9 +308,7 @@ export default function PartnerApplyPage() {
               </p>
             ) : null}
 
-            <button type="submit" disabled={busy} className={`${customerBtnPrimary} w-full`}>
-              {busy ? 'Duke dërguar…' : 'Dërgo aplikimin'}
-            </button>
+            <PartnerSubmitButton busy={busy} />
           </form>
         </section>
       </div>
