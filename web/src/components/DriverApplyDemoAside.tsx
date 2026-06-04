@@ -4,23 +4,23 @@
 const steps = [
   {
     n: 1,
-    title: 'Plotëso këtë formular',
-    body: 'Dërgoni të dhënat; aplikimi regjistrohet për shqyrtim nga administratori.',
+    title: 'Plotëso aplikimin',
+    body: 'Dërgo të dhënat dhe dokumentet për shqyrtim nga administratori.',
   },
   {
     n: 2,
-    title: 'Miratimi i llogarisë',
-    body: 'Pas verifikimit, admini hap llogarinë me rol Driver dhe ju njofton (email / telefon).',
+    title: 'Shqyrtimi nga admini',
+    body: 'Admini verifikon të dhënat, dokumentet dhe mjetin tuaj.',
   },
   {
     n: 3,
-    title: 'Hyr në panelin Deliver',
-    body: 'Me kredencialet që merrni, hyni dhe ndizni «Online» për të marrë oferta.',
+    title: 'Aktivizo llogarinë',
+    body: 'Nëse miratoheni, merrni email me link aktivizimi dhe krijoni fjalëkalimin tuaj.',
   },
   {
     n: 4,
-    title: 'Porositë në praktikë',
-    body: 'Restoranti ju cakton → pranoni ofertën → shkoni te restoranti → merrni porosinë → dorëzoni te klienti.',
+    title: 'Hyr në panelin Driver',
+    body: 'Pas aktivizimit, hyni në panel dhe pranoni porositë e caktuara për ju.',
   },
 ]
 
@@ -37,7 +37,7 @@ export function DriverApplyDemoAside({ className = '' }: Props) {
         Rrjedha e një Deliver në FoodDelivery
       </h2>
       <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-        Kjo është pamja e përgjithshme — detajet i sheh në panel pasi të miratohesh.
+        Kjo është pamja e përgjithshme — detajet i sheh në panel pasi të aktivizosh llogarinë.
       </p>
 
       <ol className="relative mt-6 space-y-0">
@@ -65,8 +65,7 @@ export function DriverApplyDemoAside({ className = '' }: Props) {
 
       <div className="mt-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5 text-xs leading-relaxed text-emerald-100/90">
         <span className="font-semibold text-emerald-300/95">Këshillë: </span>
-        pas miratimit nga platforma merrni akses në panel ku shfaqen porositë e caktuara për ju — mblidhni nga
-        restoranti dhe përfundoni dorëzimin te klienti.
+        pas miratimit merrni email me link aktivizimi; vetëm atëherë krijoni fjalëkalimin dhe hyni në panel.
       </div>
     </aside>
   )

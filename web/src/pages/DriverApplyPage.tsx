@@ -15,6 +15,46 @@ import { submitDriverApplication } from './../lib/driverApi'
 const backIconBtnClass =
   'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.05] text-lg leading-none text-zinc-200 transition hover:border-sky-400/30 hover:bg-sky-500/10 hover:text-sky-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-sky-400/30'
 
+const DOC_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,application/pdf'
+const MAX_DOC_MB = 5
+
+function fileLabel(file: File | null) {
+  if (!file) return 'Zgjidh skedarin'
+  const mb = file.size / (1024 * 1024)
+  return `${file.name} (${mb < 0.1 ? '<0.1' : mb.toFixed(1)} MB)`
+}
+
+type DocFieldProps = {
+  id: string
+  label: string
+  file: File | null
+  onChange: (file: File | null) => void
+}
+
+function DocField({ id, label, file, onChange }: DocFieldProps) {
+  return (
+    <div>
+      <label className={customerLabelForm} htmlFor={id}>
+        {label}
+      </label>
+      <label className="mt-1 flex cursor-pointer items-center justify-between gap-2 rounded-xl border border-white/[0.12] bg-white/[0.04] px-3 py-2.5 text-sm text-zinc-300 transition hover:border-sky-400/25 hover:bg-sky-500/5">
+        <span className="truncate">{fileLabel(file)}</span>
+        <span className="shrink-0 text-xs text-sky-400/90">Ngarko</span>
+        <input
+          id={id}
+          type="file"
+          accept={DOC_ACCEPT}
+          className="sr-only"
+          onChange={(e) => {
+            onChange(e.target.files?.[0] ?? null)
+            e.target.value = ''
+          }}
+        />
+      </label>
+    </div>
+  )
+}
+
 export default function DriverApplyPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -23,10 +63,19 @@ export default function DriverApplyPage() {
   const [vehicleType, setVehicleType] = useState('')
   const [licensePlate, setLicensePlate] = useState('')
   const [message, setMessage] = useState('')
+  const [identityDoc, setIdentityDoc] = useState<File | null>(null)
+  const [licenseDoc, setLicenseDoc] = useState<File | null>(null)
+  const [vehiclePhoto, setVehiclePhoto] = useState<File | null>(null)
   const [consent, setConsent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+
+  function validateDoc(file: File | null, label: string): string | null {
+    if (!file) return `Ngarko: ${label}.`
+    if (file.size > MAX_DOC_MB * 1024 * 1024) return `${label} duhet të jetë maksimum ${MAX_DOC_MB} MB.`
+    return null
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -35,6 +84,15 @@ export default function DriverApplyPage() {
       setError('Duhet të pranoni që të dhënat të përpunohen për shqyrtim.')
       return
     }
+    const docErr =
+      validateDoc(identityDoc, 'Letërnjoftimi') ??
+      validateDoc(licenseDoc, 'Patenta') ??
+      validateDoc(vehiclePhoto, 'Foto e mjetit')
+    if (docErr) {
+      setError(docErr)
+      return
+    }
+
     setBusy(true)
     const r = await submitDriverApplication({
       firstName: firstName.trim(),
@@ -44,6 +102,9 @@ export default function DriverApplyPage() {
       vehicleType: vehicleType.trim(),
       licensePlate: licensePlate.trim() || undefined,
       message: message.trim() || undefined,
+      identityDocument: identityDoc!,
+      licenseDocument: licenseDoc!,
+      vehiclePhoto: vehiclePhoto!,
     })
     setBusy(false)
     if (r.ok) setDone(true)
@@ -64,10 +125,9 @@ export default function DriverApplyPage() {
           <BrandLogo />
         </header>
         <section className={`${customerCard} mx-auto max-w-lg text-center`}>
-          <h1 className="text-2xl font-bold text-zinc-100">Faleminderit!</h1>
+          <h1 className="text-2xl font-bold text-zinc-100">Aplikimi u dërgua me sukses.</h1>
           <p className={`${customerPanelSubtitle} mx-auto max-w-md`}>
-            Aplikimi u regjistrua. Pas verifikimit, administratori hap llogarinë me rol Deliver — nuk mund të hysh derisa
-            të miratohet.
+            Do të njoftoheni me email pasi admini ta shqyrtojë aplikimin.
           </p>
           <Link to="/" className={`${customerBtnPrimary} mt-6 inline-block text-sm`}>
             Kthehu në ballinë
@@ -93,117 +153,128 @@ export default function DriverApplyPage() {
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)] lg:items-start lg:gap-10">
         <DriverApplyDemoAside className="order-2 lg:order-1" />
         <section className={`${customerCard} order-1 mx-auto w-full max-w-xl lg:order-2 lg:mx-0 lg:max-w-none`}>
-        <h1 className="text-2xl font-bold text-zinc-100">Apliko si Deliver</h1>
-        <p className={customerPanelSubtitle}>
-          Plotëso të dhënat. Email duhet të jetë unik — pas miratimit merrni fjalëkalim fillestar nga admini.
-        </p>
+          <h1 className="text-2xl font-bold text-zinc-100">Apliko si Deliver</h1>
+          <p className={customerPanelSubtitle}>
+            Plotëso të dhënat dhe ngarko dokumentet. Pas miratimit nga admini, merrni email me link aktivizimi për të
+            krijuar fjalëkalimin.
+          </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className={customerLabelForm} htmlFor="df-name">
+                  Emri
+                </label>
+                <input
+                  id="df-name"
+                  className={customerFieldPartner}
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                  autoComplete="given-name"
+                />
+              </div>
+              <div>
+                <label className={customerLabelForm} htmlFor="df-last">
+                  Mbiemri
+                </label>
+                <input
+                  id="df-last"
+                  className={customerFieldPartner}
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                  autoComplete="family-name"
+                />
+              </div>
+            </div>
             <div>
-              <label className={customerLabelForm} htmlFor="df-name">
-                Emri
+              <label className={customerLabelForm} htmlFor="df-phone">
+                Telefoni
               </label>
               <input
-                id="df-name"
+                id="df-phone"
                 className={customerFieldPartner}
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
                 required
-                autoComplete="given-name"
+                autoComplete="tel"
               />
             </div>
             <div>
-              <label className={customerLabelForm} htmlFor="df-last">
-                Mbiemri
+              <label className={customerLabelForm} htmlFor="df-email">
+                Email
               </label>
               <input
-                id="df-last"
+                id="df-email"
+                type="email"
                 className={customerFieldPartner}
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="family-name"
+                autoComplete="email"
               />
             </div>
-          </div>
-          <div>
-            <label className={customerLabelForm} htmlFor="df-phone">
-              Telefon
+            <div>
+              <label className={customerLabelForm} htmlFor="df-vehicle">
+                Mjeti
+              </label>
+              <input
+                id="df-vehicle"
+                className={customerFieldPartner}
+                value={vehicleType}
+                onChange={(e) => setVehicleType(e.target.value)}
+                placeholder="p.sh. motor, biçikletë, veturë"
+                required
+              />
+            </div>
+            <div>
+              <label className={customerLabelForm} htmlFor="df-plate">
+                Targa
+              </label>
+              <input
+                id="df-plate"
+                className={customerFieldPartner}
+                value={licensePlate}
+                onChange={(e) => setLicensePlate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={customerLabelForm} htmlFor="df-msg">
+                Mesazh
+              </label>
+              <textarea
+                id="df-msg"
+                className={customerFieldPartner + ' min-h-[4.5rem] resize-y'}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            <fieldset className="space-y-3 rounded-xl border border-white/[0.1] bg-white/[0.02] px-4 py-4">
+              <legend className="px-1 text-sm font-semibold text-zinc-200">Dokumentet</legend>
+              <p className="text-xs text-zinc-500">JPEG, PNG, WebP, GIF ose PDF — maksimum {MAX_DOC_MB} MB secili.</p>
+              <DocField id="df-id-doc" label="Letërnjoftimi" file={identityDoc} onChange={setIdentityDoc} />
+              <DocField id="df-license" label="Patenta" file={licenseDoc} onChange={setLicenseDoc} />
+              <DocField id="df-vehicle-photo" label="Foto e mjetit" file={vehiclePhoto} onChange={setVehiclePhoto} />
+            </fieldset>
+
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-400">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-1"
+              />
+              <span>Pranoj që të dhënat dhe dokumentet të përdoren për të shqyrtuar aplikimin dhe për t’u kontaktuar.</span>
             </label>
-            <input
-              id="df-phone"
-              className={customerFieldPartner}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              required
-              autoComplete="tel"
-            />
-          </div>
-          <div>
-            <label className={customerLabelForm} htmlFor="df-email">
-              Email
-            </label>
-            <input
-              id="df-email"
-              type="email"
-              className={customerFieldPartner}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
-          </div>
-          <div>
-            <label className={customerLabelForm} htmlFor="df-vehicle">
-              Mjeti (p.sh. motor, biçikletë, veturë)
-            </label>
-            <input
-              id="df-vehicle"
-              className={customerFieldPartner}
-              value={vehicleType}
-              onChange={(e) => setVehicleType(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className={customerLabelForm} htmlFor="df-plate">
-              Targa (opsionale)
-            </label>
-            <input
-              id="df-plate"
-              className={customerFieldPartner}
-              value={licensePlate}
-              onChange={(e) => setLicensePlate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className={customerLabelForm} htmlFor="df-msg">
-              Mesazh (opsionale)
-            </label>
-            <textarea
-              id="df-msg"
-              className={customerFieldPartner + ' min-h-[4.5rem] resize-y'}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-400">
-            <input
-              type="checkbox"
-              checked={consent}
-              onChange={(e) => setConsent(e.target.checked)}
-              className="mt-1"
-            />
-            <span>Pranoj që të dhënat të përdoren për të shqyrtuar aplikimin dhe për t’u kontaktuar.</span>
-          </label>
-          {error ? <p className="text-sm text-red-300">{error}</p> : null}
-          <button type="submit" disabled={busy} className={customerBtnPrimary + ' w-full sm:w-auto'}>
-            {busy ? 'Duke dërguar…' : 'Dërgo aplikimin'}
-          </button>
-        </form>
-      </section>
+            {error ? <p className="text-sm text-red-300">{error}</p> : null}
+            <button type="submit" disabled={busy} className={customerBtnPrimary + ' w-full sm:w-auto'}>
+              {busy ? 'Duke dërguar…' : 'Dërgo aplikimin'}
+            </button>
+          </form>
+        </section>
       </div>
     </div>
   )

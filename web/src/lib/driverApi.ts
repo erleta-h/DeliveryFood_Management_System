@@ -162,19 +162,25 @@ export async function submitDriverApplication(body: {
   vehicleType: string
   licensePlate?: string
   message?: string
+  identityDocument: File
+  licenseDocument: File
+  vehiclePhoto: File
 }): Promise<{ ok: true } | { ok: false; message: string }> {
+  const form = new FormData()
+  form.append('firstName', body.firstName)
+  form.append('lastName', body.lastName)
+  form.append('phone', body.phone)
+  form.append('email', body.email)
+  form.append('vehicleType', body.vehicleType)
+  if (body.licensePlate) form.append('licensePlate', body.licensePlate)
+  if (body.message) form.append('message', body.message)
+  form.append('identityDocument', body.identityDocument)
+  form.append('licenseDocument', body.licenseDocument)
+  form.append('vehiclePhoto', body.vehiclePhoto)
+
   const res = await fetch(apiPath('/api/driver/applications'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      firstName: body.firstName,
-      lastName: body.lastName,
-      phone: body.phone,
-      email: body.email,
-      vehicleType: body.vehicleType,
-      licensePlate: body.licensePlate ?? null,
-      message: body.message ?? null,
-    }),
+    body: form,
   })
   if (res.status === 204) return { ok: true }
   let message = `Gabim ${res.status}`
