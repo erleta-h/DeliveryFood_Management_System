@@ -62,13 +62,17 @@ const columnThemes = {
 export function KanbanColumn({
   kind,
   count,
+  badgeCount,
   children,
 }: {
   kind: keyof typeof columnThemes
   count: number
+  /** Numri në kornizë (p.sh. deliver online); default = count. */
+  badgeCount?: number
   children: ReactNode
 }) {
   const theme = columnThemes[kind]
+  const badge = badgeCount ?? count
   return (
     <div className="flex min-h-[320px] min-w-[min(100%,240px)] flex-1 flex-col rounded-xl border border-[#30363d] bg-[#161b22] md:min-w-0">
       <div className="flex items-center justify-between gap-2 border-b border-[#30363d] px-3 py-2.5">
@@ -78,7 +82,7 @@ export function KanbanColumn({
           {theme.label}
         </span>
         <span className="min-w-[1.25rem] rounded-md bg-[#21262d] px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums text-zinc-200">
-          {count}
+          {badge}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">{children}</div>
@@ -317,7 +321,7 @@ export function MerchantAssignDriverBtn({
       onClick={onClick}
       className="w-full rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-semibold text-[#0d1117] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-45"
     >
-      Cakto driver
+      Cakto shofer
     </button>
   )
 }

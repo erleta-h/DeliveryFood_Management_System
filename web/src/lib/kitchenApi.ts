@@ -50,6 +50,9 @@ export type KitchenAssignableDriver = {
   userId: number
   displayName: string
   vehicleType: string
+  phone: string | null
+  licensePlate: string | null
+  isOnline: boolean
   lastLatitude?: number | null
   lastLongitude?: number | null
 }
