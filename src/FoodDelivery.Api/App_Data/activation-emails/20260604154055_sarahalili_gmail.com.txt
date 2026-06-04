@@ -1,0 +1,9 @@
+To: sarahalili@gmail.com
+Subject: Aktivizo llogarinë Deliver — FoodDelivery
+
+Përshëndetje Sara Halili,
+
+Aplikimi juaj është miratuar.
+Klikoni linkun më poshtë për të aktivizuar llogarinë dhe për të krijuar fjalëkalimin:
+
+http://localhost:5173/activate-account?token=w4pBWnvttjpQbF7MpdVWjLt1PUcphzOrxvyrKGFCzA8

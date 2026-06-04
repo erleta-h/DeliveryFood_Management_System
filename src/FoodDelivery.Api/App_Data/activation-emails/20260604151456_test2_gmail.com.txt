@@ -1,0 +1,9 @@
+To: test2@gmail.com
+Subject: Aktivizo llogarinë Deliver — FoodDelivery
+
+Përshëndetje Test2 Test2,
+
+Aplikimi juaj është miratuar.
+Klikoni linkun më poshtë për të aktivizuar llogarinë dhe për të krijuar fjalëkalimin:
+
+http://localhost:5173/activate-account?token=HzS_Lyzpuimq1r55zZTbJ7tiCNvV5VBlhnJ8LqCr2TM
