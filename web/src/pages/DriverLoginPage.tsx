@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BrandLogo } from '../components/BrandLogo'
 import { canAccessAdminPanel, hasDriverRole } from '../lib/jwtRoles'
 import { useAuthStore } from '../store/authStore'
 
@@ -122,19 +123,11 @@ export default function DriverLoginPage() {
 
       <ScooterSilhouette />
 
-      <header className="relative z-10 flex justify-center px-4 pt-8 sm:pt-10">
-        <Link to="/" className="inline-flex items-center gap-2 no-underline">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-lg" aria-hidden>
-            🛵
-          </span>
-          <span className="text-xl font-semibold tracking-tight">
-            <span className="text-white">Food</span>
-            <span className="text-orange-500">Delivery</span>
-          </span>
-        </Link>
+      <header className="absolute left-0 right-0 top-0 z-10 px-4 pt-5 sm:px-8 sm:pt-7">
+        <BrandLogo />
       </header>
 
-      <div className="relative z-10 mx-auto flex min-h-[calc(100vh-8rem)] max-w-md flex-col justify-center px-4 pb-16 pt-6">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 pb-16 pt-24">
         <section className="rounded-2xl border border-white/[0.08] bg-[#151b2b]/95 p-6 shadow-2xl backdrop-blur-sm sm:p-8">
           <h1 className="text-center text-2xl font-bold text-white">Hyr në llogari</h1>
           <p className="mt-1 text-center text-sm text-zinc-400">Hyrje për deliverit e aprovuar.</p>
@@ -223,7 +216,7 @@ export default function DriverLoginPage() {
             className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-orange-500/80 bg-transparent py-3 text-sm font-semibold text-orange-400 transition hover:bg-orange-500/10"
           >
             <IconMail />
-            Aktivo llogarinë tuaj
+            Aktivizo llogarinë tuaj
           </Link>
 
           <div className="mt-6 flex gap-3 rounded-xl border border-white/[0.06] bg-[#0f141f] px-3 py-3 text-xs leading-relaxed text-zinc-400">
