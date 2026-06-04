@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using ClosedXML.Excel;
@@ -6,6 +7,7 @@ using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Data;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace FoodDelivery.Infrastructure.Admin;
@@ -21,8 +23,13 @@ public sealed class AdminDataPortService : IAdminDataPortService
     };
 
     private readonly IUnitOfWork _uow;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
-    public AdminDataPortService(IUnitOfWork uow) => _uow = uow;
+    public AdminDataPortService(IUnitOfWork uow, IPasswordHasher<User> passwordHasher)
+    {
+        _uow = uow;
+        _passwordHasher = passwordHasher;
+    }
 
     public async Task<(byte[] bytes, string contentType, string fileName)> ExportAsync(
         string resource,
@@ -55,13 +62,16 @@ public sealed class AdminDataPortService : IAdminDataPortService
         var f = format.Trim().ToLowerInvariant();
         using var reader = new StreamReader(body, Encoding.UTF8, leaveOpen: true);
         var text = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+        if (f is "csv")
+            text = NormalizeImportCsv(text);
 
         return r switch
         {
             "coupons" when f is "json" => await ImportCouponsJsonAsync(text, cancellationToken),
             "coupons" when f is "csv" => await ImportCouponsCsvAsync(text, cancellationToken),
             "cms" when f is "json" => await ImportCmsJsonAsync(text, cancellationToken),
-            _ => "Burim/format i mbështetur: coupons+json, coupons+csv, cms+json.",
+            "restaurants" when f is "csv" => await ImportRestaurantsCsvAsync(text, cancellationToken),
+            _ => "Burim/format i mbështetur: coupons+json, coupons+csv, cms+json, restaurants+csv.",
         };
     }
 
@@ -516,6 +526,15 @@ public sealed class AdminDataPortService : IAdminDataPortService
         return null;
     }
 
+    private static string NormalizeImportCsv(string csv)
+    {
+        if (string.IsNullOrEmpty(csv))
+            return csv;
+        if (csv[0] == '\uFEFF')
+            csv = csv[1..];
+        return csv.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+    }
+
     private static List<string> SplitCsvLine(string line)
     {
         var r = new List<string>();
@@ -592,5 +611,198 @@ public sealed class AdminDataPortService : IAdminDataPortService
             return "Asnjë çelës që fillon me cms.";
         await _uow.SaveChangesAsync(cancellationToken);
         return null;
+    }
+
+    private async Task<string?> ImportRestaurantsCsvAsync(string csv, CancellationToken cancellationToken)
+    {
+        var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (lines.Length < 2)
+            return "CSV: të paktën header + një rresht.";
+
+        var columns = MapRestaurantImportColumns(SplitCsvLine(lines[0]));
+        if (columns.NameIndex < 0)
+            return "CSV: kolona Name është e detyrueshme (Name,Email,Phone,City,Address).";
+
+        var categoryId = await _uow.Repository<FoodCategory, long>().Query
+            .OrderBy(c => c.SortOrder)
+            .Select(c => (long?)c.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (categoryId is null)
+            return "Nuk ka kategori ushqimi në bazë. Shto së paku një kategori.";
+
+        Role? staffRole = null;
+        var now = DateTime.UtcNow;
+        var created = 0;
+
+        for (var i = 1; i < lines.Length && created < MaxRows; i++)
+        {
+            var parts = SplitCsvLine(lines[i]);
+            var name = GetCsvField(parts, columns.NameIndex)?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                continue;
+
+            var email = GetCsvField(parts, columns.EmailIndex)?.Trim();
+            var phone = GetCsvField(parts, columns.PhoneIndex)?.Trim();
+            var city = GetCsvField(parts, columns.CityIndex)?.Trim();
+            var address = GetCsvField(parts, columns.AddressIndex)?.Trim();
+
+            var slug = await EnsureUniqueRestaurantSlugAsync(ToSlug(name), cancellationToken);
+            var restaurant = new Restaurant
+            {
+                Name = name,
+                Slug = slug,
+                AddressLine = string.IsNullOrWhiteSpace(address) ? null : address,
+                City = string.IsNullOrWhiteSpace(city) ? null : city,
+                Phone = string.IsNullOrWhiteSpace(phone) ? null : phone,
+                FoodCategoryId = categoryId.Value,
+                DeliveryFee = 1.50m,
+                AverageRating = 0,
+                ReviewCount = 0,
+                MinOrderAmount = 3m,
+                EstimatedDeliveryMinutes = 35,
+                IsApproved = true,
+                IsActive = true,
+                CreatedAt = now,
+                Description = $"Import: {name}.",
+            };
+            _uow.Repository<Restaurant, long>().Add(restaurant);
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                staffRole ??= await _uow.Repository<Role, long>().Query.AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.Name == DbSeeder.RestaurantStaffRoleName, cancellationToken);
+                if (staffRole is null)
+                    return $"Roli {DbSeeder.RestaurantStaffRoleName} mungon në bazë.";
+
+                var normalizedEmail = email.ToLowerInvariant();
+                var userExists = await _uow.Repository<User, long>().Query
+                    .AnyAsync(u => u.Email == normalizedEmail, cancellationToken);
+                if (!userExists)
+                {
+                    var (first, last) = SplitNameForUser(name);
+                    var user = new User
+                    {
+                        Email = normalizedEmail,
+                        FirstName = first,
+                        LastName = last,
+                        Phone = string.IsNullOrWhiteSpace(phone) ? null : phone,
+                        IsActive = true,
+                        MustChangePassword = true,
+                        CreatedAt = now,
+                        PasswordHash = string.Empty,
+                    };
+                    user.PasswordHash = _passwordHasher.HashPassword(user, GenerateTempPassword());
+                    _uow.Repository<User, long>().Add(user);
+                    _uow.Repository<UserRole, long>().Add(new UserRole
+                    {
+                        User = user,
+                        RoleId = staffRole.Id,
+                        AssignedAt = now,
+                        CreatedAt = now,
+                    });
+                    _uow.Repository<RestaurantStaff, long>().Add(new RestaurantStaff
+                    {
+                        User = user,
+                        Restaurant = restaurant,
+                        Title = "Administrator restoranti",
+                        CreatedAt = now,
+                    });
+                }
+            }
+
+            created++;
+        }
+
+        if (created == 0)
+            return "Asnjë rresht i vlefshëm (Name i detyrueshëm).";
+        await _uow.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    private sealed record RestaurantImportColumns(
+        int NameIndex,
+        int EmailIndex,
+        int PhoneIndex,
+        int CityIndex,
+        int AddressIndex);
+
+    private static RestaurantImportColumns MapRestaurantImportColumns(IReadOnlyList<string> headers)
+    {
+        static int Idx(IReadOnlyList<string> h, params string[] names)
+        {
+            for (var i = 0; i < h.Count; i++)
+            {
+                var cell = h[i].Trim().TrimStart('\uFEFF');
+                foreach (var n in names)
+                {
+                    if (cell.Equals(n, StringComparison.OrdinalIgnoreCase))
+                        return i;
+                }
+            }
+
+            return -1;
+        }
+
+        return new RestaurantImportColumns(
+            Idx(headers, "Name"),
+            Idx(headers, "Email"),
+            Idx(headers, "Phone"),
+            Idx(headers, "City"),
+            Idx(headers, "Address", "AddressLine"));
+    }
+
+    private static string? GetCsvField(IReadOnlyList<string> parts, int index) =>
+        index >= 0 && index < parts.Count ? parts[index] : null;
+
+    private static (string First, string Last) SplitNameForUser(string name)
+    {
+        var t = name.Trim();
+        var sp = t.IndexOf(' ');
+        if (sp <= 0)
+            return (t, string.Empty);
+        return (t[..sp].Trim(), t[(sp + 1)..].Trim());
+    }
+
+    private async Task<string> EnsureUniqueRestaurantSlugAsync(string baseSlug, CancellationToken cancellationToken)
+    {
+        var slug = baseSlug;
+        var n = 0;
+        while (await _uow.Repository<Restaurant, long>().Query.AnyAsync(r => r.Slug == slug, cancellationToken))
+        {
+            n++;
+            slug = $"{baseSlug}-{n}";
+            if (n > 200)
+                throw new InvalidOperationException("Nuk u gjet slug unik.");
+        }
+
+        return slug;
+    }
+
+    private static string ToSlug(string venueName)
+    {
+        var lower = venueName.Trim().ToLowerInvariant();
+        var sb = new StringBuilder();
+        foreach (var c in lower)
+        {
+            if (char.IsLetterOrDigit(c))
+                sb.Append(c);
+            else if (c is ' ' or '-' or '_')
+                sb.Append('-');
+        }
+
+        var s = sb.ToString().Trim('-');
+        while (s.Contains("--", StringComparison.Ordinal))
+            s = s.Replace("--", "-", StringComparison.Ordinal);
+        if (s.Length == 0)
+            s = $"restaurant-{Guid.NewGuid():N}"[..12];
+        return s.Length <= 400 ? s : s[..400].TrimEnd('-');
+    }
+
+    private static string GenerateTempPassword()
+    {
+        Span<byte> buf = stackalloc byte[8];
+        RandomNumberGenerator.Fill(buf);
+        var part = Convert.ToHexString(buf)[..10];
+        return $"Fd{part}a!";
     }
 }
