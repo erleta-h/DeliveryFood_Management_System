@@ -7,6 +7,7 @@ import {
   patchDriverAccount,
   type DriverAccountProfile,
 } from '../lib/driverApi'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
 import { useAuthStore } from '../store/authStore'
 
 function initials(first: string, last: string) {
@@ -73,6 +74,11 @@ export default function DriverProfilePage() {
   async function onSaveContact(e: FormEvent) {
     e.preventDefault()
     if (!token) return
+    const phoneErr = validatePhoneField(phone)
+    if (phoneErr) {
+      setSaveMsg(phoneErr)
+      return
+    }
     setSaveMsg(null)
     setSaving(true)
     const r = await patchDriverAccount(token, {
@@ -295,17 +301,15 @@ export default function DriverProfilePage() {
                 <p className="text-sm text-zinc-400">
                   Telefoni përdoret për porosi dhe komunikim me restorantin. Adresa ndihmon nëse duhet dokumentacion.
                 </p>
-                <label className="block">
-                  <span className="mb-1 block text-[11px] font-medium uppercase text-zinc-500">Telefon</span>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    autoComplete="tel"
-                    className="w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500/40 focus:outline-none focus:ring-1 focus:ring-sky-500/30"
-                    placeholder="+383 44 …"
-                  />
-                </label>
+                <PhoneInputField
+                  id="driver-profile-phone"
+                  variant="driver"
+                  label="Telefoni"
+                  required
+                  value={phone}
+                  onChange={setPhone}
+                  hint="Telefoni përdoret për porosi dhe komunikim me restorantin."
+                />
                 <label className="block">
                   <span className="mb-1 block text-[11px] font-medium uppercase text-zinc-500">Rruga / nr.</span>
                   <input

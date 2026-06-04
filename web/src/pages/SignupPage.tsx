@@ -13,6 +13,7 @@ import {
   customerPanelSubtitle,
   customerShellBg,
 } from '../lib/customerTheme'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
 import { useAuthStore } from '../store/authStore'
 
 export default function SignupPage() {
@@ -66,12 +67,12 @@ export default function SignupPage() {
       setError('Plotëso adresën dhe qytetin.')
       return
     }
-    const phoneTrim = phone.trim()
-    const phoneDigits = phoneTrim.replace(/\D/g, '').length
-    if (phoneDigits < 8) {
-      setError('Numri i telefonit duhet të ketë të paktën 8 shifra (p.sh. +383 44 123 456).')
+    const phoneErr = validatePhoneField(phone)
+    if (phoneErr) {
+      setError(phoneErr)
       return
     }
+    const phoneTrim = phone.trim()
     setBusy(true)
     const r = await register({
       email: email.trim(),
@@ -152,24 +153,15 @@ export default function SignupPage() {
               />
             </div>
 
-            <div>
-              <label htmlFor="su-phone" className={customerLabelSm}>
-                Numri i telefonit
-              </label>
-              <input
-                id="su-phone"
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={customerField}
-                autoComplete="tel"
-                placeholder="p.sh. +383 44 123 456"
-              />
-              <p className="mt-1.5 text-xs text-zinc-500">
-                Nevojitet që restoranti / dërgesa të mund t’ju kontaktojnë për porosinë.
-              </p>
-            </div>
+            <PhoneInputField
+              id="su-phone"
+              variant="customer"
+              label="Telefoni"
+              required
+              value={phone}
+              onChange={setPhone}
+              hint="Restoranti dhe korrieri mund t’ju telefonojnë për porosinë."
+            />
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>

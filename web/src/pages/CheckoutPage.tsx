@@ -6,7 +6,6 @@ import { fetchClientPublicConfig } from '../lib/publicConfigApi'
 import {
   FULFILLMENT_DELIVERY,
   FULFILLMENT_PICKUP,
-  PAYMENT_COD,
   PAYMENT_STRIPE,
   placeOrder,
   setStripeCheckoutOrderSession,
@@ -45,7 +44,6 @@ export default function CheckoutPage() {
   const restaurantId = useCartStore((s) => s.restaurantId)
   const restaurantName = useCartStore((s) => s.restaurantName)
   const lines = useCartStore((s) => s.lines)
-  const clear = useCartStore((s) => s.clear)
 
   const [notes, setNotes] = useState('')
   const [fulfillmentType, setFulfillmentType] = useState<number>(FULFILLMENT_DELIVERY)
@@ -54,7 +52,6 @@ export default function CheckoutPage() {
   const [otLine2, setOtLine2] = useState('')
   const [otCity, setOtCity] = useState('')
   const [otPostal, setOtPostal] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<number>(PAYMENT_COD)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -135,7 +132,7 @@ export default function CheckoutPage() {
       lines: lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
       customerNotes: notes.trim() || undefined,
       fulfillmentType,
-      paymentMethod,
+      paymentMethod: PAYMENT_STRIPE,
       oneTimeDeliveryAddress:
         !pickup && deliveryTo === 'oneTime'
           ? {
@@ -148,14 +145,8 @@ export default function CheckoutPage() {
     })
     setBusy(false)
     if (r.ok) {
-      const needsStripe = r.requiresStripePayment || paymentMethod === PAYMENT_STRIPE
-      if (needsStripe) {
-        setStripeCheckoutOrderSession(r.orderId)
-        navigate(`/app/orders/${r.orderId}/pay`, { replace: true })
-      } else {
-        clear()
-        navigate(`/app/orders/${r.orderId}`, { replace: true })
-      }
+      setStripeCheckoutOrderSession(r.orderId)
+      navigate(`/app/orders/${r.orderId}/pay`, { replace: true })
     } else setError(r.message)
   }
 
@@ -412,35 +403,10 @@ export default function CheckoutPage() {
           {/* Pagesa */}
           <div>
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-500">Pagesa</p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod(PAYMENT_COD)}
-                className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
-                  paymentMethod === PAYMENT_COD
-                    ? 'border-[#009fe3]/50 bg-[#009fe3]/15 text-[#7dd3fc]'
-                    : 'border-white/[0.1] bg-[#14161c] text-zinc-400 hover:border-white/20'
-                }`}
-              >
-                Para në dorëzim
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod(PAYMENT_STRIPE)}
-                className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
-                  paymentMethod === PAYMENT_STRIPE
-                    ? 'border-[#009fe3]/50 bg-[#009fe3]/15 text-[#7dd3fc]'
-                    : 'border-white/[0.1] bg-[#14161c] text-zinc-400 hover:border-white/20'
-                }`}
-              >
-                Kartë (Stripe)
-              </button>
-            </div>
-            {paymentMethod === PAYMENT_STRIPE ? (
-              <p className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs leading-relaxed text-sky-100/85">
-                Pas konfirmimit hapet faqja e pagesës me kartë (Stripe).
-              </p>
-            ) : null}
+            <p className="rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-sm text-sky-100/90">
+              Pagesë me <span className="font-semibold text-white">kartë bankare</span> (Stripe). Pas konfirmimit
+              plotëson të dhënat e kartës.
+            </p>
           </div>
 
           {error ? (
@@ -460,7 +426,6 @@ export default function CheckoutPage() {
             meetsMinOrder={meetsMinOrder}
             minOrder={minOrder}
             busy={busy}
-            paymentMethod={paymentMethod}
             woltBlueClass={woltBlue}
           />
         </aside>
@@ -478,7 +443,6 @@ function SummaryCard({
   meetsMinOrder,
   minOrder,
   busy,
-  paymentMethod,
   woltBlueClass,
 }: {
   subtotal: number
@@ -489,7 +453,6 @@ function SummaryCard({
   meetsMinOrder: boolean
   minOrder: number
   busy: boolean
-  paymentMethod: number
   woltBlueClass: string
 }) {
   const submitBlocked = busy || !meetsMinOrder
@@ -556,9 +519,7 @@ function SummaryCard({
               Porosia minimale: {minOrder.toFixed(2)} €
             </span>
           </>
-        : paymentMethod === PAYMENT_STRIPE ?
-          'Konfirmo dhe paguaj me kartë'
-        : 'Konfirmo porosinë'}
+        : 'Konfirmo dhe paguaj me kartë'}
       </button>
     </div>
   )

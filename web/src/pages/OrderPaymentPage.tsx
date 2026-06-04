@@ -2,7 +2,7 @@ import { loadStripe, type StripeCardCvcElement, type StripeCardExpiryElement, ty
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PaymentLegalFooter } from '../components/payment/PaymentLegalFooter'
-import { PaymentMethodSelector, type PaymentUiMethod } from '../components/payment/PaymentMethodSelector'
+import { PaymentMethodSelector } from '../components/payment/PaymentMethodSelector'
 import { PaymentSecurityBanner } from '../components/payment/PaymentSecurityBanner'
 import { StripeCardFields } from '../components/payment/StripeCardFields'
 import {
@@ -19,7 +19,6 @@ import {
   fetchMyOrder,
   setStripeCheckoutOrderSession,
 } from '../lib/ordersApi'
-import { rdYellow } from '../lib/restaurantDetailTheme'
 import { useAuthStore } from '../store/authStore'
 import { useCartStore } from '../store/cartStore'
 
@@ -76,7 +75,6 @@ export default function OrderPaymentPage() {
   const cardCvcRef = useRef<StripeCardCvcElement | null>(null)
   const clientSecretRef = useRef<string | null>(null)
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentUiMethod>('card')
   const [cardholderName, setCardholderName] = useState('')
   const [billingCountry, setBillingCountry] = useState<BillingCountryCode>(DEFAULT_BILLING_COUNTRY)
   const [saveCard, setSaveCard] = useState(false)
@@ -163,11 +161,6 @@ export default function OrderPaymentPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (paymentMethod !== 'card') {
-      setError('Për këtë porosi duhet të paguash me kartë bankare.')
-      return
-    }
-
     const stripe = stripeRef.current
     const card = cardNumberRef.current
     const secret = clientSecretRef.current
@@ -255,7 +248,7 @@ export default function OrderPaymentPage() {
 
       <h1 className="mt-5 text-3xl font-bold text-white">Pagesa</h1>
       <p className="mt-1 text-sm text-zinc-500">
-        Zgjidh mënyrën e pagesës dhe përfundo porosinë.
+        Përfundo pagesën me kartë bankare (Stripe).
       </p>
 
       {isStripeConfigError(error) ? (
@@ -277,14 +270,9 @@ Stripe__SecretKey=sk_test_xxxxxxxx`}
       ) : null}
 
       <form onSubmit={onSubmit} autoComplete="on" className="mt-8 space-y-6">
-        <PaymentMethodSelector
-          selected={paymentMethod}
-          onSelect={setPaymentMethod}
-          lockToCard
-        />
+        <PaymentMethodSelector />
 
-        {paymentMethod === 'card' ? (
-          <div>
+        <div>
             <h2 className="mb-4 text-sm font-bold text-white">Detajet e kartës</h2>
 
             {stripeLoaded && clientSecret && stripeRef.current ? (
@@ -350,23 +338,16 @@ Stripe__SecretKey=sk_test_xxxxxxxx`}
               <span className="text-sm text-zinc-400">Ruaje kartën për herën tjetër</span>
             </label>
           </div>
-        ) : null}
 
         <PaymentSecurityBanner />
 
-        <button type="submit" disabled={!ready || busy || paymentMethod !== 'card'} className={btnPay}>
+        <button type="submit" disabled={!ready || busy} className={btnPay}>
           <LockIcon />
           {busy ? 'Duke përpunuar…' : payLabel}
         </button>
 
         <PaymentLegalFooter />
       </form>
-
-      {paymentMethod !== 'card' ? (
-        <p className="mt-4 text-center text-xs" style={{ color: rdYellow }}>
-          Zgjidh «Kartë bankare» për të vazhduar me pagesën online.
-        </p>
-      ) : null}
     </div>
   )
 }

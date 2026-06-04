@@ -13,6 +13,7 @@ import {
 
 const backIconBtnClass =
   'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.05] text-lg leading-none text-zinc-200 transition hover:border-amber-400/30 hover:bg-amber-500/10 hover:text-amber-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-amber-400/30'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
 import { submitPartnerApplication } from './../lib/partnerApi'
 
 const countries = ['Kosovë', 'Shqipëri', 'Maqedoni e Veriut', 'Tjetër']
@@ -46,6 +47,11 @@ export default function PartnerApplyPage() {
     setError(null)
     if (!consent) {
       setError('Duhet të pranoni kushtet për të vazhduar.')
+      return
+    }
+    const phoneErr = validatePhoneField(phone)
+    if (phoneErr) {
+      setError(phoneErr)
       return
     }
     setBusy(true)
@@ -273,21 +279,15 @@ export default function PartnerApplyPage() {
                 />
               </div>
             </div>
-            <div className="min-w-0">
-              <label htmlFor="pa-phone" className={customerLabelForm}>
-                Telefoni
-              </label>
-              <input
-                id="pa-phone"
-                type="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className={customerFieldPartner}
-                autoComplete="tel"
-                placeholder="+383 44 123 456"
-              />
-            </div>
+            <PhoneInputField
+              id="pa-phone"
+              className="min-w-0"
+              variant="partner"
+              label="Telefoni"
+              required
+              value={phone}
+              onChange={setPhone}
+            />
             <div className="min-w-0">
               <label htmlFor="pa-email" className={customerLabelForm}>
                 Email
