@@ -52,40 +52,55 @@ public sealed class DriverApplicationsController : ControllerBase
             return BadRequest(new { message = "Ngarko të tre dokumentet: letërnjoftimi, patenta dhe foto e mjetit." });
         }
 
-        var err = await _svc.SubmitAsync(body, documents, cancellationToken);
-        if (err is not null)
-            return BadRequest(new { message = err });
+        try
+        {
+            var err = await _svc.SubmitAsync(body, documents, cancellationToken);
+            if (err is not null)
+                return BadRequest(new { message = err });
 
-        return NoContent();
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new
+            {
+                message = "Aplikimi dështoi në server. Rinis API-n pas migrimit të bazës, pastaj provo përsëri.",
+                detail = ex.Message,
+            });
+        }
     }
 
-    private static DriverApplicationDocumentUpload ToUpload(
+    private static async Task<DriverApplicationDocumentUpload> ToUploadAsync(
         IFormFile file,
-        DriverApplicationDocumentKind kind) =>
-        new(
+        DriverApplicationDocumentKind kind,
+        CancellationToken cancellationToken)
+    {
+        var ms = new MemoryStream();
+        await file.CopyToAsync(ms, cancellationToken);
+        ms.Position = 0;
+        return new DriverApplicationDocumentUpload(
             kind,
-            file.OpenReadStream(),
+            ms,
             file.FileName,
             file.ContentType ?? "application/octet-stream",
             file.Length);
+    }
 
-    private static Task<IReadOnlyList<DriverApplicationDocumentUpload>?> ReadDocumentsAsync(
+    private static async Task<IReadOnlyList<DriverApplicationDocumentUpload>?> ReadDocumentsAsync(
         IFormCollection form,
         CancellationToken cancellationToken)
     {
-        _ = cancellationToken;
         var identity = form.Files.GetFile("identityDocument");
         var license = form.Files.GetFile("licenseDocument");
         var vehicle = form.Files.GetFile("vehiclePhoto");
         if (identity is null || license is null || vehicle is null)
-            return Task.FromResult<IReadOnlyList<DriverApplicationDocumentUpload>?>(null);
+            return null;
 
-        IReadOnlyList<DriverApplicationDocumentUpload> list =
+        return
         [
-            ToUpload(identity, DriverApplicationDocumentKind.Identity),
-            ToUpload(license, DriverApplicationDocumentKind.License),
-            ToUpload(vehicle, DriverApplicationDocumentKind.VehiclePhoto),
+            await ToUploadAsync(identity, DriverApplicationDocumentKind.Identity, cancellationToken),
+            await ToUploadAsync(license, DriverApplicationDocumentKind.License, cancellationToken),
+            await ToUploadAsync(vehicle, DriverApplicationDocumentKind.VehiclePhoto, cancellationToken),
         ];
-        return Task.FromResult<IReadOnlyList<DriverApplicationDocumentUpload>?>(list);
     }
 }

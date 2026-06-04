@@ -23,6 +23,7 @@ const OrderPaymentPage = lazy(() => import('./pages/OrderPaymentPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const SupportPage = lazy(() => import('./pages/SupportPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ActivateAccountPage = lazy(() => import('./pages/ActivateAccountPage'))
 const SignupPage = lazy(() => import('./pages/SignupPage'))
 const KitchenLayout = lazy(() => import('./layouts/KitchenLayout'))
 const KitchenOrdersPage = lazy(() => import('./pages/KitchenOrdersPage'))
@@ -414,6 +415,14 @@ function App() {
             element={
               <Suspense fallback={lazyFallback}>
                 <SignupPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/activate-account"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <ActivateAccountPage />
               </Suspense>
             }
           />

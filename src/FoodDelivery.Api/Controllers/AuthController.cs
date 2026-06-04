@@ -82,6 +82,21 @@ public sealed class AuthController : ControllerBase
         return Ok(user);
     }
 
+    [HttpPost("activate-account")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ActivateAccount(
+        [FromBody] ActivateAccountRequest request,
+        CancellationToken cancellationToken)
+    {
+        var err = await _auth.ActivateAccountAsync(request, cancellationToken);
+        if (err is not null)
+            return BadRequest(new { error = err });
+
+        return NoContent();
+    }
+
     [HttpPost("change-password")]
     [Authorize]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
@@ -121,6 +136,7 @@ public sealed class AuthController : ControllerBase
             AuthErrorCode.InvalidCredentials => Unauthorized(payload),
             AuthErrorCode.InvalidRefreshToken => Unauthorized(payload),
             AuthErrorCode.InactiveUser => StatusCode(StatusCodes.Status403Forbidden, payload),
+            AuthErrorCode.PendingActivation => StatusCode(StatusCodes.Status403Forbidden, payload),
             AuthErrorCode.RoleMissing => StatusCode(StatusCodes.Status503ServiceUnavailable, payload),
             _ => BadRequest(payload),
         };

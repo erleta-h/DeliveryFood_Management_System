@@ -1,7 +1,10 @@
 using FoodDelivery.Application.Auth;
+using FoodDelivery.Application.Drivers;
 //using FoodDelivery.Application.Maps;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
+using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Infrastructure.Drivers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -111,7 +114,22 @@ public sealed class AuthService : IAuthService
             return AuthResult.Fail("Email ose fjalëkalim i gabuar.", AuthErrorCode.InvalidCredentials);
 
         if (!user.IsActive)
+        {
+            var isDriver = user.UserRoles.Any(ur => ur.Role.Name == DbSeeder.DriverRoleName);
+            if (isDriver)
+            {
+                var pendingToken = await _uow.Repository<AccountActivationToken, long>().Query.AsNoTracking()
+                    .AnyAsync(
+                        t => t.UserId == user.Id && t.UsedAtUtc == null && t.ExpiresAtUtc > DateTime.UtcNow,
+                        cancellationToken);
+                if (pendingToken)
+                    return AuthResult.Fail(
+                        "Llogaria nuk është aktivizuar ende. Hap linkun nga emaili ose shko te «Aktivizo llogarinë».",
+                        AuthErrorCode.PendingActivation);
+            }
+
             return AuthResult.Fail("Llogaria është joaktive.", AuthErrorCode.InactiveUser);
+        }
 
         var verify = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (verify == PasswordVerificationResult.Failed)
@@ -282,6 +300,71 @@ public sealed class AuthService : IAuthService
             CreatedById = userId,
             NewValue = "self",
         });
+
+        await _uow.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    public async Task<string?> ActivateAccountAsync(
+        ActivateAccountRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var tokenPlain = request.Token?.Trim();
+        if (string.IsNullOrWhiteSpace(tokenPlain))
+            return "Token aktivizimi mungon.";
+
+        var newPw = request.NewPassword?.Trim() ?? string.Empty;
+        var confirm = request.ConfirmPassword?.Trim() ?? string.Empty;
+        if (newPw.Length < 8)
+            return "Fjalëkalimi duhet të ketë të paktën 8 karaktere.";
+        if (newPw != confirm)
+            return "Fjalëkalimet nuk përputhen.";
+
+        var hash = ActivationTokenHelper.HashToken(tokenPlain);
+        var row = await _uow.Repository<AccountActivationToken, long>().Query
+            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash, cancellationToken);
+
+        if (row is null || row.UsedAtUtc is not null)
+            return "Linku i aktivizimit është i pavlefshëm ose është përdorur.";
+
+        if (row.ExpiresAtUtc < DateTime.UtcNow)
+            return "Linku i aktivizimit ka skaduar. Kërko email të ri nga administratori.";
+
+        var user = row.User;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var emailNorm = request.Email.Trim().ToLowerInvariant();
+            if (!string.Equals(user.Email, emailNorm, StringComparison.OrdinalIgnoreCase))
+                return "Emaili nuk përputhet me llogarinë.";
+        }
+
+        if (!user.UserRoles.Any(ur => ur.Role.Name == DbSeeder.DriverRoleName))
+            return "Ky link nuk vlen për këtë lloj llogarie.";
+
+        var now = DateTime.UtcNow;
+        user.PasswordHash = _passwordHasher.HashPassword(user, newPw);
+        user.IsActive = true;
+        user.EmailConfirmed = true;
+        user.MustChangePassword = false;
+        user.UpdatedAt = now;
+        row.UsedAtUtc = now;
+
+        var app = await _uow.Repository<DriverApplication, long>().Query
+            .FirstOrDefaultAsync(a => a.UserId == user.Id, cancellationToken);
+        if (app is not null)
+        {
+            app.Status = DriverApplicationStatuses.Active;
+            app.ActivatedAtUtc = now;
+            app.UpdatedAt = now;
+            DriverApplicationAuditWriter.Add(
+                _uow,
+                app.Id,
+                DriverApplicationAuditEventTypes.AccountActivated,
+                user.Email,
+                user.Id,
+                now);
+        }
 
         await _uow.SaveChangesAsync(cancellationToken);
         return null;

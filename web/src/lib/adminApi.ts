@@ -128,28 +128,104 @@ export type DriverApplicationRow = {
   licensePlate: string | null
 }
 
-export type ApproveDriverResult = {
-  email: string
-  temporaryPassword: string
+export type DriverApplicationStats = {
+  total: number
+  pending: number
+  approvedWaitingActivation: number
+  active: number
+  rejected: number
 }
 
-export async function fetchDriverApplications(token: string): Promise<DriverApplicationRow[]> {
-  const res = await fetch(apiPath('/api/admin/driver-applications'), {
+export type ApproveDriverResult = {
+  email: string
+  activationEmailSent: boolean
+  activationEmailSentAtUtc: string | null
+  devActivationUrl?: string | null
+}
+
+export type DriverApplicationDetail = {
+  id: number
+  createdAtUtc: string
+  status: number
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  message: string | null
+  vehicleType: string
+  licensePlate: string | null
+  rejectionReason: string | null
+  approvedAtUtc: string | null
+  approvedByName: string | null
+  activatedAtUtc: string | null
+  activationEmailSentAtUtc: string | null
+  canResendActivationEmail: boolean
+  documents: { kind: string; filename: string; fileSize: number; downloadUrl: string }[]
+  history: { eventType: string; detail: string | null; createdAtUtc: string; actorName: string | null }[]
+}
+
+/** Llogarit statistikat nga lista (fallback kur API nuk ka ende /stats). */
+export function driverApplicationStatsFromRows(rows: DriverApplicationRow[]): DriverApplicationStats {
+  const S = { pending: 0, approved: 2, active: 3, rejected: 9 } as const
+  return {
+    total: rows.length,
+    pending: rows.filter((r) => r.status === S.pending).length,
+    approvedWaitingActivation: rows.filter((r) => r.status === S.approved).length,
+    active: rows.filter((r) => r.status === S.active).length,
+    rejected: rows.filter((r) => r.status === S.rejected).length,
+  }
+}
+
+export async function fetchDriverApplicationStats(
+  token: string,
+): Promise<DriverApplicationStats | null> {
+  const res = await fetch(apiPath('/api/admin/driver-applications/stats'), {
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DriverApplicationStats>
+}
+
+export async function fetchDriverApplications(
+  token: string,
+  params?: { search?: string; status?: number; from?: string; to?: string },
+): Promise<DriverApplicationRow[]> {
+  const q = new URLSearchParams()
+  if (params?.search?.trim()) q.set('search', params.search.trim())
+  if (params?.status !== undefined) q.set('status', String(params.status))
+  if (params?.from) q.set('from', params.from)
+  if (params?.to) q.set('to', params.to)
+  const qs = q.toString()
+  const res = await fetch(apiPath(`/api/admin/driver-applications${qs ? `?${qs}` : ''}`), {
     headers: { ...authHeader(token) },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<DriverApplicationRow[]>
 }
 
+export async function fetchDriverApplicationDetail(
+  token: string,
+  id: number,
+): Promise<DriverApplicationDetail> {
+  const res = await fetch(apiPath(`/api/admin/driver-applications/${id}`), {
+    headers: { ...authHeader(token) },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DriverApplicationDetail>
+}
+
+export function driverApplicationDocumentUrl(appId: number, kind: string): string {
+  return apiPath(`/api/admin/driver-applications/${appId}/documents/${kind}`)
+}
+
 export async function approveDriverApplication(
   token: string,
   id: number,
-  initialPassword?: string | null,
 ): Promise<{ ok: true; data: ApproveDriverResult } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/admin/driver-applications/${id}/approve`), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
-    body: JSON.stringify({ initialPassword: initialPassword ?? null }),
+    headers: { ...authHeader(token) },
   })
   if (res.ok) {
     const data = (await res.json()) as ApproveDriverResult
@@ -168,8 +244,29 @@ export async function approveDriverApplication(
 export async function rejectDriverApplication(
   token: string,
   id: number,
+  reason: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/admin/driver-applications/${id}/reject`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ reason }),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try {
+    const j = (await res.json()) as { message?: string }
+    if (j.message) message = j.message
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, message }
+}
+
+export async function resendDriverActivationEmail(
+  token: string,
+  id: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/driver-applications/${id}/resend-activation`), {
     method: 'POST',
     headers: authHeader(token),
   })

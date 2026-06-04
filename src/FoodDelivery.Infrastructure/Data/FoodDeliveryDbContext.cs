@@ -34,6 +34,8 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<RestaurantPartnerApplication> RestaurantPartnerApplications => Set<RestaurantPartnerApplication>();
     public DbSet<DriverApplication> DriverApplications => Set<DriverApplication>();
+    public DbSet<DriverApplicationAudit> DriverApplicationAudits => Set<DriverApplicationAudit>();
+    public DbSet<AccountActivationToken> AccountActivationTokens => Set<AccountActivationToken>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Review> Reviews => Set<Review>();
 
@@ -115,9 +117,47 @@ public class FoodDeliveryDbContext : DbContext
             e.Property(x => x.VehicleType).HasMaxLength(64).IsRequired();
             e.Property(x => x.LicensePlate).HasMaxLength(32);
             e.Property(x => x.Message).HasMaxLength(2000);
+            e.Property(x => x.RejectionReason).HasMaxLength(500);
             e.HasIndex(x => x.CreatedAt);
             e.HasIndex(x => x.Email);
             e.HasIndex(x => x.Status);
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(x => x.UpdatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<DriverApplicationAudit>(e =>
+        {
+            e.ToTable("DriverApplicationAudits");
+            e.Property(x => x.EventType).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Detail).HasMaxLength(2000);
+            e.HasIndex(x => x.DriverApplicationId);
+            e.HasIndex(x => x.CreatedAtUtc);
+            e.HasOne(x => x.DriverApplication)
+                .WithMany(x => x.Audits)
+                .HasForeignKey(x => x.DriverApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CreatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<AccountActivationToken>(e =>
+        {
+            e.ToTable("AccountActivationTokens");
+            e.Property(x => x.TokenHash).HasMaxLength(128).IsRequired();
+            e.HasIndex(x => x.UserId);
+            e.HasIndex(x => x.TokenHash);
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<FoodCategory>(e =>

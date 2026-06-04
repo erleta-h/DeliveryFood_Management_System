@@ -23,6 +23,7 @@ using FoodDelivery.Application.Restaurants;
 using FoodDelivery.Application.SiteContent;
 using FoodDelivery.Application.Support;
 using FoodDelivery.Infrastructure.Admin;
+using FoodDelivery.Infrastructure.Drivers;
 using FoodDelivery.Infrastructure.Favorites;
 using FoodDelivery.Infrastructure.Maps;
 using FoodDelivery.Infrastructure.Mongo;
@@ -97,6 +98,8 @@ public static class DependencyInjection
         services.Configure<MenuImageStorageOptions>(configuration.GetSection(MenuImageStorageOptions.SectionName));
         services.Configure<SupportAttachmentStorageOptions>(
             configuration.GetSection(SupportAttachmentStorageOptions.SectionName));
+        services.Configure<DriverActivationOptions>(configuration.GetSection(DriverActivationOptions.SectionName));
+        services.AddScoped<IDriverActivationEmailSender, LoggingDriverActivationEmailSender>();
 
         services.AddDistributedMemoryCache();
         services.AddMongoDb(configuration);

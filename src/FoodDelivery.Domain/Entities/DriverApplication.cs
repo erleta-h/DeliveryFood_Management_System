@@ -17,4 +17,14 @@ public class DriverApplication
     public byte Status { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
+
+    public long? UserId { get; set; }
+    public string? RejectionReason { get; set; }
+    public DateTime? ApprovedAtUtc { get; set; }
+    public DateTime? ActivatedAtUtc { get; set; }
+    public DateTime? ActivationEmailSentAtUtc { get; set; }
+
+    public User? User { get; set; }
+    public User? UpdatedBy { get; set; }
+    public ICollection<DriverApplicationAudit> Audits { get; set; } = new List<DriverApplicationAudit>();
 }

@@ -24,6 +24,11 @@ public interface IAuthService
         long userId,
         ChangePasswordRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <returns>null në sukses, mesazh gabimi përndryshe.</returns>
+    Task<string?> ActivateAccountAsync(
+        ActivateAccountRequest request,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class AuthResult
@@ -47,6 +52,7 @@ public enum AuthErrorCode
     DuplicateEmail,
     InvalidCredentials,
     InactiveUser,
+    PendingActivation,
     RoleMissing,
     Validation,
     InvalidRefreshToken,

@@ -4,6 +4,8 @@ using FoodDelivery.Application.Partners;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Auth;
+using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Infrastructure.Drivers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 
@@ -60,8 +62,8 @@ public sealed class DriverApplicationService : IDriverApplicationService
 
         if (await _uow.Repository<DriverApplication, long>().Query.AnyAsync(
                 a => a.Email.ToLower() == emailNorm
-                     && a.Status != PartnerApplicationStatuses.Approved
-                     && a.Status != PartnerApplicationStatuses.Rejected,
+                     && a.Status != DriverApplicationStatuses.Rejected
+                     && a.Status != DriverApplicationStatuses.Active,
                 cancellationToken))
             return "Ke tashmë një aplikim aktiv me këtë email.";
 
@@ -83,7 +85,7 @@ public sealed class DriverApplicationService : IDriverApplicationService
             VehicleType = vehicle,
             LicensePlate = plate,
             Message = string.IsNullOrWhiteSpace(request.Message) ? null : request.Message.Trim(),
-            Status = PartnerApplicationStatuses.Pending,
+            Status = DriverApplicationStatuses.Pending,
         };
 
         _uow.Repository<DriverApplication, long>().Add(entity);
@@ -92,18 +94,25 @@ public sealed class DriverApplicationService : IDriverApplicationService
         var uploadErr = await SaveDocumentsAsync(entity.Id, documents!, cancellationToken);
         if (uploadErr is not null)
         {
-            await DeleteApplicationFilesAsync(entity.Id, cancellationToken);
-            _uow.Repository<DriverApplication, long>().Remove(entity);
-            await _uow.SaveChangesAsync(cancellationToken);
+            await RollbackApplicationAsync(entity.Id, cancellationToken);
             return uploadErr;
         }
 
-        await _notifications.NotifyUsersInRolesAsync(
-            AdminNotifyRoles,
-            "Aplikim i ri deliver",
-            $"{first} {last} ({vehicle})",
-            NotificationTypes.DriverApplication,
-            cancellationToken);
+        await TryWriteSubmittedAuditAsync(entity.Id, entity.CreatedAt, cancellationToken);
+
+        try
+        {
+            await _notifications.NotifyUsersInRolesAsync(
+                AdminNotifyRoles,
+                "Aplikim i ri deliver",
+                $"{first} {last} ({vehicle})",
+                NotificationTypes.DriverApplication,
+                cancellationToken);
+        }
+        catch
+        {
+            /* njoftimi nuk duhet të anulojë aplikimin */
+        }
 
         return null;
     }
@@ -144,7 +153,7 @@ public sealed class DriverApplicationService : IDriverApplicationService
         var uploaderId = await (
             from ur in _uow.Repository<UserRole, long>().Query.AsNoTracking()
             join r in _uow.Repository<Role, long>().Query.AsNoTracking() on ur.RoleId equals r.Id
-            where r.Name == "Admin"
+            where r.Name == DbSeeder.AdminRoleName
             select ur.UserId
         ).FirstOrDefaultAsync(cancellationToken);
 
@@ -156,6 +165,7 @@ public sealed class DriverApplicationService : IDriverApplicationService
 
         foreach (var doc in documents)
         {
+            await using var _ = doc.Content;
             var ext = Path.GetExtension(doc.FileName);
             if (string.IsNullOrEmpty(ext))
                 ext = ".bin";
@@ -214,6 +224,52 @@ public sealed class DriverApplicationService : IDriverApplicationService
 
         await _uow.SaveChangesAsync(cancellationToken);
         return null;
+    }
+
+    private async Task TryWriteSubmittedAuditAsync(
+        long applicationId,
+        DateTime createdAt,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            DriverApplicationAuditWriter.Add(
+                _uow,
+                applicationId,
+                DriverApplicationAuditEventTypes.ApplicationSubmitted,
+                null,
+                null,
+                createdAt);
+            await _uow.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            /* audit opsional nëse skema ende nuk është migruar */
+        }
+    }
+
+    private async Task RollbackApplicationAsync(long applicationId, CancellationToken cancellationToken)
+    {
+        await DeleteApplicationFilesAsync(applicationId, cancellationToken);
+        try
+        {
+            var audits = await _uow.Repository<DriverApplicationAudit, long>().Query
+                .Where(a => a.DriverApplicationId == applicationId)
+                .ToListAsync(cancellationToken);
+            foreach (var a in audits)
+                _uow.Repository<DriverApplicationAudit, long>().Remove(a);
+        }
+        catch
+        {
+            /* tabela mund të mungojë */
+        }
+
+        var app = await _uow.Repository<DriverApplication, long>().Query
+            .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
+        if (app is not null)
+            _uow.Repository<DriverApplication, long>().Remove(app);
+
+        await _uow.SaveChangesAsync(cancellationToken);
     }
 
     private async Task DeleteApplicationFilesAsync(long applicationId, CancellationToken cancellationToken)

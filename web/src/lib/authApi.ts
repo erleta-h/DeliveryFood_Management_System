@@ -119,6 +119,30 @@ export async function patchCustomerProfile(
 }
 
 /** Invalidon refresh token-et në server — pas ndryshimit të fjalëkalimit duhet hyrje përsëri. */
+export async function activateAccount(body: {
+  token: string
+  email?: string
+  newPassword: string
+  confirmPassword: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(apiPath('/api/auth/activate-account'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: body.token,
+        email: body.email ?? null,
+        newPassword: body.newPassword,
+        confirmPassword: body.confirmPassword,
+      }),
+    })
+    if (res.status === 204) return { ok: true }
+    return { ok: false, error: await readApiErrorMessage(res) }
+  } catch (e) {
+    return { ok: false, error: networkErrorMessage(e) }
+  }
+}
+
 export async function changePassword(
   token: string,
   currentPassword: string,
