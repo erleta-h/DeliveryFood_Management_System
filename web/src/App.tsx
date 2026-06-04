@@ -411,6 +411,14 @@ function App() {
             }
           />
           <Route
+            path="/driver/login"
+            element={
+              <Suspense fallback={lazyFallback}>
+                <LoginPage />
+              </Suspense>
+            }
+          />
+          <Route
             path="/signup"
             element={
               <Suspense fallback={lazyFallback}>

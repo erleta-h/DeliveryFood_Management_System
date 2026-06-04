@@ -89,6 +89,7 @@ export default function AdminDriverApplicationsPage() {
   const [approveRow, setApproveRow] = useState<DriverApplicationRow | null>(null)
   const [rejectRow, setRejectRow] = useState<DriverApplicationRow | null>(null)
   const [viewRow, setViewRow] = useState<DriverApplicationRow | null>(null)
+  const [devActivationUrls, setDevActivationUrls] = useState<Record<number, string>>({})
 
   useEffect(() => {
     const t = window.setTimeout(() => setSearchDebounced(search), 300)
@@ -150,9 +151,12 @@ export default function AdminDriverApplicationsPage() {
     setBusyId(null)
     setApproveRow(null)
     if (r.ok) {
+      if (r.data.devActivationUrl && approveRow) {
+        setDevActivationUrls((m) => ({ ...m, [approveRow.id]: r.data.devActivationUrl! }))
+      }
       setActionMsg(
         r.data.devActivationUrl
-          ? `Email aktivizimi u dërgua te ${r.data.email}. (Dev link: ${r.data.devActivationUrl})`
+          ? `Email aktivizimi u dërgua te ${r.data.email}. Hap «Shiko» për linkun e aktivizimit.`
           : `Email aktivizimi u dërgua te ${r.data.email}.`,
       )
       await load()
@@ -179,7 +183,7 @@ export default function AdminDriverApplicationsPage() {
           label: 'Miratuar',
           value: stats.approvedWaitingActivation,
           hint: 'Në pritje aktivizimi',
-          color: 'text-sky-600',
+          color: 'text-orange-600',
         },
         { label: 'Aktiv', value: stats.active, hint: 'Driver aktivë', color: 'text-emerald-600' },
         { label: 'Refuzuar', value: stats.rejected, hint: 'Aplikime të refuzuara', color: 'text-red-600' },
@@ -318,7 +322,7 @@ export default function AdminDriverApplicationsPage() {
                       <button
                         type="button"
                         className={customerBtnGhost + ' text-xs'}
-                        onClick={() => setViewRow(a)}
+                        onClick={() => setViewRow(rows.find((x) => x.id === a.id) ?? a)}
                       >
                         Shiko
                       </button>
@@ -398,7 +402,13 @@ export default function AdminDriverApplicationsPage() {
         />
       ) : null}
       {viewRow ? (
-        <DriverApplicationDetailsDrawer row={viewRow} onClose={() => setViewRow(null)} onUpdated={() => void load()} />
+        <DriverApplicationDetailsDrawer
+          row={viewRow}
+          initialDevActivationUrl={devActivationUrls[viewRow.id] ?? null}
+          onClose={() => setViewRow(null)}
+          onUpdated={() => void load()}
+          onReject={(r) => setRejectRow(r)}
+        />
       ) : null}
     </div>
   )

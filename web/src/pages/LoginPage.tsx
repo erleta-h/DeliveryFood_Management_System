@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import DriverLoginPage from './DriverLoginPage'
 import { BrandLogo } from '../components/BrandLogo'
 import {
   customerBtnGhost,
@@ -25,6 +26,7 @@ function loginSubtitle(next: string | null): string {
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const login = useAuthStore((s) => s.login)
   const logout = useAuthStore((s) => s.logout)
@@ -32,7 +34,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const isDriverLogin = searchParams.get('next') === 'driver'
+  const isDriverLogin =
+    searchParams.get('next') === 'driver' || location.pathname === '/driver/login'
+
+  if (isDriverLogin) {
+    return <DriverLoginPage />
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -112,14 +119,8 @@ export default function LoginPage() {
         </Link>
 
         <section className={`${customerCard} animate-auth-panel-in`}>
-          <h1 className="text-2xl font-bold text-zinc-100">
-            {isDriverLogin ? 'Hyrje Deliver' : 'Hyr në llogari'}
-          </h1>
-          <p className={customerPanelSubtitle}>
-            {isDriverLogin
-              ? 'Vetëm deliverët e miratuar mund të hyjnë në këtë portal.'
-              : loginSubtitle(searchParams.get('next'))}
-          </p>
+          <h1 className="text-2xl font-bold text-zinc-100">Hyr në llogari</h1>
+          <p className={customerPanelSubtitle}>{loginSubtitle(searchParams.get('next'))}</p>
 
           <form onSubmit={onSubmit} className="mt-8 space-y-5">
             <div>
@@ -163,30 +164,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {isDriverLogin ? (
-            <div className="mt-8 space-y-2 text-center text-sm text-zinc-400">
-              <p>
-                <Link to="/activate-account" className="font-semibold text-sky-400 hover:text-sky-300">
-                  Aktivizo llogarinë
-                </Link>
-                {' · '}
-                <span className="text-zinc-500">Harrove fjalëkalimin? Kontakto mbështetjen.</span>
-              </p>
-              <p>
-                Nuk je deliver i miratuar?{' '}
-                <Link to="/driver/apply" className="font-semibold text-amber-400 hover:text-amber-300">
-                  Apliko si Deliver
-                </Link>
-              </p>
-            </div>
-          ) : (
-            <p className="mt-8 text-center text-sm text-zinc-400">
-              Nuk ke llogari?{' '}
-              <Link to="/signup" className="font-semibold text-amber-400 hover:text-amber-300">
-                Regjistruhu
-              </Link>
-            </p>
-          )}
+          <p className="mt-8 text-center text-sm text-zinc-400">
+            Nuk ke llogari?{' '}
+            <Link to="/signup" className="font-semibold text-amber-400 hover:text-amber-300">
+              Regjistruhu
+            </Link>
+          </p>
         </section>
       </div>
     </div>

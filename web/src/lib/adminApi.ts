@@ -160,6 +160,7 @@ export type DriverApplicationDetail = {
   activatedAtUtc: string | null
   activationEmailSentAtUtc: string | null
   canResendActivationEmail: boolean
+  devActivationUrl?: string | null
   documents: { kind: string; filename: string; fileSize: number; downloadUrl: string }[]
   history: { eventType: string; detail: string | null; createdAtUtc: string; actorName: string | null }[]
 }
@@ -262,15 +263,24 @@ export async function rejectDriverApplication(
   return { ok: false, message }
 }
 
+export type ResendActivationResult = {
+  sent: boolean
+  activationEmailSentAtUtc: string | null
+  devActivationUrl?: string | null
+}
+
 export async function resendDriverActivationEmail(
   token: string,
   id: number,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; data: ResendActivationResult } | { ok: false; message: string }> {
   const res = await fetch(apiPath(`/api/admin/driver-applications/${id}/resend-activation`), {
     method: 'POST',
     headers: authHeader(token),
   })
-  if (res.status === 204) return { ok: true }
+  if (res.ok) {
+    const data = (await res.json()) as ResendActivationResult
+    return { ok: true, data }
+  }
   let message = `Gabim ${res.status}`
   try {
     const j = (await res.json()) as { message?: string }

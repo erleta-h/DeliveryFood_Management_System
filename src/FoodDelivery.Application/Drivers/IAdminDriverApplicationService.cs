@@ -27,7 +27,7 @@ public interface IAdminDriverApplicationService
         long rejectedByUserId,
         CancellationToken cancellationToken = default);
 
-    Task<(bool Sent, string? Error)> ResendActivationEmailAsync(
+    Task<(ResendDriverActivationResultDto? Result, string? Error)> ResendActivationEmailAsync(
         long applicationId,
         long actorUserId,
         bool includeDevActivationUrl,

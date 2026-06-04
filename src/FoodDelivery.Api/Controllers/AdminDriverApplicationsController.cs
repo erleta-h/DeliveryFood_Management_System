@@ -95,17 +95,17 @@ public sealed class AdminDriverApplicationsController : ControllerBase
     }
 
     [HttpPost("{id:long}/resend-activation")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ResendDriverActivationResultDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ResendActivation(long id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ResendDriverActivationResultDto>> ResendActivation(long id, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null) return Unauthorized();
 
-        var (sent, err) = await _svc.ResendActivationEmailAsync(id, userId.Value, _env.IsDevelopment(), cancellationToken);
+        var (result, err) = await _svc.ResendActivationEmailAsync(id, userId.Value, _env.IsDevelopment(), cancellationToken);
         if (err is not null)
             return BadRequest(new { message = err });
 
-        return NoContent();
+        return Ok(result);
     }
 }

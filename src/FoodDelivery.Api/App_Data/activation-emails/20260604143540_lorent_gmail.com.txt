@@ -1,0 +1,9 @@
+To: lorent@gmail.com
+Subject: Aktivizo llogarinë Deliver — FoodDelivery
+
+Përshëndetje lorent tahiri,
+
+Aplikimi juaj është miratuar.
+Klikoni linkun më poshtë për të aktivizuar llogarinë dhe për të krijuar fjalëkalimin:
+
+http://localhost:5173/activate-account?token=x-0n54dfT2Gr3C6kHhnPUFjrutFV9xGXEoSbHtAM1zk

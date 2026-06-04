@@ -95,6 +95,9 @@ public sealed class AdminDriverApplicationService : IAdminDriverApplicationServi
 
         var docs = await LoadDocumentDtosAsync(app.Id, cancellationToken);
         var history = await BuildHistoryAsync(app, approvedByName, cancellationToken);
+        var devUrl = _env.IsDevelopment()
+            ? ReadDevActivationUrlFromDisk(app.Email)
+            : null;
 
         return new DriverApplicationDetailDto(
             app.Id,
@@ -113,8 +116,55 @@ public sealed class AdminDriverApplicationService : IAdminDriverApplicationServi
             app.ActivatedAtUtc,
             app.ActivationEmailSentAtUtc,
             app.Status == DriverApplicationStatuses.ApprovedWaitingActivation,
+            devUrl,
             docs,
             history);
+    }
+
+    private string? ReadDevActivationUrlFromDisk(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return null;
+
+        var dir = Path.Combine(_env.ContentRootPath, "App_Data", "activation-emails");
+        if (!Directory.Exists(dir))
+            return null;
+
+        var needle = email.Trim().Replace('@', '_');
+        string? latestFile = null;
+        DateTime latestTime = DateTime.MinValue;
+        foreach (var path in Directory.EnumerateFiles(dir, "*.txt"))
+        {
+            var name = Path.GetFileName(path);
+            if (!name.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var wt = File.GetLastWriteTimeUtc(path);
+            if (wt <= latestTime)
+                continue;
+
+            latestTime = wt;
+            latestFile = path;
+        }
+
+        if (latestFile is null)
+            return null;
+
+        try
+        {
+            var text = File.ReadAllText(latestFile);
+            const string marker = "http";
+            var idx = text.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+                return null;
+
+            var end = text.IndexOfAny(['\r', '\n', ' '], idx);
+            return end < 0 ? text[idx..].Trim() : text[idx..end].Trim();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public async Task<(string? PhysicalPath, string? ContentType, string? Error)> GetDocumentFileAsync(
@@ -266,7 +316,7 @@ public sealed class AdminDriverApplicationService : IAdminDriverApplicationServi
         return null;
     }
 
-    public async Task<(bool Sent, string? Error)> ResendActivationEmailAsync(
+    public async Task<(ResendDriverActivationResultDto? Result, string? Error)> ResendActivationEmailAsync(
         long applicationId,
         long actorUserId,
         bool includeDevActivationUrl,
@@ -276,18 +326,21 @@ public sealed class AdminDriverApplicationService : IAdminDriverApplicationServi
             .Include(a => a.User)
             .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
         if (app is null)
-            return (false, "Aplikimi nuk u gjet.");
+            return (null, "Aplikimi nuk u gjet.");
         if (app.Status != DriverApplicationStatuses.ApprovedWaitingActivation || app.User is null)
-            return (false, "Email aktivizimi mund të ridërgohet vetëm për aplikime të miratuara që presin aktivizim.");
+            return (null, "Email aktivizimi mund të ridërgohet vetëm për aplikime të miratuara që presin aktivizim.");
 
-        await IssueActivationTokenAndEmailAsync(
+        var activationUrl = await IssueActivationTokenAndEmailAsync(
             app.User,
             app,
             actorUserId,
             DriverApplicationAuditEventTypes.ActivationEmailResent,
             cancellationToken);
         await _uow.SaveChangesAsync(cancellationToken);
-        return (true, null);
+        return (new ResendDriverActivationResultDto(
+            true,
+            app.ActivationEmailSentAtUtc,
+            includeDevActivationUrl && _env.IsDevelopment() ? activationUrl : null), null);
     }
 
     private async Task<string> IssueActivationTokenAndEmailAsync(

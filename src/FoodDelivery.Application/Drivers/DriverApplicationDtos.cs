@@ -43,6 +43,11 @@ public record ApproveDriverApplicationResultDto(
 
 public record RejectDriverApplicationRequest(string Reason);
 
+public record ResendDriverActivationResultDto(
+    bool Sent,
+    DateTime? ActivationEmailSentAtUtc,
+    string? DevActivationUrl);
+
 public record DriverApplicationDocumentDto(
     string Kind,
     string Filename,
@@ -72,5 +77,6 @@ public record DriverApplicationDetailDto(
     DateTime? ActivatedAtUtc,
     DateTime? ActivationEmailSentAtUtc,
     bool CanResendActivationEmail,
+    string? DevActivationUrl,
     IReadOnlyList<DriverApplicationDocumentDto> Documents,
     IReadOnlyList<DriverApplicationAuditEntryDto> History);
