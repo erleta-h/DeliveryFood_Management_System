@@ -266,8 +266,11 @@ public sealed class KitchenOrdersService : IKitchenOrdersService
             .ThenBy(d => d.User.FirstName)
             .Select(d => new KitchenAssignableDriverDto(
                 d.UserId,
-                d.User.FirstName + " " + d.User.LastName,
+                (d.User.FirstName + " " + d.User.LastName).Trim(),
                 d.VehicleType,
+                d.User.Phone,
+                d.LicensePlate,
+                d.IsOnline,
                 d.LastLatitude,
                 d.LastLongitude))
             .ToListAsync(cancellationToken);

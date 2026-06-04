@@ -22,9 +22,9 @@ export function formatOrderClock(placedAtUtc: string): string {
   }
 }
 
-/** Kohë relative nga `placedAtUtc`: min → orë (≥60) → ditë (≥24h). */
-export function minutesAgoLabel(placedAtUtc: string, nowMs = Date.now()): string {
-  const t = Date.parse(placedAtUtc)
+/** Kohë relative nga një moment UTC: min → orë (≥60) → ditë (≥24h). */
+export function minutesAgoLabel(atUtc: string, nowMs = Date.now()): string {
+  const t = Date.parse(atUtc)
   if (!Number.isFinite(t)) return ''
   const m = Math.max(0, Math.floor((nowMs - t) / 60_000))
   if (m < 1) return 'tani'
@@ -33,6 +33,16 @@ export function minutesAgoLabel(placedAtUtc: string, nowMs = Date.now()): string
   if (h < 24) return `${h} orë më parë`
   const d = Math.floor(h / 24)
   return `${d} ditë më parë`
+}
+
+/** Për rreshtin «Deliver: …» — kohë e caktimit / pranimit, jo koha e porosisë. */
+export function kitchenDriverStatusAtUtc(o: KitchenOrder): string {
+  return (
+    o.deliveryAcceptedAtUtc ??
+    o.deliveryOfferedAtUtc ??
+    o.deliveryArrivedAtRestaurantUtc ??
+    o.placedAtUtc
+  )
 }
 
 function customerFullName(o: KitchenOrder): string {
@@ -52,13 +62,17 @@ const columnThemes = {
 export function KanbanColumn({
   kind,
   count,
+  badgeCount,
   children,
 }: {
   kind: keyof typeof columnThemes
   count: number
+  /** Numri në kornizë (p.sh. deliver online); default = count. */
+  badgeCount?: number
   children: ReactNode
 }) {
   const theme = columnThemes[kind]
+  const badge = badgeCount ?? count
   return (
     <div className="flex min-h-[320px] min-w-[min(100%,240px)] flex-1 flex-col rounded-xl border border-[#30363d] bg-[#161b22] md:min-w-0">
       <div className="flex items-center justify-between gap-2 border-b border-[#30363d] px-3 py-2.5">
@@ -68,7 +82,7 @@ export function KanbanColumn({
           {theme.label}
         </span>
         <span className="min-w-[1.25rem] rounded-md bg-[#21262d] px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums text-zinc-200">
-          {count}
+          {badge}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">{children}</div>
@@ -208,15 +222,19 @@ export function MerchantOrderCard({
   o,
   nowMs,
   statusLine,
+  statusAtUtc,
   footer,
   highlight,
 }: {
   o: KitchenOrder
   nowMs?: number
   statusLine?: string
+  /** Momenti për «· X min më parë»; default = placedAtUtc. */
+  statusAtUtc?: string
   footer?: ReactNode
   highlight?: boolean
 }) {
+  const relativeAt = statusAtUtc ?? o.placedAtUtc
   const isDelivery = o.fulfillmentType !== 'pickup'
   const orderLabel = o.orderNumber.startsWith('#') ? o.orderNumber : `#${o.orderNumber}`
   const address = [o.addressLine1, o.city].filter(Boolean).join(', ')
@@ -274,7 +292,7 @@ export function MerchantOrderCard({
           <InfoLine icon={clockIcon}>
             {statusLine}
             {nowMs != null ? (
-              <span className="text-zinc-500"> · {minutesAgoLabel(o.placedAtUtc, nowMs)}</span>
+              <span className="text-zinc-500"> · {minutesAgoLabel(relativeAt, nowMs)}</span>
             ) : null}
           </InfoLine>
         ) : null}
@@ -303,7 +321,7 @@ export function MerchantAssignDriverBtn({
       onClick={onClick}
       className="w-full rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-semibold text-[#0d1117] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] transition hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-45"
     >
-      Cakto driver
+      Cakto shofer
     </button>
   )
 }

@@ -10,6 +10,8 @@ import {
   customerPanelSubtitle,
   customerShellBg,
 } from '../lib/customerTheme'
+import { LicensePlateInputField, validateLicensePlateField } from '../components/LicensePlateInputField'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
 import { submitDriverApplication } from './../lib/driverApi'
 
 const backIconBtnClass =
@@ -90,6 +92,16 @@ export default function DriverApplyPage() {
       validateDoc(vehiclePhoto, 'Foto e mjetit')
     if (docErr) {
       setError(docErr)
+      return
+    }
+    const phoneErr = validatePhoneField(phone)
+    if (phoneErr) {
+      setError(phoneErr)
+      return
+    }
+    const plateErr = validateLicensePlateField(licensePlate)
+    if (plateErr) {
+      setError(plateErr)
       return
     }
 
@@ -188,19 +200,15 @@ export default function DriverApplyPage() {
                 />
               </div>
             </div>
-            <div>
-              <label className={customerLabelForm} htmlFor="df-phone">
-                Telefoni
-              </label>
-              <input
-                id="df-phone"
-                className={customerFieldPartner}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                autoComplete="tel"
-              />
-            </div>
+            <PhoneInputField
+              id="df-phone"
+              variant="partner"
+              label="Telefoni"
+              required
+              value={phone}
+              onChange={setPhone}
+              hint="Për t’ju kontaktuar gjatë shqyrtimit të aplikimit."
+            />
             <div>
               <label className={customerLabelForm} htmlFor="df-email">
                 Email
@@ -228,17 +236,11 @@ export default function DriverApplyPage() {
                 required
               />
             </div>
-            <div>
-              <label className={customerLabelForm} htmlFor="df-plate">
-                Targa
-              </label>
-              <input
-                id="df-plate"
-                className={customerFieldPartner}
-                value={licensePlate}
-                onChange={(e) => setLicensePlate(e.target.value)}
-              />
-            </div>
+            <LicensePlateInputField
+              id="df-plate"
+              value={licensePlate}
+              onChange={setLicensePlate}
+            />
             <div>
               <label className={customerLabelForm} htmlFor="df-msg">
                 Mesazh

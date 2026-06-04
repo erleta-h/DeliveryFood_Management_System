@@ -14,7 +14,8 @@ import {
   type KitchenTodayStats,
 } from '../lib/kitchenApi'
 import { DRIVER_LEG } from '../lib/driverApi'
-import { distanceKmBetween, type LatLng } from '../lib/geo'
+import { pickNearestAssignableDriverUserId } from '../lib/kitchenDriverSort'
+import { ReadyOrderDriverAssign } from '../components/kitchen/ReadyOrderDriverAssign'
 import { createOrdersHubConnection } from '../lib/orderHub'
 import {
   KitchenOrderDetailsDrawer,
@@ -24,7 +25,7 @@ import {
 import {
   ColumnEmptyState,
   KanbanColumn,
-  MerchantAssignDriverBtn,
+  kitchenDriverStatusAtUtc,
   MerchantGhostBtn,
   MerchantOrderCard,
   MerchantPrimaryBtn,
@@ -211,19 +212,12 @@ export function DeliverWoltRailCard({
           <p className="mt-1.5 max-w-full truncate px-1 text-[11px] text-zinc-500">{shortCustomerLabel(o)}</p>
         </div>
 
-        <div className="max-h-[min(48vh,380px)] overflow-y-auto overscroll-y-contain pr-0.5">
-          <DriverProximityCouponsList
-            o={o}
+        <div className="mt-2">
+          <ReadyOrderDriverAssign
+            order={o}
             assignableDrivers={assignableDrivers}
-            interactive
             busy={busy}
-            onAssignDriver={(du) => onAssignNearest!(o.id, du)}
-            intro={
-              <>
-                <span className="font-medium text-zinc-400">3 më të afërtit</span> — prek për caktim manual nëse #1
-                nuk u caktua automatikisht me «Gati për marrje».
-              </>
-            }
+            onAssign={(du) => onAssignNearest!(o.id, du)}
           />
         </div>
 
@@ -454,239 +448,12 @@ function PrepCountdownRing({
   )
 }
 
-function kitchenLatLng(lat?: number | null, lng?: number | null): LatLng | null {
-  if (lat == null || lng == null) return null
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
-  return { lat, lng }
-}
-
-function driverLatLng(d: KitchenAssignableDriver): LatLng | null {
-  return kitchenLatLng(d.lastLatitude, d.lastLongitude)
-}
-
-function computeSortedDriversForOrder(
-  assignableDrivers: KitchenAssignableDriver[],
-  restaurantPos: LatLng | null,
-  deliveryDestPos: LatLng | null,
-): KitchenAssignableDriver[] {
-  const m = new Map<number, KitchenAssignableDriver>()
-  for (const d of assignableDrivers) {
-    if (!m.has(d.userId)) m.set(d.userId, d)
-  }
-  const list = [...m.values()]
-  function sortKey(d: KitchenAssignableDriver): [number, number, number, string] {
-    const p = driverLatLng(d)
-    const toRest = distanceKmBetween(p, restaurantPos)
-    const toDest = distanceKmBetween(p, deliveryDestPos)
-    const hasKm = toRest != null || toDest != null
-    const tier = hasKm ? 0 : 1
-    const primary = toRest ?? toDest ?? Number.POSITIVE_INFINITY
-    const secondary = toDest ?? Number.POSITIVE_INFINITY
-    return [tier, primary, secondary, d.displayName]
-  }
-  list.sort((a, b) => {
-    const [ta, pa, sa, na] = sortKey(a)
-    const [tb, pb, sb, nb] = sortKey(b)
-    if (ta !== tb) return ta - tb
-    if (pa !== pb) return pa - pb
-    if (sa !== sb) return sa - sb
-    return na.localeCompare(nb, 'sq', { sensitivity: 'base' })
-  })
-  return list
-}
-
-/** Distanca më e mirë e vlerësuar: min(restorant, klient) kur të dyja ekzistojnë. */
-function bestKmDriverToOrder(
-  d: KitchenAssignableDriver,
-  restaurantPos: LatLng | null,
-  deliveryDestPos: LatLng | null,
-): number | null {
-  const dp = driverLatLng(d)
-  const kmRest = distanceKmBetween(dp, restaurantPos)
-  const kmDest = distanceKmBetween(dp, deliveryDestPos)
-  if (kmRest == null && kmDest == null) return null
-  if (kmRest == null) return kmDest
-  if (kmDest == null) return kmRest
-  return Math.min(kmRest, kmDest)
-}
-
-/**
- * Të gjithë korrierët e caktueshëm, të renditur: më i afërti me restorantin/klientin sipas GPS,
- * pastaj ata pa koordinata (sipas emrit).
- */
-function useSortedDriversForReadyOrder(
-  o: KitchenOrder,
-  assignableDrivers: KitchenAssignableDriver[],
-): KitchenAssignableDriver[] {
-  return useMemo(() => {
-    const restaurantPos = kitchenLatLng(o.restaurantLatitude, o.restaurantLongitude)
-    const deliveryDestPos = kitchenLatLng(o.deliveryDestinationLatitude, o.deliveryDestinationLongitude)
-    return computeSortedDriversForOrder(assignableDrivers, restaurantPos, deliveryDestPos)
-  }, [
-    assignableDrivers,
-    o.restaurantLatitude,
-    o.restaurantLongitude,
-    o.deliveryDestinationLatitude,
-    o.deliveryDestinationLongitude,
-  ])
-}
-
-/** Për caktim automatik: #1 me GPS vetëm nga 3 kuponat e shfaqura në panel (si në Ready gjatë përgatitjes). */
-function pickNearestAssignableDriverUserId(
-  o: KitchenOrder,
-  assignableDrivers: KitchenAssignableDriver[],
-): number | null {
-  if (o.fulfillmentType === 'pickup') return null
-  if (o.assignedDriverUserId != null) return null
-  const restaurantPos = kitchenLatLng(o.restaurantLatitude, o.restaurantLongitude)
-  const deliveryDestPos = kitchenLatLng(o.deliveryDestinationLatitude, o.deliveryDestinationLongitude)
-  const sorted = computeSortedDriversForOrder(assignableDrivers, restaurantPos, deliveryDestPos)
-  const top3 = sorted.slice(0, 3)
-  for (const d of top3) {
-    const km = bestKmDriverToOrder(d, restaurantPos, deliveryDestPos)
-    if (km != null) return d.userId
-  }
-  return null
-}
-
-/**
- * ETA vizuale nga distanca (si Wolt «Pickup in < 2 min» jeshil).
- * Vlerësim i përafërt, jo GPS live i korrierit.
- */
-function woltDriverEtaFromKm(km: number | null): { timePart: string; timeGreen: boolean } {
-  if (km == null) return { timePart: '…', timeGreen: false }
-  if (km <= 2) return { timePart: '< 2 min', timeGreen: true }
-  const mins = Math.max(2, Math.min(45, Math.round(km * 2.2)))
-  return { timePart: `${mins} min`, timeGreen: false }
-}
-
-/** Tre kuponat më të afërt; rifreskohen me `assignableDrivers` të panelit. Prep: vetëm pamje; Ready: klik për caktim. */
-function DriverProximityCouponsList({
-  o,
-  assignableDrivers,
-  interactive,
-  busy = false,
-  onAssignDriver,
-  intro,
-}: {
-  o: KitchenOrder
-  assignableDrivers: KitchenAssignableDriver[]
-  interactive: boolean
-  busy?: boolean
-  onAssignDriver?: (driverUserId: number) => void
-  intro: ReactNode
-}) {
-  const driversSorted = useSortedDriversForReadyOrder(o, assignableDrivers)
-  const driversList = useMemo(() => driversSorted.slice(0, 3), [driversSorted])
-  const restaurantPos = useMemo(
-    () => kitchenLatLng(o.restaurantLatitude, o.restaurantLongitude),
-    [o.restaurantLatitude, o.restaurantLongitude],
-  )
-  const deliveryDestPos = useMemo(
-    () => kitchenLatLng(o.deliveryDestinationLatitude, o.deliveryDestinationLongitude),
-    [o.deliveryDestinationLatitude, o.deliveryDestinationLongitude],
-  )
-  const typeLabel = o.fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'
-
-  if (driversList.length === 0) {
-    return (
-      <p className="mt-3 px-1 text-[10px] leading-snug text-amber-200/90">
-        Nuk ka korrier online — lista rifreskohet me panelin (~12s).
-      </p>
-    )
-  }
-
-  const nearestIdxWithGps = driversList.findIndex(
-    (x) => bestKmDriverToOrder(x, restaurantPos, deliveryDestPos) != null,
-  )
-
+/** Porosi READY delivery pa shofer — duhet lista e shoferëve online. */
+function orderNeedsDriverAssign(o: KitchenOrder): boolean {
   return (
-    <>
-      <p className="mt-2 px-1 text-center text-[9px] leading-snug text-zinc-500">{intro}</p>
-      <ul className="mt-2 flex w-full flex-col gap-2" role="list">
-        {driversList.map((d, idx) => {
-          const km = bestKmDriverToOrder(d, restaurantPos, deliveryDestPos)
-          const eta = woltDriverEtaFromKm(km)
-          const isNearestWithGps = nearestIdxWithGps >= 0 && idx === nearestIdxWithGps
-          const du = Number(d.userId)
-          const rank = idx + 1
-          const shell = `flex w-full flex-col items-center rounded-[1.15rem] px-2 py-2.5 text-center ${
-            interactive
-              ? `transition active:scale-[0.99] disabled:opacity-45 ${
-                  isNearestWithGps
-                    ? 'bg-[#343b42] ring-1 ring-[#3ddc84]/40 shadow-[0_0_0_1px_rgba(61,220,132,0.12)]'
-                    : 'bg-[#363a44] ring-1 ring-white/[0.08] hover:ring-white/15'
-                }`
-              : `cursor-default select-none ${
-                  isNearestWithGps
-                    ? 'bg-[#343b42] ring-1 ring-[#3ddc84]/35 shadow-[0_0_0_1px_rgba(61,220,132,0.1)]'
-                    : 'bg-[#363a44] ring-1 ring-white/[0.08]'
-                }`
-          }`
-          const body = (
-            <>
-              <div className="mb-1.5 flex w-full items-center justify-center gap-1.5">
-                <span className="flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-black/35 px-1.5 text-[10px] font-bold tabular-nums text-zinc-300 ring-1 ring-white/10">
-                  #{rank}
-                </span>
-                {isNearestWithGps ? (
-                  <span className="rounded-full bg-[#3ddc84]/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#3ddc84]">
-                    Më i afërmi
-                  </span>
-                ) : null}
-              </div>
-              <p className="max-w-full truncate text-[15px] font-semibold text-white">
-                {shortCourierLabel(d.displayName)}
-              </p>
-              <div
-                className="mt-2 flex h-[44px] w-[44px] items-center justify-center rounded-full bg-[#2f333c] text-white ring-1 ring-white/12"
-                title={d.vehicleType?.trim() || typeLabel}
-              >
-                <WoltCarGlyph className="h-[22px] w-[22px]" />
-              </div>
-              <p className="mt-2 text-[12px] leading-snug">
-                <span className="text-zinc-400">Pickup in </span>
-                <span
-                  className={
-                    eta.timeGreen ? 'font-semibold text-[#3ddc84]' : 'font-semibold text-white'
-                  }
-                >
-                  {eta.timePart}
-                </span>
-              </p>
-              {km != null ? (
-                <span className="mt-0.5 text-[9px] tabular-nums text-zinc-600">{km.toFixed(1)} km</span>
-              ) : (
-                <span className="mt-0.5 text-[9px] text-zinc-600">GPS mungon</span>
-              )}
-            </>
-          )
-          return (
-            <li key={d.userId}>
-              {interactive ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  className={shell}
-                  aria-label={
-                    isNearestWithGps
-                      ? `Cakto ${d.displayName} — më i afërmi, marrje`
-                      : `Cakto ${d.displayName} për marrje`
-                  }
-                  onClick={() => onAssignDriver?.(du)}
-                >
-                  {body}
-                </button>
-              ) : (
-                <div className={shell} role="group" aria-label={`${rank}. ${d.displayName}`}>
-                  {body}
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-    </>
+    o.status === S.ReadyForPickup &&
+    o.fulfillmentType !== 'pickup' &&
+    o.assignedDriverUserId == null
   )
 }
 
@@ -937,16 +704,23 @@ export default function KitchenOrdersPage() {
         fetchKitchenOrders(token),
         fetchKitchenTodayStats(token),
       ])
+      const needsDrivers = list.some(orderNeedsDriverAssign)
       let driversNext: KitchenAssignableDriver[] | 'keep' = 'keep'
-      try {
-        driversNext = await fetchKitchenAssignableDrivers(token)
-      } catch (e: unknown) {
-        if (isKitchenHttpUnauthorized(e)) throw e
-        /* rrjet / 5xx — mos e zbraz listën e korrierëve në rifreskim */
+      if (needsDrivers) {
+        try {
+          driversNext = await fetchKitchenAssignableDrivers(token)
+        } catch (e: unknown) {
+          if (isKitchenHttpUnauthorized(e)) throw e
+          /* rrjet / 5xx — mos e zbraz listën nëse kishte shoferë më parë */
+        }
       }
       setOrders(list)
       setStats(st)
-      if (driversNext !== 'keep') setAssignableDrivers(driversNext)
+      if (needsDrivers) {
+        if (driversNext !== 'keep') setAssignableDrivers(driversNext)
+      } else {
+        setAssignableDrivers([])
+      }
 
       const pending = list.filter((o) => o.status === S.Pending).length
       if (prevPendingRef.current !== null && pending > prevPendingRef.current) {
@@ -1358,9 +1132,6 @@ export default function KitchenOrdersPage() {
             readyOrdered.map((o) => {
               const needsDriver =
                 o.fulfillmentType !== 'pickup' && o.assignedDriverUserId == null
-              const nearestId = needsDriver
-                ? pickNearestAssignableDriverUserId(o, assignableDrivers)
-                : null
               return (
                 <MerchantOrderCard
                   key={o.id}
@@ -1369,12 +1140,11 @@ export default function KitchenOrdersPage() {
                   statusLine="Gati për dërgesë"
                   footer={
                     needsDriver ? (
-                      <MerchantAssignDriverBtn
+                      <ReadyOrderDriverAssign
+                        order={o}
+                        assignableDrivers={assignableDrivers}
                         busy={busyId === o.id}
-                        onClick={() => {
-                          if (nearestId != null) void runAssignDriver(o.id, nearestId)
-                          else setActionError('Nuk ka driver online për caktim.')
-                        }}
+                        onAssign={(driverUserId) => void runAssignDriver(o.id, driverUserId)}
                       />
                     ) : o.fulfillmentType === 'pickup' ? (
                       <MerchantPrimaryBtn busy={busyId === o.id} onClick={() => void runAction(o.id, S.Delivered)}>
@@ -1412,9 +1182,8 @@ export default function KitchenOrdersPage() {
                     ? `Deliver: ${o.assignedDriverDisplay}`
                     : 'Në rrugë për klientin'
                 }
-                footer={
-                  <MerchantDetailsBtn onClick={() => openOrderDetails(o.id)} />
-                }
+                statusAtUtc={kitchenDriverStatusAtUtc(o)}
+                footer={<MerchantDetailsBtn onClick={() => openOrderDetails(o.id)} />}
               />
             ))
           )}

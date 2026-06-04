@@ -48,13 +48,13 @@ export default function CheckoutPage() {
   const clear = useCartStore((s) => s.clear)
 
   const [notes, setNotes] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<number>(PAYMENT_COD)
   const [fulfillmentType, setFulfillmentType] = useState<number>(FULFILLMENT_DELIVERY)
   const [deliveryTo, setDeliveryTo] = useState<'saved' | 'oneTime'>('saved')
   const [otLine1, setOtLine1] = useState('')
   const [otLine2, setOtLine2] = useState('')
   const [otCity, setOtCity] = useState('')
   const [otPostal, setOtPostal] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<number>(PAYMENT_COD)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -440,7 +440,11 @@ export default function CheckoutPage() {
               <p className="mt-2 rounded-xl border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs leading-relaxed text-sky-100/85">
                 Pas konfirmimit hapet faqja e pagesës me kartë (Stripe).
               </p>
-            ) : null}
+            ) : (
+              <p className="mt-2 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-xs leading-relaxed text-zinc-400">
+                Paguani kur porosia mbërrin — deliver-i mbledh shumën në dorë.
+              </p>
+            )}
           </div>
 
           {error ? (

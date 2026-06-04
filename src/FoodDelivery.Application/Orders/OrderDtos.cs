@@ -106,6 +106,9 @@ public record KitchenAssignableDriverDto(
     long UserId,
     string DisplayName,
     string VehicleType,
+    string? Phone,
+    string? LicensePlate,
+    bool IsOnline,
     double? LastLatitude,
     double? LastLongitude);
 

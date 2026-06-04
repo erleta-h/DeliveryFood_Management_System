@@ -12,6 +12,7 @@ import {
 } from '../lib/customerTheme'
 import { getApproxCoordsForCity } from '../lib/kosovoCities'
 import { reverseGeocodeParts, searchAddress } from '../lib/nominatim'
+import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
 import { useAuthStore } from '../store/authStore'
 
 export default function AddressesPage() {
@@ -109,11 +110,12 @@ export default function AddressesPage() {
     e.preventDefault()
     setError(null)
     if (!line1.trim() || !city.trim()) return
-    const phoneTrim = phone.trim()
-    if (phoneTrim.replace(/\D/g, '').length < 8) {
-      setError('Numri i telefonit duhet të ketë të paktën 8 shifra.')
+    const phoneErr = validatePhoneField(phone)
+    if (phoneErr) {
+      setError(phoneErr)
       return
     }
+    const phoneTrim = phone.trim()
     const r = await updateProfile({
       phone: phoneTrim,
       line1: line1.trim(),
@@ -154,24 +156,15 @@ export default function AddressesPage() {
       </div>
 
       <form onSubmit={onSubmit} className="mt-8 max-w-xl space-y-5">
-        <div>
-          <label htmlFor="addr-phone" className={customerLabelSm}>
-            Numri i telefonit
-          </label>
-          <input
-            id="addr-phone"
-            type="tel"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className={customerField}
-            autoComplete="tel"
-            placeholder="p.sh. +383 44 123 456"
-          />
-          <p className="mt-1.5 text-xs text-zinc-500">
-            Për t’ju thirrur kur porosia është gati ose për pyetje nga restoranti.
-          </p>
-        </div>
+        <PhoneInputField
+          id="addr-phone"
+          variant="customer"
+          label="Telefoni"
+          required
+          value={phone}
+          onChange={setPhone}
+          hint="Për t’ju thirrur kur porosia është gati ose për pyetje nga restoranti."
+        />
         <div>
           <label htmlFor="addr-line1" className={customerLabelSm}>
             Adresa (rruga, numri)

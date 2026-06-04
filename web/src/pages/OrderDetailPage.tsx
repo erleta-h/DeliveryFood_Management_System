@@ -271,15 +271,11 @@ export default function OrderDetailPage() {
     <div className="-mx-4 -mt-6 sm:-mt-8">
 
       {/* ═══ Top bar ═══ */}
-      <div className="flex items-center justify-between px-4 py-3 sm:px-6">
+      <div className="px-4 py-3 sm:px-6">
         <Link to="/app/orders" className="inline-flex items-center gap-1.5 text-sm text-zinc-400 transition hover:text-zinc-200">
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><polyline points="12 19 5 12 12 5"/></svg>
           Kthehu te porositë
         </Link>
-        <button type="button" className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-[#1e293b] px-3 py-1.5 text-xs font-medium text-zinc-300 transition hover:border-white/15 hover:text-white">
-          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Ndihmë
-        </button>
       </div>
 
       {/* Payment banners */}
