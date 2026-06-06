@@ -70,13 +70,16 @@ public sealed class CouponService : ICouponService
             return "Kuponi nuk është aktiv.";
 
         if (coupon.ValidFrom.HasValue && nowUtc < coupon.ValidFrom.Value)
-            return "Kuponi ka skaduar.";
+            return "Kuponi nuk është aktiv ende.";
 
         if (coupon.ValidTo.HasValue && nowUtc > coupon.ValidTo.Value)
             return "Kuponi ka skaduar.";
 
         if (coupon.MaxUses.HasValue && coupon.UsesCount >= coupon.MaxUses.Value)
             return "Kuponi ka arritur limitin e përdorimeve.";
+
+        if (coupon.MinOrderAmount.HasValue && subtotal < coupon.MinOrderAmount.Value)
+            return $"Porosia minimale për këtë kupon është {coupon.MinOrderAmount.Value:0.##} €.";
 
         if (subtotal <= 0)
             return "Shuma e porosisë duhet të jetë pozitive.";

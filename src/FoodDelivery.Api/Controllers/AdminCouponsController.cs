@@ -1,3 +1,4 @@
+using FoodDelivery.Api.Security;
 using FoodDelivery.Application.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,16 +47,55 @@ public sealed class AdminCouponsController : ControllerBase
         return detail is null ? NotFound() : Ok(detail);
     }
 
+    [HttpGet("{id:long}/uses")]
+    [ProducesResponseType(typeof(AdminCouponUsesResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminCouponUsesResultDto>> Uses(
+        long id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _svc.ListUsesAsync(id, page, pageSize, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpGet("{id:long}/history")]
+    [ProducesResponseType(typeof(AdminCouponHistoryResultDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminCouponHistoryResultDto>> History(long id, CancellationToken cancellationToken)
+    {
+        var result = await _svc.ListHistoryAsync(id, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpPost]
     [ProducesResponseType(typeof(object), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] AdminCouponCreateRequest body, CancellationToken cancellationToken)
     {
-        var (ok, id, error) = await _svc.CreateAsync(body, cancellationToken);
+        var userId = User.GetUserId();
+        var (ok, id, error) = await _svc.CreateAsync(body, userId, cancellationToken);
         if (!ok)
             return BadRequest(new { message = error });
 
         return StatusCode(StatusCodes.Status201Created, new { id });
+    }
+
+    [HttpPut("{id:long}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(long id, [FromBody] AdminCouponUpdateRequest body, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var err = await _svc.UpdateAsync(id, body, userId, cancellationToken);
+        if (err == "Kupon nuk u gjet.")
+            return NotFound(new { message = err });
+        if (err is not null)
+            return BadRequest(new { message = err });
+
+        return NoContent();
     }
 
     [HttpPatch("{id:long}/active")]
@@ -63,7 +103,8 @@ public sealed class AdminCouponsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> SetActive(long id, [FromBody] AdminCouponSetActiveRequest body, CancellationToken cancellationToken)
     {
-        var err = await _svc.SetActiveAsync(id, body.IsActive, cancellationToken);
+        var userId = User.GetUserId();
+        var err = await _svc.SetActiveAsync(id, body.IsActive, userId, cancellationToken);
         if (err is not null)
             return BadRequest(new { message = err });
 
