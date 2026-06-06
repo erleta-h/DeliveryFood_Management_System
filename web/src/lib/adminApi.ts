@@ -691,6 +691,9 @@ export type AdminCustomerRow = {
   isActive: boolean
   addressCount: number
   orderCount: number
+  createdAtUtc: string
+  lastOrderAtUtc: string | null
+  lastOrderRestaurantName: string | null
 }
 
 export type AdminCustomerListResult = {
@@ -700,15 +703,43 @@ export type AdminCustomerListResult = {
   pageSize: number
 }
 
+export type AdminCustomerStats = {
+  total: number
+  active: number
+  blocked: number
+  totalAddresses: number
+  newThisWeek: number
+  newAddressesThisWeek: number
+}
+
+export type AdminCustomersQuery = {
+  search?: string
+  status?: 'all' | 'active' | 'blocked'
+  sort?: string
+  registeredFrom?: string
+  registeredTo?: string
+  page?: number
+  pageSize?: number
+}
+
+export async function fetchAdminCustomerStats(token: string): Promise<AdminCustomerStats> {
+  const res = await fetch(apiPath('/api/admin/customers/stats'), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminCustomerStats>
+}
+
 export async function fetchAdminCustomers(
   token: string,
-  q: { search?: string; sort?: string; page?: number; pageSize?: number },
+  q: AdminCustomersQuery,
 ): Promise<AdminCustomerListResult> {
   const p = new URLSearchParams()
   if (q.search?.trim()) p.set('search', q.search.trim())
+  if (q.status && q.status !== 'all') p.set('status', q.status)
   if (q.sort?.trim()) p.set('sort', q.sort.trim())
+  if (q.registeredFrom) p.set('registeredFromUtc', `${q.registeredFrom}T00:00:00.000Z`)
+  if (q.registeredTo) p.set('registeredToUtc', `${q.registeredTo}T23:59:59.999Z`)
   p.set('page', String(q.page ?? 1))
-  p.set('pageSize', String(q.pageSize ?? 20))
+  p.set('pageSize', String(q.pageSize ?? 10))
   const res = await fetch(apiPath(`/api/admin/customers?${p}`), { headers: { ...authHeader(token) } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<AdminCustomerListResult>

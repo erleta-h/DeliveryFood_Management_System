@@ -20,12 +20,31 @@ public sealed class AdminCustomersController : ControllerBase
     [ProducesResponseType(typeof(AdminCustomerListResultDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<AdminCustomerListResultDto>> List(
         [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? sort,
+        [FromQuery] DateTime? registeredFromUtc,
+        [FromQuery] DateTime? registeredToUtc,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery] int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        var result = await _svc.ListAsync(page, pageSize, search, cancellationToken);
+        var result = await _svc.ListAsync(
+            page,
+            pageSize,
+            search,
+            status,
+            sort,
+            registeredFromUtc,
+            registeredToUtc,
+            cancellationToken);
         return Ok(result);
+    }
+
+    [HttpGet("stats")]
+    [ProducesResponseType(typeof(AdminCustomerStatsDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AdminCustomerStatsDto>> Stats(CancellationToken cancellationToken)
+    {
+        return Ok(await _svc.GetStatsAsync(cancellationToken));
     }
 
     [HttpPatch("{id:long}/active")]

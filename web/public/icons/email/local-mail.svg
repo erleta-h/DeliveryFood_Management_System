@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Email lokal">
+  <rect width="48" height="48" rx="10" fill="#0078D4"/>
+  <path fill="#fff" d="M8 16h32c1.1 0 2 .9 2 2v16c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V18c0-1.1.9-2 2-2z"/>
+  <path fill="#B3D7FF" d="M8 18l16 12 16-12v16c0 1.1-.9 2-2 2H8c-1.1 0-2-.9-2-2V18z"/>
+  <path fill="#fff" d="M8 18l16 12L40 18" stroke="#E8F2FF" stroke-width="1"/>
+</svg>
