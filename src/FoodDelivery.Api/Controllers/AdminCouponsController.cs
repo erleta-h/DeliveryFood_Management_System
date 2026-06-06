@@ -16,15 +16,34 @@ public sealed class AdminCouponsController : ControllerBase
         _svc = svc;
     }
 
+    [HttpGet("stats")]
+    [ProducesResponseType(typeof(AdminCouponStatsDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<AdminCouponStatsDto>> Stats(CancellationToken cancellationToken)
+    {
+        return Ok(await _svc.GetStatsAsync(cancellationToken));
+    }
+
     [HttpGet]
     [ProducesResponseType(typeof(AdminCouponListResultDto), StatusCodes.Status200OK)]
     public async Task<ActionResult<AdminCouponListResultDto>> List(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string? search = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
-        var result = await _svc.ListAsync(page, pageSize, cancellationToken);
+        var result = await _svc.ListAsync(page, pageSize, search, status, sort, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(AdminCouponDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminCouponDetailDto>> GetOne(long id, CancellationToken cancellationToken)
+    {
+        var detail = await _svc.GetByIdAsync(id, cancellationToken);
+        return detail is null ? NotFound() : Ok(detail);
     }
 
     [HttpPost]

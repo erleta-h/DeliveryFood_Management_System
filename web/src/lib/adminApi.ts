@@ -9,6 +9,19 @@ export type PartnerApplicationRow = {
   email: string
   contactFirstName: string
   contactLastName: string
+  phone?: string
+  businessType?: string
+  venueCountLabel?: string
+  streetAddress?: string
+  message?: string | null
+}
+
+export type PartnerApplicationStats = {
+  total: number
+  pending: number
+  contacted: number
+  approved: number
+  rejected: number
 }
 
 export type ApprovePartnerResult = {
@@ -106,6 +119,102 @@ export async function rejectPartnerApplication(
     headers: authHeader(token),
   })
   if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try {
+    const j = (await res.json()) as { message?: string }
+    if (j.message) message = j.message
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, message }
+}
+
+export type PartnerContractDocument = {
+  filename: string
+  fileSize: number
+  uploadedAtUtc: string
+  uploadedByName: string | null
+  downloadUrl: string
+}
+
+export type PartnerApplicationAuditEntry = {
+  eventType: string
+  detail: string | null
+  createdAtUtc: string
+  actorName: string | null
+}
+
+export type PartnerApplicationDetail = {
+  id: number
+  createdAtUtc: string
+  status: number
+  venueName: string
+  city: string
+  email: string
+  contactFirstName: string
+  contactLastName: string
+  phone: string
+  businessType: string
+  venueCountLabel: string
+  streetAddress: string
+  message: string | null
+  country: string
+  postalCode: string
+  hasContract: boolean
+  contract: PartnerContractDocument | null
+  history: PartnerApplicationAuditEntry[]
+}
+
+export function partnerContractUrl(appId: number): string {
+  return apiPath(`/api/admin/partner-applications/${appId}/contract`)
+}
+
+export async function fetchPartnerApplicationDetail(
+  token: string,
+  id: number,
+): Promise<PartnerApplicationDetail> {
+  const res = await fetch(apiPath(`/api/admin/partner-applications/${id}`), {
+    headers: authHeader(token),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<PartnerApplicationDetail>
+}
+
+export async function markPartnerApplicationContacted(
+  token: string,
+  id: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/partner-applications/${id}/contact`), {
+    method: 'POST',
+    headers: authHeader(token),
+  })
+  if (res.status === 204) return { ok: true }
+  let message = `Gabim ${res.status}`
+  try {
+    const j = (await res.json()) as { message?: string }
+    if (j.message) message = j.message
+  } catch {
+    /* ignore */
+  }
+  return { ok: false, message }
+}
+
+export async function uploadPartnerContract(
+  token: string,
+  id: number,
+  file: File,
+): Promise<{ ok: true; data: PartnerContractDocument } | { ok: false; message: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(apiPath(`/api/admin/partner-applications/${id}/contract`), {
+    method: 'POST',
+    headers: authHeader(token),
+    body: form,
+  })
+  if (res.ok) {
+    const data = (await res.json()) as PartnerContractDocument
+    return { ok: true, data }
+  }
   let message = `Gabim ${res.status}`
   try {
     const j = (await res.json()) as { message?: string }
@@ -348,6 +457,45 @@ export type AdminOrderListResult = {
   pageSize: number
 }
 
+export type AdminOrderItem = {
+  name: string
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+export type AdminOrderStatusHistoryEntry = {
+  id: number
+  status: number
+  note: string | null
+  createdAtUtc: string
+}
+
+export type AdminOrderDetail = {
+  id: number
+  orderNumber: string
+  placedAtUtc: string
+  status: number
+  fulfillmentType: number
+  subtotal: number
+  deliveryFee: number
+  discountTotal: number
+  total: number
+  restaurantId: number
+  restaurantName: string
+  customerUserId: number
+  customerEmail: string
+  customerPhone: string | null
+  customerNotes: string | null
+  addressLine1: string
+  addressLine2: string | null
+  city: string
+  postalCode: string | null
+  items: AdminOrderItem[]
+  payments: AdminOrderPayment[]
+  statusHistory: AdminOrderStatusHistoryEntry[]
+}
+
 export type AdminOrdersQuery = {
   fromUtc?: string
   toUtc?: string
@@ -383,6 +531,18 @@ export async function fetchAdminOrders(
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<AdminOrderListResult>
+}
+
+export async function fetchAdminOrderDetail(
+  token: string,
+  orderId: number,
+): Promise<AdminOrderDetail> {
+  const res = await fetch(apiPath(`/api/admin/orders/${orderId}`), {
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 404) throw new Error('Porosia nuk u gjet.')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminOrderDetail>
 }
 
 async function readApiMessage(res: Response): Promise<string> {
@@ -462,9 +622,15 @@ export type AdminRestaurantRow = {
   slug: string | null
   isActive: boolean
   isApproved: boolean
-  deliveryFee: number
-  minOrderAmount: number
-  estimatedDeliveryMinutes: number
+  deliveryZoneId: number | null
+  deliveryZoneName: string | null
+  effectiveDeliveryFee: number
+  effectiveMinOrderAmount: number
+  effectiveEstimatedDeliveryMinutes: number
+  hasDeliveryOverride: boolean
+  overrideDeliveryFee: number | null
+  overrideMinOrderAmount: number | null
+  overrideEstimatedDeliveryMinutes: number | null
   orderCount: number
 }
 
@@ -495,6 +661,11 @@ export async function adminPatchRestaurant(
   body: {
     isActive?: boolean | null
     isApproved?: boolean | null
+    deliveryZoneId?: number | null
+    overrideDeliveryFee?: number | null
+    overrideMinOrderAmount?: number | null
+    overrideEstimatedDeliveryMinutes?: number | null
+    clearDeliveryOverrides?: boolean | null
     deliveryFee?: number | null
     minOrderAmount?: number | null
     estimatedDeliveryMinutes?: number | null
@@ -559,6 +730,13 @@ export async function adminSetCustomerActive(
 
 // --- Kupona ---
 
+export type AdminCouponStats = {
+  activeCount: number
+  totalUses: number
+  expiringSoonCount: number
+  totalDiscountGiven: number
+}
+
 export type AdminCouponRow = {
   id: number
   code: string
@@ -572,6 +750,11 @@ export type AdminCouponRow = {
   createdAt: string
 }
 
+export type AdminCouponDetail = AdminCouponRow & {
+  createdByName: string | null
+  totalDiscountGiven: number
+}
+
 export type AdminCouponListResult = {
   items: AdminCouponRow[]
   total: number
@@ -579,13 +762,32 @@ export type AdminCouponListResult = {
   pageSize: number
 }
 
+export async function fetchAdminCouponStats(token: string): Promise<AdminCouponStats> {
+  const res = await fetch(apiPath('/api/admin/coupons/stats'), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminCouponStats>
+}
+
+export async function fetchAdminCouponDetail(token: string, id: number): Promise<AdminCouponDetail> {
+  const res = await fetch(apiPath(`/api/admin/coupons/${id}`), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminCouponDetail>
+}
+
 export async function fetchAdminCoupons(
   token: string,
-  q: { search?: string; sort?: string; page?: number; pageSize?: number },
+  q: {
+    search?: string
+    sort?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  },
 ): Promise<AdminCouponListResult> {
   const p = new URLSearchParams()
   if (q.search?.trim()) p.set('search', q.search.trim())
   if (q.sort?.trim()) p.set('sort', q.sort.trim())
+  if (q.status?.trim()) p.set('status', q.status.trim())
   p.set('page', String(q.page ?? 1))
   p.set('pageSize', String(q.pageSize ?? 20))
   const res = await fetch(apiPath(`/api/admin/coupons?${p}`), { headers: { ...authHeader(token) } })
@@ -602,6 +804,7 @@ export async function adminCreateCoupon(
     maxUses?: number | null
     validFrom?: string | null
     validTo?: string | null
+    isActive?: boolean
   },
 ): Promise<{ ok: true; id: number } | { ok: false; message: string }> {
   const res = await fetch(apiPath('/api/admin/coupons'), {
@@ -679,7 +882,11 @@ export async function adminDeleteReview(
 
 export type AdminPaymentRow = {
   id: number
+  orderId: number
   orderNumber: string
+  restaurantName: string | null
+  customerEmail: string | null
+  customerName: string | null
   amount: number
   currency: string
   status: number
@@ -693,15 +900,28 @@ export type AdminPaymentListResult = {
   page: number
   pageSize: number
   sumCapturedAmount: number
+  sumPendingAmount: number
+  sumRefundedAmount: number
+  pendingCount: number
+  refundedCount: number
 }
 
 export async function fetchAdminPayments(
   token: string,
-  q: { fromUtc?: string; toUtc?: string; page?: number; pageSize?: number },
+  q: {
+    fromUtc?: string
+    toUtc?: string
+    status?: number
+    provider?: string
+    page?: number
+    pageSize?: number
+  },
 ): Promise<AdminPaymentListResult> {
   const p = new URLSearchParams()
   if (q.fromUtc) p.set('fromUtc', q.fromUtc)
   if (q.toUtc) p.set('toUtc', q.toUtc)
+  if (q.status !== undefined && q.status !== null) p.set('status', String(q.status))
+  if (q.provider?.trim()) p.set('provider', q.provider.trim())
   p.set('page', String(q.page ?? 1))
   p.set('pageSize', String(q.pageSize ?? 25))
   const res = await fetch(apiPath(`/api/admin/finance/payments?${p}`), {
@@ -1104,12 +1324,158 @@ export async function fetchAdminAudit(
   return res.json() as Promise<AdminAuditListResult>
 }
 
-// --- Zona (qytete) ---
+// --- Zonat e dërgesës ---
 
 export type AdminCityZone = {
   city: string
   restaurantCount: number
   activeApprovedCount: number
+}
+
+export type DeliveryZoneRow = {
+  id: number
+  name: string
+  city: string
+  deliveryFee: number
+  minOrderAmount: number
+  estimatedDeliveryMinutes: number
+  isActive: boolean
+  restaurantCount: number
+  sortOrder: number
+}
+
+export type DeliveryZoneListResult = {
+  items: DeliveryZoneRow[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export type DeliveryZoneStats = {
+  activeZoneCount: number
+  restaurantsCovered: number
+  averageDeliveryFee: number
+  averageEstimatedMinutes: number
+  pendingApplicationsCount: number
+}
+
+export type DeliveryZoneRestaurantSummary = {
+  id: number
+  name: string
+  isActive: boolean
+  isApproved: boolean
+}
+
+export type DeliveryZoneDetail = {
+  id: number
+  name: string
+  city: string
+  deliveryFee: number
+  minOrderAmount: number
+  estimatedDeliveryMinutes: number
+  description: string | null
+  isActive: boolean
+  sortOrder: number
+  restaurantCount: number
+  restaurants: DeliveryZoneRestaurantSummary[]
+}
+
+export type DeliveryZoneOption = {
+  id: number
+  name: string
+  city: string
+  isActive: boolean
+}
+
+export async function fetchDeliveryZoneStats(token: string): Promise<DeliveryZoneStats> {
+  const res = await fetch(apiPath('/api/admin/zones/stats'), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DeliveryZoneStats>
+}
+
+export async function fetchDeliveryZones(
+  token: string,
+  q: { page?: number; pageSize?: number; search?: string; status?: string; sort?: string },
+): Promise<DeliveryZoneListResult> {
+  const p = new URLSearchParams()
+  p.set('page', String(q.page ?? 1))
+  p.set('pageSize', String(q.pageSize ?? 20))
+  if (q.search?.trim()) p.set('search', q.search.trim())
+  if (q.status?.trim()) p.set('status', q.status.trim())
+  if (q.sort?.trim()) p.set('sort', q.sort.trim())
+  const res = await fetch(apiPath(`/api/admin/zones?${p}`), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DeliveryZoneListResult>
+}
+
+export async function fetchDeliveryZoneOptions(token: string): Promise<DeliveryZoneOption[]> {
+  const res = await fetch(apiPath('/api/admin/zones/options'), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DeliveryZoneOption[]>
+}
+
+export async function fetchDeliveryZoneDetail(token: string, id: number): Promise<DeliveryZoneDetail> {
+  const res = await fetch(apiPath(`/api/admin/zones/${id}`), { headers: { ...authHeader(token) } })
+  if (res.status === 404) throw new Error('Zona nuk u gjet.')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<DeliveryZoneDetail>
+}
+
+export async function createDeliveryZone(
+  token: string,
+  body: {
+    name: string
+    city: string
+    deliveryFee: number
+    minOrderAmount: number
+    estimatedDeliveryMinutes: number
+    description?: string | null
+    isActive: boolean
+    sortOrder?: number | null
+  },
+): Promise<{ ok: true; data: DeliveryZoneDetail } | { ok: false; message: string }> {
+  const res = await fetch(apiPath('/api/admin/zones'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return { ok: false, message: await readApiMessage(res) }
+  return { ok: true, data: (await res.json()) as DeliveryZoneDetail }
+}
+
+export async function updateDeliveryZone(
+  token: string,
+  id: number,
+  body: {
+    name?: string
+    city?: string
+    deliveryFee?: number
+    minOrderAmount?: number
+    estimatedDeliveryMinutes?: number
+    description?: string | null
+    isActive?: boolean
+    sortOrder?: number
+  },
+): Promise<{ ok: true; data: DeliveryZoneDetail } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/zones/${id}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return { ok: false, message: await readApiMessage(res) }
+  return { ok: true, data: (await res.json()) as DeliveryZoneDetail }
+}
+
+export async function deleteDeliveryZone(
+  token: string,
+  id: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/zones/${id}`), {
+    method: 'DELETE',
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 204) return { ok: true }
+  return { ok: false, message: await readApiMessage(res) }
 }
 
 export async function fetchAdminCityZones(token: string): Promise<AdminCityZone[]> {
@@ -1164,7 +1530,12 @@ export function adminDataExportUrl(resource: string, format: 'csv' | 'json' | 'x
 
 // --- CMS (faqja kryesore) ---
 
-export type AdminCmsEntry = { key: string; value: string | null; description: string | null }
+export type AdminCmsEntry = {
+  key: string
+  value: string | null
+  description: string | null
+  updatedAt: string | null
+}
 
 export async function fetchAdminCms(token: string): Promise<AdminCmsEntry[]> {
   const res = await fetch(apiPath('/api/admin/cms'), { headers: { ...authHeader(token) } })
