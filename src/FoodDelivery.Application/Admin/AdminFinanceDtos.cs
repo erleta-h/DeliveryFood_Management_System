@@ -2,7 +2,11 @@ namespace FoodDelivery.Application.Admin;
 
 public sealed record AdminPaymentListItemDto(
     long Id,
+    long OrderId,
     string OrderNumber,
+    string? RestaurantName,
+    string? CustomerEmail,
+    string? CustomerName,
     decimal Amount,
     string Currency,
     int Status,
@@ -14,4 +18,8 @@ public sealed record AdminPaymentListResultDto(
     int Total,
     int Page,
     int PageSize,
-    decimal SumCapturedAmount);
+    decimal SumCapturedAmount,
+    decimal SumPendingAmount,
+    decimal SumRefundedAmount,
+    int PendingCount,
+    int RefundedCount);

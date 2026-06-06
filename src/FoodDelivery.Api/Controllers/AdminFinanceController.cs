@@ -21,11 +21,13 @@ public sealed class AdminFinanceController : ControllerBase
     public async Task<ActionResult<AdminPaymentListResultDto>> List(
         [FromQuery] DateTime? fromUtc,
         [FromQuery] DateTime? toUtc,
+        [FromQuery] int? status,
+        [FromQuery] string? provider,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         CancellationToken cancellationToken = default)
     {
-        var result = await _svc.ListPaymentsAsync(page, pageSize, fromUtc, toUtc, cancellationToken);
+        var result = await _svc.ListPaymentsAsync(page, pageSize, fromUtc, toUtc, status, provider, cancellationToken);
         return Ok(result);
     }
 }
