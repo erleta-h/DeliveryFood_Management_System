@@ -319,9 +319,13 @@ public sealed class AdminDataPortService : IAdminDataPortService
                 c.Id,
                 c.Code,
                 c.DiscountPercent,
+                c.MaxDiscountAmount,
+                c.MinOrderAmount,
                 c.IsActive,
                 c.UsesCount,
                 c.MaxUses,
+                c.ValidFrom,
+                c.ValidTo,
                 c.CreatedAt,
             })
             .ToListAsync(cancellationToken);
@@ -333,16 +337,20 @@ public sealed class AdminDataPortService : IAdminDataPortService
         if (format == "csv")
         {
             var sb = new StringBuilder();
-            sb.AppendLine("id,code,discountPercent,isActive,usesCount,maxUses,createdAtUtc");
+            sb.AppendLine("id,code,discountPercent,maxDiscountAmount,minOrderAmount,isActive,usesCount,maxUses,validFromUtc,validToUtc,createdAtUtc");
             foreach (var x in rows)
             {
                 sb.AppendLine(string.Join(',',
                     x.Id,
                     CsvCell(x.Code),
                     x.DiscountPercent,
+                    x.MaxDiscountAmount?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    x.MinOrderAmount?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
                     x.IsActive ? 1 : 0,
                     x.UsesCount,
                     x.MaxUses?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+                    x.ValidFrom?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
+                    x.ValidTo?.ToString("o", CultureInfo.InvariantCulture) ?? string.Empty,
                     x.CreatedAt.ToString("o", CultureInfo.InvariantCulture)));
             }
 
@@ -447,6 +455,8 @@ public sealed class AdminDataPortService : IAdminDataPortService
     {
         public string? Code { get; set; }
         public int DiscountPercent { get; set; }
+        public decimal? MaxDiscountAmount { get; set; }
+        public decimal? MinOrderAmount { get; set; }
     }
 
     private async Task<string?> ImportCouponsJsonAsync(string json, CancellationToken cancellationToken)
@@ -477,6 +487,8 @@ public sealed class AdminDataPortService : IAdminDataPortService
             {
                 Code = code,
                 DiscountPercent = row.DiscountPercent,
+                MaxDiscountAmount = row.MaxDiscountAmount,
+                MinOrderAmount = row.MinOrderAmount,
                 IsActive = true,
                 UsesCount = 0,
                 CreatedAt = now,
@@ -509,10 +521,20 @@ public sealed class AdminDataPortService : IAdminDataPortService
                 continue;
             if (await _uow.Repository<Coupon, long>().Query.AnyAsync(c => c.Code == code, cancellationToken))
                 continue;
+
+            decimal? maxDisc = null;
+            if (parts.Count > 2 && decimal.TryParse(parts[2], NumberStyles.Number, CultureInfo.InvariantCulture, out var md))
+                maxDisc = md;
+            decimal? minOrder = null;
+            if (parts.Count > 3 && decimal.TryParse(parts[3], NumberStyles.Number, CultureInfo.InvariantCulture, out var mo))
+                minOrder = mo;
+
             _uow.Repository<Coupon, long>().Add(new Coupon
             {
                 Code = code,
                 DiscountPercent = pct,
+                MaxDiscountAmount = maxDisc,
+                MinOrderAmount = minOrder,
                 IsActive = true,
                 UsesCount = 0,
                 CreatedAt = now,

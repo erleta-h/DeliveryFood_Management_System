@@ -9,6 +9,8 @@ public class Coupon
     public decimal DiscountPercent { get; set; }
     public bool IsActive { get; set; }
     public decimal? MaxDiscountAmount { get; set; }
+    /// <summary>Porosia minimale (nëntotali) për të aplikuar kuponin.</summary>
+    public decimal? MinOrderAmount { get; set; }
     public int? MaxUses { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
@@ -17,4 +19,5 @@ public class Coupon
     public DateTime? ValidTo { get; set; }
 
     public ICollection<OrderCoupon> OrderCoupons { get; set; } = new List<OrderCoupon>();
+    public ICollection<CouponAudit> Audits { get; set; } = new List<CouponAudit>();
 }

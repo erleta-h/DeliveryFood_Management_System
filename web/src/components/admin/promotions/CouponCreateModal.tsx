@@ -1,40 +1,76 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { adminCreateCoupon } from '../../../lib/adminApi'
+import { adminCreateCoupon, adminUpdateCoupon, type AdminCouponDetail } from '../../../lib/adminApi'
 import { customerBtnGhost, customerBtnPrimary, customerField, customerLabelForm, customerSelect } from '../../../lib/adminTheme'
 import { useAuthStore } from '../../../store/authStore'
-import { dateTimeLocalToIso } from './couponHelpers'
+import { dateTimeLocalToIso, toDateTimeLocalValue } from './couponHelpers'
 
-type Props = {
-  onClose: () => void
-  onCreated: () => void
-  onMessage: (m: string) => void
-}
+type Props =
+  | { mode: 'create'; onClose: () => void; onSaved: () => void; onMessage: (m: string) => void }
+  | {
+      mode: 'edit'
+      coupon: AdminCouponDetail
+      onClose: () => void
+      onSaved: () => void
+      onMessage: (m: string) => void
+    }
 
-export function CouponCreateModal({ onClose, onCreated, onMessage }: Props) {
+export function CouponCreateModal(props: Props) {
   const token = useAuthStore((s) => s.token)
-  const [code, setCode] = useState('')
-  const [discountPercent, setDiscountPercent] = useState('10')
-  const [maxDiscountAmount, setMaxDiscountAmount] = useState('')
-  const [maxUses, setMaxUses] = useState('')
-  const [validFrom, setValidFrom] = useState('')
-  const [validTo, setValidTo] = useState('')
-  const [isActive, setIsActive] = useState(true)
+  const isEdit = props.mode === 'edit'
+
+  const [code, setCode] = useState(isEdit ? props.coupon.code : '')
+  const [discountPercent, setDiscountPercent] = useState(
+    isEdit ? String(props.coupon.discountPercent) : '10',
+  )
+  const [maxDiscountAmount, setMaxDiscountAmount] = useState(
+    isEdit && props.coupon.maxDiscountAmount != null ? String(props.coupon.maxDiscountAmount) : '',
+  )
+  const [minOrderAmount, setMinOrderAmount] = useState(
+    isEdit && props.coupon.minOrderAmount != null ? String(props.coupon.minOrderAmount) : '',
+  )
+  const [maxUses, setMaxUses] = useState(
+    isEdit && props.coupon.maxUses != null ? String(props.coupon.maxUses) : '',
+  )
+  const [validFrom, setValidFrom] = useState(
+    isEdit ? toDateTimeLocalValue(props.coupon.validFrom) : '',
+  )
+  const [validTo, setValidTo] = useState(isEdit ? toDateTimeLocalValue(props.coupon.validTo) : '')
+  const [isActive, setIsActive] = useState(isEdit ? props.coupon.isActive : true)
   const [busy, setBusy] = useState(false)
   const [localErr, setLocalErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isEdit) return
+    setCode(props.coupon.code)
+    setDiscountPercent(String(props.coupon.discountPercent))
+    setMaxDiscountAmount(
+      props.coupon.maxDiscountAmount != null ? String(props.coupon.maxDiscountAmount) : '',
+    )
+    setMinOrderAmount(props.coupon.minOrderAmount != null ? String(props.coupon.minOrderAmount) : '')
+    setMaxUses(props.coupon.maxUses != null ? String(props.coupon.maxUses) : '')
+    setValidFrom(toDateTimeLocalValue(props.coupon.validFrom))
+    setValidTo(toDateTimeLocalValue(props.coupon.validTo))
+    setIsActive(props.coupon.isActive)
+  }, [isEdit, props.mode === 'edit' ? props.coupon.id : 0])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!token) return
     const pct = Number(discountPercent)
-    if (!code.trim() || !Number.isFinite(pct)) {
+    if ((!isEdit && !code.trim()) || !Number.isFinite(pct)) {
       setLocalErr('Plotëso kodin dhe përqindjen.')
       return
     }
     const maxDisc = maxDiscountAmount.trim() === '' ? null : Number(maxDiscountAmount)
+    const minOrder = minOrderAmount.trim() === '' ? null : Number(minOrderAmount)
     const maxU = maxUses.trim() === '' ? null : Number(maxUses)
     if (maxDisc != null && !Number.isFinite(maxDisc)) {
       setLocalErr('Max. zbritja duhet të jetë numër.')
+      return
+    }
+    if (minOrder != null && !Number.isFinite(minOrder)) {
+      setLocalErr('Min. porosia duhet të jetë numër.')
       return
     }
     if (maxU != null && (!Number.isFinite(maxU) || maxU <= 0)) {
@@ -44,55 +80,67 @@ export function CouponCreateModal({ onClose, onCreated, onMessage }: Props) {
 
     setLocalErr(null)
     setBusy(true)
-    const r = await adminCreateCoupon(token, {
-      code: code.trim(),
+
+    const payload = {
       discountPercent: pct,
       maxDiscountAmount: maxDisc,
+      minOrderAmount: minOrder,
       maxUses: maxU,
       validFrom: dateTimeLocalToIso(validFrom),
       validTo: dateTimeLocalToIso(validTo),
       isActive,
-    })
+    }
+
+    const r =
+      isEdit ?
+        await adminUpdateCoupon(token, props.coupon.id, payload)
+      : await adminCreateCoupon(token, { code: code.trim(), ...payload })
+
     setBusy(false)
     if (!r.ok) {
       setLocalErr(r.message)
       return
     }
-    onMessage('Kuponi u krijua.')
-    onCreated()
-    onClose()
+    props.onMessage(isEdit ? 'Kuponi u përditësua.' : 'Kuponi u krijua.')
+    props.onSaved()
+    props.onClose()
   }
 
   const modal = (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
       <button
         type="button"
         className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"
         aria-label="Mbyll"
-        onClick={onClose}
+        onClick={props.onClose}
       />
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="coupon-create-title"
+        aria-labelledby="coupon-form-title"
         className="relative z-10 w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl"
       >
-        <h2 id="coupon-create-title" className="text-lg font-semibold text-gray-900">
-          Kupon i ri
+        <h2 id="coupon-form-title" className="text-lg font-semibold text-gray-900">
+          {isEdit ? 'Ndrysho kupon' : 'Kupon i ri'}
         </h2>
-        <p className="mt-1 text-sm text-gray-500">Kupona globale — kodi bëhet automatikisht me shkronja të mëdha.</p>
+        <p className="mt-1 text-sm text-gray-500">
+          {isEdit ? 'Kodi nuk ndryshohet pas krijimit.' : 'Kupona globale — kodi bëhet automatikisht me shkronja të mëdha.'}
+        </p>
 
         <form onSubmit={submit} className="mt-5 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={customerLabelForm}>
               Kodi
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className={`${customerField} mt-1 font-mono uppercase`}
-                placeholder="VERE25"
-                autoFocus
-              />
+              {isEdit ?
+                <div className={`${customerField} mt-1 font-mono uppercase text-gray-600`}>{code}</div>
+              : <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className={`${customerField} mt-1 font-mono uppercase`}
+                  placeholder="VERE25"
+                  autoFocus
+                />
+              }
             </label>
             <label className={customerLabelForm}>
               Zbritja (%)
@@ -118,6 +166,18 @@ export function CouponCreateModal({ onClose, onCreated, onMessage }: Props) {
               />
             </label>
             <label className={customerLabelForm}>
+              Min. porosia (€)
+              <input
+                value={minOrderAmount}
+                onChange={(e) => setMinOrderAmount(e.target.value)}
+                type="number"
+                min={0}
+                step="0.01"
+                className={`${customerField} mt-1`}
+                placeholder="15.00"
+              />
+            </label>
+            <label className={customerLabelForm}>
               Max. përdorime
               <input
                 value={maxUses}
@@ -137,7 +197,7 @@ export function CouponCreateModal({ onClose, onCreated, onMessage }: Props) {
                 className={`${customerField} mt-1`}
               />
             </label>
-            <label className={customerLabelForm}>
+            <label className={`${customerLabelForm} sm:col-span-2`}>
               Data e skadimit
               <input
                 value={validTo}
@@ -162,11 +222,11 @@ export function CouponCreateModal({ onClose, onCreated, onMessage }: Props) {
           {localErr ? <p className="text-sm text-red-600">{localErr}</p> : null}
 
           <div className="flex justify-end gap-2 border-t border-gray-100 pt-4">
-            <button type="button" className={customerBtnGhost} onClick={onClose} disabled={busy}>
+            <button type="button" className={customerBtnGhost} onClick={props.onClose} disabled={busy}>
               Anulo
             </button>
             <button type="submit" className={customerBtnPrimary} disabled={busy}>
-              {busy ? 'Duke krijuar…' : 'Krijo kupon'}
+              {busy ? 'Duke ruajtur…' : isEdit ? 'Ruaj ndryshimet' : 'Krijo kupon'}
             </button>
           </div>
         </form>

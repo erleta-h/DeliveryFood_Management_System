@@ -99,6 +99,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Property<decimal?>("MaxDiscountAmount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<decimal?>("MinOrderAmount")
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<int?>("MaxUses")
                         .HasColumnType("int");
 
@@ -960,6 +963,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFeatured")
                         .HasColumnType("bit");
 
                     b.Property<double?>("Latitude")
