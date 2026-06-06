@@ -1,4 +1,5 @@
 ﻿using FoodDelivery.Application.Admin;
+using FoodDelivery.Application.Delivery;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -25,7 +26,7 @@ public sealed class AdminRestaurantsService : IAdminRestaurantsService
         var p = Math.Max(1, page);
         var ps = Math.Clamp(pageSize, 1, MaxPageSize);
 
-        var q = _db.Restaurants.AsNoTracking();
+        IQueryable<Restaurant> q = _db.Restaurants.AsNoTracking().Include(r => r.DeliveryZone);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim();
@@ -33,10 +34,20 @@ public sealed class AdminRestaurantsService : IAdminRestaurantsService
         }
 
         var total = await q.CountAsync(cancellationToken);
-        var rows = await q
+        var restaurants = await q
             .OrderBy(r => r.Name)
             .Skip((p - 1) * ps)
             .Take(ps)
+            .ToListAsync(cancellationToken);
+
+        var ids = restaurants.Select(r => r.Id).ToList();
+        var orderCounts = await _db.Orders.AsNoTracking()
+            .Where(o => ids.Contains(o.RestaurantId))
+            .GroupBy(o => o.RestaurantId)
+            .Select(g => new { RestaurantId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.RestaurantId, x => x.Count, cancellationToken);
+
+        var rows = restaurants
             .Select(r => new AdminRestaurantListItemDto(
                 r.Id,
                 r.Name,
@@ -44,11 +55,17 @@ public sealed class AdminRestaurantsService : IAdminRestaurantsService
                 r.Slug,
                 r.IsActive,
                 r.IsApproved,
-                r.DeliveryFee,
-                r.MinOrderAmount,
-                r.EstimatedDeliveryMinutes,
-                _db.Orders.Count(o => o.RestaurantId == r.Id)))
-            .ToListAsync(cancellationToken);
+                r.DeliveryZoneId,
+                r.DeliveryZone?.Name,
+                RestaurantDeliveryTerms.EffectiveDeliveryFee(r, r.DeliveryZone),
+                RestaurantDeliveryTerms.EffectiveMinOrderAmount(r, r.DeliveryZone),
+                RestaurantDeliveryTerms.EffectiveEstimatedMinutes(r, r.DeliveryZone),
+                RestaurantDeliveryTerms.HasOverride(r),
+                r.OverrideDeliveryFee,
+                r.OverrideMinOrderAmount,
+                r.OverrideEstimatedDeliveryMinutes,
+                orderCounts.GetValueOrDefault(r.Id)))
+            .ToList();
 
         return new AdminRestaurantListResultDto(rows, total, p, ps);
     }
@@ -58,7 +75,9 @@ public sealed class AdminRestaurantsService : IAdminRestaurantsService
         AdminRestaurantPatchRequest request,
         CancellationToken cancellationToken = default)
     {
-        var r = await _db.Restaurants.FirstOrDefaultAsync(x => x.Id == restaurantId, cancellationToken);
+        var r = await _db.Restaurants
+            .Include(x => x.DeliveryZone)
+            .FirstOrDefaultAsync(x => x.Id == restaurantId, cancellationToken);
         if (r is null)
             return "Restoranti nuk u gjet.";
 
@@ -66,25 +85,70 @@ public sealed class AdminRestaurantsService : IAdminRestaurantsService
             r.IsActive = ia;
         if (request.IsApproved is { } ap)
             r.IsApproved = ap;
+
+        if (request.DeliveryZoneId is { } zid)
+        {
+            if (zid <= 0)
+            {
+                r.DeliveryZoneId = null;
+            }
+            else
+            {
+                var exists = await _db.DeliveryZones.AnyAsync(z => z.Id == zid, cancellationToken);
+                if (!exists)
+                    return "Zona e dërgesës nuk u gjet.";
+                r.DeliveryZoneId = zid;
+            }
+        }
+
+        if (request.ClearDeliveryOverrides == true)
+        {
+            r.OverrideDeliveryFee = null;
+            r.OverrideMinOrderAmount = null;
+            r.OverrideEstimatedDeliveryMinutes = null;
+        }
+
+        if (request.OverrideDeliveryFee is { } odf)
+        {
+            if (odf < 0)
+                return "Tarifa e dërgesës nuk mund të jetë negative.";
+            r.OverrideDeliveryFee = odf;
+        }
+
+        if (request.OverrideMinOrderAmount is { } omo)
+        {
+            if (omo < 0)
+                return "Porosia minimale nuk mund të jetë negative.";
+            r.OverrideMinOrderAmount = omo;
+        }
+
+        if (request.OverrideEstimatedDeliveryMinutes is { } oeta)
+        {
+            if (oeta < 1 || oeta > 300)
+                return "ETA duhet të jetë 1–300 minuta.";
+            r.OverrideEstimatedDeliveryMinutes = oeta;
+        }
+
+        // Legacy fields — treated as explicit overrides when set.
         if (request.DeliveryFee is { } df)
         {
             if (df < 0)
                 return "Tarifa e dërgesës nuk mund të jetë negative.";
-            r.DeliveryFee = df;
+            r.OverrideDeliveryFee = df;
         }
 
         if (request.MinOrderAmount is { } mo)
         {
             if (mo < 0)
                 return "Porosia minimale nuk mund të jetë negative.";
-            r.MinOrderAmount = mo;
+            r.OverrideMinOrderAmount = mo;
         }
 
         if (request.EstimatedDeliveryMinutes is { } eta)
         {
             if (eta < 1 || eta > 300)
                 return "ETA duhet të jetë 1–300 minuta.";
-            r.EstimatedDeliveryMinutes = eta;
+            r.OverrideEstimatedDeliveryMinutes = eta;
         }
 
         r.UpdatedAt = DateTime.UtcNow;

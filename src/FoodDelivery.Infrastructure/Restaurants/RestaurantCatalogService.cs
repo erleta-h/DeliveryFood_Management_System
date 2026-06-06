@@ -1,3 +1,4 @@
+using FoodDelivery.Application.Delivery;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Restaurants;
 using FoodDelivery.Domain.Entities;
@@ -59,6 +60,8 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
     {
         var query = _uow.Repository<Restaurant, long>().Query
             .AsNoTracking()
+            .Include(r => r.FoodCategory)
+            .Include(r => r.DeliveryZone)
             .Where(r => r.IsActive && r.IsApproved);
 
         if (categoryId is { } cid)
@@ -89,16 +92,29 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             RestaurantListSort.Rating => query
                 .OrderByDescending(r => r.AverageRating)
                 .ThenByDescending(r => r.ReviewCount),
-            RestaurantListSort.EstimatedDelivery => query
-                .OrderBy(r => r.EstimatedDeliveryMinutes),
-            RestaurantListSort.DeliveryFee => query
-                .OrderBy(r => r.DeliveryFee),
+            RestaurantListSort.EstimatedDelivery => query.OrderBy(r => r.EstimatedDeliveryMinutes),
+            RestaurantListSort.DeliveryFee => query.OrderBy(r => r.DeliveryFee),
             RestaurantListSort.Name => query.OrderBy(r => r.Name),
             RestaurantListSort.Proximity => query.OrderBy(r => r.Id),
             _ => query.OrderBy(r => r.Name),
         };
 
-        var rows = await ordered
+        var materialized = await ordered.ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        if (effectiveSort == RestaurantListSort.DeliveryFee)
+        {
+            materialized = materialized
+                .OrderBy(r => RestaurantDeliveryTerms.EffectiveDeliveryFee(r, r.DeliveryZone))
+                .ToList();
+        }
+        else if (effectiveSort == RestaurantListSort.EstimatedDelivery)
+        {
+            materialized = materialized
+                .OrderBy(r => RestaurantDeliveryTerms.EffectiveEstimatedMinutes(r, r.DeliveryZone))
+                .ToList();
+        }
+
+        var rows = materialized
             .Select(r => new
             {
                 r.Id,
@@ -108,15 +124,15 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                 r.AddressLine,
                 CategoryName = r.FoodCategory.Name,
                 r.FoodCategoryId,
-                r.DeliveryFee,
-                r.MinOrderAmount,
+                DeliveryFee = RestaurantDeliveryTerms.EffectiveDeliveryFee(r, r.DeliveryZone),
+                MinOrderAmount = RestaurantDeliveryTerms.EffectiveMinOrderAmount(r, r.DeliveryZone),
                 r.AverageRating,
                 r.ReviewCount,
-                r.EstimatedDeliveryMinutes,
+                EstimatedDeliveryMinutes = RestaurantDeliveryTerms.EffectiveEstimatedMinutes(r, r.DeliveryZone),
                 r.Latitude,
                 r.Longitude,
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         if (useProximity)
         {
@@ -216,27 +232,30 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
         if (cached is not null)
             return cached;
 
-        var row = await _uow.Repository<Restaurant, long>().Query
+        var entity = await _uow.Repository<Restaurant, long>().Query
             .AsNoTracking()
+            .Include(r => r.FoodCategory)
+            .Include(r => r.DeliveryZone)
             .Where(r => r.Id == restaurantId && r.IsActive && r.IsApproved)
-            .Select(r => new RestaurantSummaryDto(
-                r.Id,
-                r.Name,
-                r.FoodCategory.Name,
-                r.DeliveryFee,
-                r.EstimatedDeliveryMinutes,
-                r.AverageRating,
-                r.ReviewCount,
-                r.AddressLine,
-                r.City,
-                r.Latitude,
-                r.Longitude,
-                r.MinOrderAmount))
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (row is null)
+        if (entity is null)
             return null;
+
+        var row = new RestaurantSummaryDto(
+            entity.Id,
+            entity.Name,
+            entity.FoodCategory.Name,
+            RestaurantDeliveryTerms.EffectiveDeliveryFee(entity, entity.DeliveryZone),
+            RestaurantDeliveryTerms.EffectiveEstimatedMinutes(entity, entity.DeliveryZone),
+            entity.AverageRating,
+            entity.ReviewCount,
+            entity.AddressLine,
+            entity.City,
+            entity.Latitude,
+            entity.Longitude,
+            RestaurantDeliveryTerms.EffectiveMinOrderAmount(entity, entity.DeliveryZone));
 
         await DistributedJsonCache
             .SetAsync(_cache, key, row, SummaryTtl, cancellationToken)
