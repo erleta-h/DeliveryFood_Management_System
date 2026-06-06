@@ -63,6 +63,75 @@ public sealed class AdminOrdersService : IAdminOrdersService
         return new AdminOrderListResultDto(items, total, page, pageSize);
     }
 
+    public async Task<AdminOrderDetailDto?> GetDetailAsync(
+        long orderId,
+        CancellationToken cancellationToken = default)
+    {
+        var order = await _db.Orders.AsNoTracking()
+            .Include(o => o.Restaurant)
+            .Include(o => o.User)
+            .Include(o => o.CustomerAddress)
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.StatusHistory)
+            .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+
+        if (order is null)
+            return null;
+
+        var items = order.Items
+            .OrderBy(i => i.Id)
+            .Select(i => new AdminOrderItemDto(
+                i.NameSnapshot,
+                i.Quantity,
+                i.UnitPrice,
+                i.UnitPrice * i.Quantity))
+            .ToList();
+
+        var payments = order.Payments
+            .OrderBy(p => p.Id)
+            .Select(p => new AdminOrderPaymentDto(
+                p.Id,
+                p.Amount,
+                p.Currency,
+                p.Provider,
+                p.Status))
+            .ToList();
+
+        var history = order.StatusHistory
+            .OrderBy(h => h.CreatedAt)
+            .Select(h => new AdminOrderStatusHistoryDto(
+                h.Id,
+                h.Status,
+                h.Note,
+                h.CreatedAt))
+            .ToList();
+
+        return new AdminOrderDetailDto(
+            order.Id,
+            order.OrderNumber,
+            order.PlacedAt,
+            order.Status,
+            order.FulfillmentType,
+            order.Subtotal,
+            order.DeliveryFee,
+            order.DiscountTotal,
+            order.Total,
+            order.RestaurantId,
+            order.Restaurant.Name,
+            order.UserId,
+            order.User.Email,
+            order.ContactPhone ?? order.User.Phone,
+            order.CustomerNotes,
+            order.CustomerAddress.Line1,
+            order.CustomerAddress.Line2,
+            order.CustomerAddress.City,
+            order.CustomerAddress.PostalCode,
+            items,
+            payments,
+            history);
+    }
+
     private static AdminOrderListItemDto MapListItem(Order o)
     {
         var payments = o.Payments

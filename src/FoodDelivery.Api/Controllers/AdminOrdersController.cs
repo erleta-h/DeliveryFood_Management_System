@@ -43,6 +43,18 @@ public sealed class AdminOrdersController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id:long}")]
+    [ProducesResponseType(typeof(AdminOrderDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<AdminOrderDetailDto>> GetOne(long id, CancellationToken cancellationToken)
+    {
+        var detail = await _adminOrders.GetDetailAsync(id, cancellationToken);
+        if (detail is null)
+            return NotFound(new { message = "Porosia nuk u gjet." });
+
+        return Ok(detail);
+    }
+
     [HttpPatch("{id:long}/status")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
