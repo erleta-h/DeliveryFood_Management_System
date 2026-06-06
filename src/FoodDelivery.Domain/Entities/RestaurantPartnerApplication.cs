@@ -21,4 +21,6 @@ public class RestaurantPartnerApplication
 
     /// <summary>0 = në pritje, 1 = kontaktuar, 2 = miratuar (gati për onboarding), 9 = refuzuar.</summary>
     public byte Status { get; set; }
+
+    public ICollection<PartnerApplicationAudit> Audits { get; set; } = new List<PartnerApplicationAudit>();
 }

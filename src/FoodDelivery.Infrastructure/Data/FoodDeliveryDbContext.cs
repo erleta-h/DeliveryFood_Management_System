@@ -17,6 +17,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Restaurant> Restaurants => Set<Restaurant>();
+    public DbSet<DeliveryZone> DeliveryZones => Set<DeliveryZone>();
     public DbSet<RestaurantStaff> RestaurantStaff => Set<RestaurantStaff>();
     public DbSet<Role> Roles => Set<Role>();
 
@@ -33,6 +34,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<StoredFile> StoredFiles => Set<StoredFile>();
     public DbSet<RestaurantPartnerApplication> RestaurantPartnerApplications => Set<RestaurantPartnerApplication>();
+    public DbSet<PartnerApplicationAudit> PartnerApplicationAudits => Set<PartnerApplicationAudit>();
     public DbSet<DriverApplication> DriverApplications => Set<DriverApplication>();
     public DbSet<DriverApplicationAudit> DriverApplicationAudits => Set<DriverApplicationAudit>();
     public DbSet<AccountActivationToken> AccountActivationTokens => Set<AccountActivationToken>();
@@ -148,6 +150,23 @@ public class FoodDeliveryDbContext : DbContext
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
+        modelBuilder.Entity<PartnerApplicationAudit>(e =>
+        {
+            e.ToTable("PartnerApplicationAudits");
+            e.Property(x => x.EventType).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Detail).HasMaxLength(2000);
+            e.HasIndex(x => x.PartnerApplicationId);
+            e.HasIndex(x => x.CreatedAtUtc);
+            e.HasOne(x => x.PartnerApplication)
+                .WithMany(x => x.Audits)
+                .HasForeignKey(x => x.PartnerApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CreatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
         modelBuilder.Entity<AccountActivationToken>(e =>
         {
             e.ToTable("AccountActivationTokens");
@@ -169,14 +188,28 @@ public class FoodDeliveryDbContext : DbContext
         {
             e.Property(x => x.DeliveryFee).HasPrecision(18, 2);
             e.Property(x => x.MinOrderAmount).HasPrecision(18, 2);
+            e.Property(x => x.OverrideDeliveryFee).HasPrecision(18, 2);
+            e.Property(x => x.OverrideMinOrderAmount).HasPrecision(18, 2);
             e.Property(x => x.AverageRating).HasPrecision(3, 2);
             e.HasOne(x => x.FoodCategory)
                 .WithMany(x => x.Restaurants)
                 .HasForeignKey(x => x.FoodCategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.DeliveryZone)
+                .WithMany(x => x.Restaurants)
+                .HasForeignKey(x => x.DeliveryZoneId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(x => x.Slug)
                 .IsUnique()
                 .HasFilter("[Slug] IS NOT NULL");
+        });
+
+        modelBuilder.Entity<DeliveryZone>(e =>
+        {
+            e.Property(x => x.DeliveryFee).HasPrecision(18, 2);
+            e.Property(x => x.MinOrderAmount).HasPrecision(18, 2);
+            e.HasIndex(x => x.City);
+            e.HasIndex(x => x.IsActive);
         });
 
         modelBuilder.Entity<FavoriteRestaurant>(e =>
