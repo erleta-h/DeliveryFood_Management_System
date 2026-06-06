@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { CouponInput } from '../components/checkout/CouponInput'
 import { RestaurantGoogleMap } from '../components/RestaurantGoogleMap'
 import { customerField, customerPanelSubtitle } from '../lib/customerTheme'
+import type { AppliedCoupon } from '../lib/couponsApi'
 import { fetchClientPublicConfig } from '../lib/publicConfigApi'
 import {
   FULFILLMENT_DELIVERY,
@@ -57,6 +59,7 @@ export default function CheckoutPage() {
   const [otPostal, setOtPostal] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
 
   const deliveryFee = useCartStore((s) => s.deliveryFee)
   const setDeliveryFee = useCartStore((s) => s.setDeliveryFee)
@@ -68,10 +71,16 @@ export default function CheckoutPage() {
   const pickup = fulfillmentType === FULFILLMENT_PICKUP
   const feeNum = pickup ? 0 : deliveryFee
   const feeKnown = pickup || feeNum != null
-  const total = feeKnown && lines.length > 0 ? subtotal + (pickup ? 0 : (feeNum ?? 0)) : null
+  const discountAmount = appliedCoupon?.discountAmount ?? 0
+  const total =
+    feeKnown && lines.length > 0 ? Math.max(0, subtotal - discountAmount) + (pickup ? 0 : (feeNum ?? 0)) : null
 
   const minOrder = summary?.minOrderAmount ?? 0
   const meetsMinOrder = minOrder <= 0 || subtotal >= minOrder
+
+  useEffect(() => {
+    setAppliedCoupon(null)
+  }, [subtotal])
 
   useEffect(() => {
     let cancelled = false
@@ -145,6 +154,7 @@ export default function CheckoutPage() {
               line2: otLine2.trim() || undefined,
             }
           : null,
+      couponCode: appliedCoupon?.code,
     })
     setBusy(false)
     if (r.ok) {
@@ -456,10 +466,15 @@ export default function CheckoutPage() {
 
         <aside className="order-1 lg:sticky lg:top-6 lg:order-2">
           <SummaryCard
+            token={token}
             subtotal={subtotal}
             pickup={pickup}
             feeKnown={feeKnown}
             feeNum={feeNum}
+            discountAmount={discountAmount}
+            appliedCoupon={appliedCoupon}
+            onCouponApplied={setAppliedCoupon}
+            onCouponRemoved={() => setAppliedCoupon(null)}
             total={total}
             meetsMinOrder={meetsMinOrder}
             minOrder={minOrder}
@@ -474,10 +489,15 @@ export default function CheckoutPage() {
 }
 
 function SummaryCard({
+  token,
   subtotal,
   pickup,
   feeKnown,
   feeNum,
+  discountAmount,
+  appliedCoupon,
+  onCouponApplied,
+  onCouponRemoved,
   total,
   meetsMinOrder,
   minOrder,
@@ -485,10 +505,15 @@ function SummaryCard({
   paymentMethod,
   woltBlueClass,
 }: {
+  token: string
   subtotal: number
   pickup: boolean
   feeKnown: boolean
   feeNum: number | null
+  discountAmount: number
+  appliedCoupon: AppliedCoupon | null
+  onCouponApplied: (coupon: AppliedCoupon) => void
+  onCouponRemoved: () => void
   total: number | null
   meetsMinOrder: boolean
   minOrder: number
@@ -502,22 +527,39 @@ function SummaryCard({
     <div className="rounded-3xl border border-white/[0.1] bg-[#1c1f26] p-5 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5)]">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-lg font-bold text-white">Përmbledhje</h2>
+          <h2 className="text-lg font-bold text-white">Përmbledhja e porosisë</h2>
           <p className="text-xs text-zinc-500">përfshirë taksat (nëse vlejnë)</p>
         </div>
       </div>
+
+      <div className="mt-4">
+        <CouponInput
+          token={token}
+          subtotal={subtotal}
+          applied={appliedCoupon}
+          onApplied={onCouponApplied}
+          onRemoved={onCouponRemoved}
+        />
+      </div>
+
       <Link
         to="/app/support"
-        className="mt-2 inline-block text-xs font-medium text-[#009fe3] hover:underline"
+        className="mt-3 inline-block text-xs font-medium text-[#009fe3] hover:underline"
       >
         Si funksionojnë tarifat
       </Link>
 
       <dl className="mt-5 space-y-3 text-sm">
         <div className="flex justify-between gap-4 text-zinc-300">
-          <dt>Nëntotali artikujsh</dt>
+          <dt>Nëntotali</dt>
           <dd className="tabular-nums font-medium text-zinc-100">{subtotal.toFixed(2)} €</dd>
         </div>
+        {discountAmount > 0 ? (
+          <div className="flex justify-between gap-4 text-emerald-300">
+            <dt>Zbritja{appliedCoupon ? ` (${appliedCoupon.code})` : ''}</dt>
+            <dd className="tabular-nums font-medium">−{discountAmount.toFixed(2)} €</dd>
+          </div>
+        ) : null}
         <div className="flex justify-between gap-4 text-zinc-300">
           <dt>Tarifa e shërbimit</dt>
           <dd className="tabular-nums text-zinc-400">0,00 €</dd>
@@ -537,7 +579,7 @@ function SummaryCard({
       </dl>
 
       <div className="mt-4 flex justify-between border-t border-white/[0.08] pt-4 text-base font-bold text-white">
-        <span>Gjithsej</span>
+        <span>Totali</span>
         <span className="tabular-nums text-lg">
           {total != null ? `${total.toFixed(2)} €` : '—'}
         </span>

@@ -1,5 +1,6 @@
 using FoodDelivery.Application.Auth;
 using FoodDelivery.Application.Configuration;
+using FoodDelivery.Application.Coupons;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Auth;
@@ -23,6 +24,7 @@ using FoodDelivery.Application.Restaurants;
 using FoodDelivery.Application.SiteContent;
 using FoodDelivery.Application.Support;
 using FoodDelivery.Infrastructure.Admin;
+using FoodDelivery.Infrastructure.Coupons;
 using FoodDelivery.Infrastructure.Drivers;
 using FoodDelivery.Infrastructure.Favorites;
 using FoodDelivery.Infrastructure.Maps;
@@ -75,10 +77,12 @@ public static class DependencyInjection
         services.AddScoped<IAdminSettingsService, AdminSettingsService>();
         services.AddScoped<IAdminCmsService, AdminCmsService>();
         services.AddScoped<IPublicSiteContentService, PublicSiteContentService>();
+        services.AddScoped<IPublicLandingService, PublicLandingService>();
         services.AddScoped<IPartnerApplicationService, PartnerApplicationService>();
         services.AddScoped<IDriverApplicationService, DriverApplicationService>();
         services.AddScoped<IFavoriteRestaurantsService, FavoriteRestaurantsService>();
         services.AddScoped<IRestaurantCatalogService, RestaurantCatalogService>();
+        services.AddScoped<ICouponService, CouponService>();
         services.AddScoped<IOrdersService, OrdersService>();
         services.AddScoped<IKitchenOrdersService, KitchenOrdersService>();
         services.AddScoped<IKitchenMenuService, KitchenMenuService>();

@@ -1,4 +1,6 @@
-﻿using FoodDelivery.Application.Notifications;
+﻿using FoodDelivery.Application.Coupons;
+using FoodDelivery.Application.Delivery;
+using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Orders;
 using FoodDelivery.Application.Realtime; // Shtuar për Realtime Notifier
 using FoodDelivery.Application.Persistence;
@@ -15,15 +17,18 @@ public sealed class OrdersService : IOrdersService
     private readonly IUnitOfWork _uow;
     private readonly IOrderRealtimeNotifier _realtime;
     private readonly INotificationPublisher _notifications;
+    private readonly ICouponService _coupons;
 
     public OrdersService(
         IUnitOfWork uow,
         IOrderRealtimeNotifier realtime,
-        INotificationPublisher notifications)
+        INotificationPublisher notifications,
+        ICouponService coupons)
     {
         _uow = uow;
         _realtime = realtime;
         _notifications = notifications;
+        _coupons = coupons;
     }
 
     public async Task<(PlaceOrderResponse? Response, string? Error)> PlaceOrderAsync(
@@ -44,13 +49,18 @@ public sealed class OrdersService : IOrdersService
         if (!PhoneValidation.TryNormalize(user.Phone, out var phoneNorm, out var phoneErr))
             return (null, phoneErr ?? "Shto nje numer telefoni te vlefshem para porosise.");
 
-        var restaurant = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
+        var restaurant = await _uow.Repository<Restaurant, long>().Query
+            .Include(r => r.DeliveryZone)
+            .AsNoTracking()
             .FirstOrDefaultAsync(
                 r => r.Id == request.RestaurantId && r.IsActive && r.IsApproved,
                 cancellationToken);
 
         if (restaurant is null)
             return (null, "Restoranti nuk eshte i disponueshem.");
+
+        if (restaurant.DeliveryZone is { IsActive: false })
+            return (null, "Zona e dergeses se restorantit nuk eshte aktive.");
 
         if (request.PaymentMethod != OrderPaymentMethod.CashOnDelivery
             && request.PaymentMethod != OrderPaymentMethod.Stripe)
@@ -102,11 +112,28 @@ public sealed class OrdersService : IOrdersService
             subtotal += item.Price * line.Quantity;
         }
 
-        if (subtotal < restaurant.MinOrderAmount)
-            return (null, $"Shuma minimale e porosise eshte {restaurant.MinOrderAmount:0.##} €.");
+        var minOrder = RestaurantDeliveryTerms.EffectiveMinOrderAmount(restaurant, restaurant.DeliveryZone);
+        if (subtotal < minOrder)
+            return (null, $"Shuma minimale e porosise eshte {minOrder:0.##} €.");
 
-        var deliveryFee = restaurant.DeliveryFee;
-        var total = subtotal + deliveryFee;
+        var deliveryFee = RestaurantDeliveryTerms.EffectiveDeliveryFee(restaurant, restaurant.DeliveryZone);
+
+        decimal discountTotal = 0;
+        Coupon? appliedCoupon = null;
+        if (!string.IsNullOrWhiteSpace(request.CouponCode))
+        {
+            var (coupon, preview, couponErr) = await _coupons.ResolveTrackedAsync(
+                request.CouponCode,
+                subtotal,
+                cancellationToken);
+            if (coupon is null || preview is null)
+                return (null, couponErr ?? "Kuponi nuk u gjet.");
+
+            appliedCoupon = coupon;
+            discountTotal = preview.DiscountAmount;
+        }
+
+        var total = subtotal - discountTotal + deliveryFee;
         var now = DateTime.UtcNow;
 
         var order = new Order
@@ -119,7 +146,7 @@ public sealed class OrdersService : IOrdersService
             Status = OrderStatus.Pending,
             Subtotal = subtotal,
             DeliveryFee = deliveryFee,
-            DiscountTotal = 0,
+            DiscountTotal = discountTotal,
             Total = total,
             CustomerNotes = string.IsNullOrWhiteSpace(request.CustomerNotes)
                 ? null
@@ -157,6 +184,20 @@ public sealed class OrdersService : IOrdersService
             Status = PaymentStatus.Pending,
             CreatedAt = now,
         });
+
+        if (appliedCoupon is not null && discountTotal > 0)
+        {
+            _uow.Repository<OrderCoupon, long>().Add(new OrderCoupon
+            {
+                OrderId = order.Id,
+                CouponId = appliedCoupon.Id,
+                DiscountAmount = discountTotal,
+                CreatedAt = now,
+            });
+
+            appliedCoupon.UsesCount += 1;
+            appliedCoupon.UpdatedAt = now;
+        }
 
         await _uow.SaveChangesAsync(cancellationToken);
 
@@ -209,6 +250,8 @@ public sealed class OrdersService : IOrdersService
             .Include(o => o.CustomerAddress)
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.OrderCoupons)
+                .ThenInclude(oc => oc.Coupon)
             .Include(o => o.Delivery)
                 .ThenInclude(d => d!.Driver)
                     .ThenInclude(u => u.DriverProfile)
@@ -265,6 +308,8 @@ public sealed class OrdersService : IOrdersService
             order.FulfillmentType,
             order.Subtotal,
             order.DeliveryFee,
+            order.DiscountTotal,
+            order.OrderCoupons.FirstOrDefault()?.Coupon.Code,
             order.Total,
             order.CustomerNotes,
             order.ContactPhone ?? string.Empty,

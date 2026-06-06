@@ -17,7 +17,8 @@ public record PlaceOrderRequest(
     string? CustomerNotes,
     int FulfillmentType = OrderFulfillmentType.Delivery,
     int PaymentMethod = OrderPaymentMethod.CashOnDelivery,
-    PlaceOrderOneTimeAddressDto? OneTimeDeliveryAddress = null);
+    PlaceOrderOneTimeAddressDto? OneTimeDeliveryAddress = null,
+    string? CouponCode = null);
 
 /// <summary>Përgjigje POST /api/orders — Stripe kërkon hap të dytë pagese.</summary>
 public record PlaceOrderResponse(long OrderId, bool RequiresStripePayment);
@@ -53,6 +54,8 @@ public record CustomerOrderDetailDto(
     int FulfillmentType,
     decimal Subtotal,
     decimal DeliveryFee,
+    decimal DiscountTotal,
+    string? CouponCode,
     decimal Total,
     string? CustomerNotes,
     string ContactPhone,

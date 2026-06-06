@@ -201,16 +201,17 @@ export default function OrderDetailPage() {
       setChatRefresh((s) => s + 1)
       if (m.senderRole === 'driver') setUnreadChat((n) => n + 1)
     })
-    let stopped = false
+    let cancelled = false
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
       } catch (err) {
         console.warn('[OrderDetail] SignalR nuk u lidh.', err)
       }
+      if (cancelled) return
     })()
     return () => {
-      stopped = true
+      cancelled = true
       void conn.stop()
     }
   }, [token, orderId])
@@ -469,6 +470,11 @@ export default function OrderDetailPage() {
             <hr className="border-white/[0.06]" />
             <div className="space-y-1 text-right">
               <p className="text-sm text-zinc-500">Nëntotali: {order.subtotal.toFixed(2)} €</p>
+              {(order.discountTotal ?? 0) > 0 ? (
+                <p className="text-sm text-emerald-400/90">
+                  Zbritja{order.couponCode ? ` (${order.couponCode})` : ''}: −{(order.discountTotal ?? 0).toFixed(2)} €
+                </p>
+              ) : null}
               <p className="text-sm text-zinc-500">Tarifa e dorëzimit: {order.deliveryFee.toFixed(2)} €</p>
               <p className="text-base font-bold text-white">Totali: {order.total.toFixed(2)} €</p>
             </div>

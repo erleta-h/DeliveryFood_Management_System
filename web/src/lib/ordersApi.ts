@@ -48,6 +48,8 @@ export type CustomerOrderDetail = {
   fulfillmentType: number
   subtotal: number
   deliveryFee: number
+  discountTotal: number
+  couponCode?: string | null
   total: number
   customerNotes: string | null
   contactPhone: string
@@ -113,6 +115,7 @@ export async function placeOrder(
     paymentMethod?: number
     /** Vetëm për dërgesë: adresë tjetër vetëm për këtë porosi (krijohet rresht i ri «Porosi (një herë)»). */
     oneTimeDeliveryAddress?: PlaceOrderOneTimeAddress | null
+    couponCode?: string | null
   },
 ): Promise<
   | { ok: true; orderId: number; requiresStripePayment: boolean }
@@ -131,6 +134,7 @@ export async function placeOrder(
       fulfillmentType: body.fulfillmentType ?? FULFILLMENT_DELIVERY,
       paymentMethod: body.paymentMethod ?? PAYMENT_COD,
       oneTimeDeliveryAddress: body.oneTimeDeliveryAddress ?? null,
+      couponCode: body.couponCode?.trim() || null,
     }),
   })
   if (res.status === 201) {
