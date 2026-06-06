@@ -42,6 +42,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Review> Reviews => Set<Review>();
 
     public DbSet<Coupon> Coupons => Set<Coupon>();
+    public DbSet<CouponAudit> CouponAudits => Set<CouponAudit>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
     public DbSet<FavoriteRestaurant> FavoriteRestaurants => Set<FavoriteRestaurant>();
     public DbSet<Order> Orders => Set<Order>();
@@ -52,7 +53,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
 
-  
+
 
     public DbSet<Setting> Settings => Set<Setting>();
 
@@ -160,6 +161,30 @@ public class FoodDeliveryDbContext : DbContext
             e.HasOne(x => x.PartnerApplication)
                 .WithMany(x => x.Audits)
                 .HasForeignKey(x => x.PartnerApplicationId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.CreatedBy)
+                .WithMany()
+                .HasForeignKey(x => x.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<Coupon>(e =>
+        {
+            e.Property(x => x.DiscountPercent).HasPrecision(18, 2);
+            e.Property(x => x.MaxDiscountAmount).HasPrecision(18, 2);
+            e.Property(x => x.MinOrderAmount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<CouponAudit>(e =>
+        {
+            e.ToTable("CouponAudits");
+            e.Property(x => x.EventType).HasMaxLength(64).IsRequired();
+            e.Property(x => x.Detail).HasMaxLength(2000);
+            e.HasIndex(x => x.CouponId);
+            e.HasIndex(x => x.CreatedAtUtc);
+            e.HasOne(x => x.Coupon)
+                .WithMany(x => x.Audits)
+                .HasForeignKey(x => x.CouponId)
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.CreatedBy)
                 .WithMany()
@@ -384,7 +409,7 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.Key).IsUnique();
         });
 
-    
+
 
 
         modelBuilder.Entity<WebPushSubscription>(e =>
