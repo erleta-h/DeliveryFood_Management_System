@@ -24,12 +24,12 @@ body {
   background-color: #171820;
 }
 
-/* Panel admin — sfond i njëtrajtshëm, scroll vetëm në përmbajtje (jo në body) */
+/* Panel admin — sfond i çelët, scroll vetëm në përmbajtje (jo në body) */
 html.admin-panel,
 html.admin-panel body {
   height: 100%;
   overflow: hidden;
-  background-color: #f3f4f6 !important;
+  background-color: #f9fafb !important;
 }
 
 /* Panel admin — pa shirit scroll vizual (scroll me maus/trackpad mbetet) */
@@ -90,6 +90,65 @@ select.partner-form-select option:checked,
 
 .animate-auth-panel-in {
   animation: auth-panel-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes auth-hero-in {
+  from {
+    opacity: 0;
+    transform: translateX(10%) scale(0.97);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.animate-auth-hero-in {
+  animation: auth-hero-in 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+@keyframes auth-hero-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-auth-hero-caption-in {
+  animation: auth-hero-caption-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.42s both;
+}
+
+.animate-auth-stagger-in {
+  animation: auth-hero-caption-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+  opacity: 0;
+}
+
+.animate-auth-panel-in-delayed {
+  animation: auth-panel-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+  opacity: 0;
+}
+
+/* Login / signup — autofill i shfletuesit mos e lën fushën email të bardhë */
+.auth-form {
+  color-scheme: dark;
+  --auth-autofill-bg: #161922;
+}
+
+.auth-form input:-webkit-autofill,
+.auth-form input:-webkit-autofill:hover,
+.auth-form input:-webkit-autofill:focus,
+.auth-form input:-webkit-autofill:active {
+  -webkit-text-fill-color: #e4e4e7 !important;
+  caret-color: #e4e4e7;
+  transition: background-color 99999s ease-out 0s;
+  -webkit-box-shadow: 0 0 0 1000px var(--auth-autofill-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--auth-autofill-bg) inset !important;
 }
 
 /* Hyrje moderne në ballinë — logo, nav, hero */
@@ -176,6 +235,17 @@ select.partner-form-select option:checked,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .animate-auth-panel-in,
+  .animate-auth-panel-in-delayed,
+  .animate-auth-hero-in,
+  .animate-auth-hero-caption-in,
+  .animate-auth-stagger-in {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
   .animate-site-logo-wrap,
   .animate-site-logo-food,
   .animate-site-logo-delivery,
