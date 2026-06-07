@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<IOrdersService, OrdersService>();
         services.AddScoped<IKitchenOrdersService, KitchenOrdersService>();
         services.AddScoped<IKitchenMenuService, KitchenMenuService>();
+        services.AddScoped<IKitchenBrandingService, KitchenBrandingService>();
         services.AddScoped<IPublicMenuImageService, PublicMenuImageService>();
         services.AddScoped<IDriverDeliveryService, DriverDeliveryService>();
         services.AddScoped<IDeliveryAutoDispatchService, DeliveryAutoDispatchService>();

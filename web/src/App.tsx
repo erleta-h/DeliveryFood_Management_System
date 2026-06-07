@@ -8,7 +8,7 @@ import { KitchenStaffRoute } from './components/KitchenStaffRoute'
 import { LandingPage } from './components/LandingPage'
 import { PageSpinner } from './components/PageSpinner'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { KitchenAccountPage, KitchenHistoryPage, KitchenMenuPage , KitchenSupportPage  } from './lazy/kitchen'
+import { KitchenAccountPage, KitchenBrandingPage, KitchenHistoryPage, KitchenMenuPage, KitchenSupportPage } from './lazy/kitchen'
 import { useAuthStore } from './store/authStore'
 
 const CustomerLayout = lazy(() => import('./layouts/CustomerLayout'))
@@ -379,6 +379,14 @@ function App() {
               element={
                 <Suspense fallback={lazyFallback}>
                   <KitchenMenuPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="branding"
+              element={
+                <Suspense fallback={lazyFallback}>
+                  <KitchenBrandingPage />
                 </Suspense>
               }
             />

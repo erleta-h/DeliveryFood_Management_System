@@ -10,10 +10,12 @@ import { useKitchenNotificationsStore } from '../store/kitchenNotificationsStore
 
 type CtxPhase = 'loading' | 'ready' | 'unauthorized' | 'error'
 
-function navClass(isActive: boolean) {
+function navClass(isActive: boolean, accent = false) {
+  const activeColor = accent ? 'text-[#ffc107]' : 'text-white'
+  const barColor = accent ? 'after:bg-[#ffc107]' : 'after:bg-white'
   return `relative px-2 py-2 text-sm transition-colors ${
     isActive
-      ? 'font-medium text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-white'
+      ? `font-medium ${activeColor} after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full ${barColor}`
       : 'text-zinc-500 hover:text-zinc-200'
   }`
 }
@@ -126,6 +128,8 @@ export default function KitchenLayout() {
             <p className="mt-0.5 text-xs text-zinc-500">
               {location.pathname.startsWith('/kitchen/menu')
                 ? `${kitchenLabel} / Menaxho seksionet e menusë`
+                : location.pathname.startsWith('/kitchen/branding')
+                  ? `${kitchenLabel} / Branding i restorantit`
                 : location.pathname.startsWith('/kitchen/history')
                   ? `${kitchenLabel} / Historiku i porosive`
                   : location.pathname.startsWith('/kitchen/account')
@@ -144,6 +148,9 @@ export default function KitchenLayout() {
             </NavLink>
             <NavLink to="/kitchen/menu" className={({ isActive }) => navClass(isActive)}>
               Menuja
+            </NavLink>
+            <NavLink to="/kitchen/branding" className={({ isActive }) => navClass(isActive, true)}>
+              Branding
             </NavLink>
             <NavLink to="/kitchen/account" className={({ isActive }) => navClass(isActive)}>
               Llogaria

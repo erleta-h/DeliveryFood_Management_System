@@ -17,7 +17,11 @@ public sealed class PublicMenuImageService : IPublicMenuImageService
     {
         var usedByMenu = await _uow.Repository<MenuItem, long>().Query.AsNoTracking()
             .AnyAsync(m => m.ImageFileId == fileId, cancellationToken);
-        if (!usedByMenu)
+        var usedByRestaurantBranding = await _uow.Repository<Restaurant, long>().Query.AsNoTracking()
+            .AnyAsync(
+                r => r.IsActive && r.IsApproved && (r.LogoFileId == fileId || r.CoverFileId == fileId),
+                cancellationToken);
+        if (!usedByMenu && !usedByRestaurantBranding)
             return null;
 
         var file = await _uow.Repository<StoredFile, long>().Query.AsNoTracking()

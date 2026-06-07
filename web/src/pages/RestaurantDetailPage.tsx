@@ -96,9 +96,11 @@ export default function RestaurantDetailPage() {
     summary?.estimatedDeliveryMinutes ?? navState?.estimatedDeliveryMinutes ?? 30
 
   const coverUrl = useMemo(
-    () => coverImageFromMenu(rawCategories, categoryName),
-    [rawCategories, categoryName],
+    () => coverImageFromMenu(rawCategories, categoryName, summary?.coverUrl),
+    [rawCategories, categoryName, summary?.coverUrl],
   )
+
+  const logoUrl = summary?.logoUrl ?? null
 
   const cartForThisRestaurant = cartRid === restaurantId
   const cartLines = cartForThisRestaurant ? lines : []
@@ -332,6 +334,7 @@ export default function RestaurantDetailPage() {
       <RestaurantDetailHero
         title={displayName}
         coverUrl={coverUrl}
+        logoUrl={logoUrl}
         summary={summary}
         categoryName={categoryName}
         averageRating={displayAverageRating}

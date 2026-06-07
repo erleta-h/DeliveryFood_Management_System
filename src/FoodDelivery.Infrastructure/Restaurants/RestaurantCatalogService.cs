@@ -132,6 +132,8 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                 EstimatedDeliveryMinutes = RestaurantDeliveryTerms.EffectiveEstimatedMinutes(r, r.DeliveryZone),
                 r.Latitude,
                 r.Longitude,
+                r.LogoFileId,
+                r.CoverFileId,
             })
             .ToList();
 
@@ -166,7 +168,9 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
                     r.ReviewCount,
                     r.EstimatedDeliveryMinutes,
                     previews.GetValueOrDefault(r.Id, Array.Empty<RestaurantProductPreviewDto>()),
-                    dist);
+                    dist,
+                    RestaurantBrandingImageUrls.PublicUrl(r.LogoFileId),
+                    RestaurantBrandingImageUrls.PublicUrl(r.CoverFileId));
             })
             .ToList();
     }
@@ -256,7 +260,9 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
             entity.City,
             entity.Latitude,
             entity.Longitude,
-            RestaurantDeliveryTerms.EffectiveMinOrderAmount(entity, entity.DeliveryZone));
+            RestaurantDeliveryTerms.EffectiveMinOrderAmount(entity, entity.DeliveryZone),
+            RestaurantBrandingImageUrls.PublicUrl(entity.LogoFileId),
+            RestaurantBrandingImageUrls.PublicUrl(entity.CoverFileId));
 
         await DistributedJsonCache
             .SetAsync(_cache, key, row, SummaryTtl, cancellationToken)

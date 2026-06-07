@@ -13,4 +13,6 @@ public record RestaurantSummaryDto(
     string? City,
     double? Latitude,
     double? Longitude,
-    decimal MinOrderAmount);
+    decimal MinOrderAmount,
+    string? LogoUrl = null,
+    string? CoverUrl = null);

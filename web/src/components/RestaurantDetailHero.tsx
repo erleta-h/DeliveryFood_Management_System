@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { RestaurantSummary } from '../lib/restaurantsApi'
-import { etaRangeLabel, isRestaurantOpenNow } from '../lib/restaurantDetailUi'
+import { apiPath } from '../lib/apiBase'
+import { etaRangeLabel, generatedLogoLines, isRestaurantOpenNow } from '../lib/restaurantDetailUi'
 
 type Props = {
   title: string
   coverUrl: string
+  logoUrl?: string | null
   summary: RestaurantSummary | null
   categoryName: string
   averageRating: number
@@ -40,6 +42,7 @@ function IconBtn({
 export function RestaurantDetailHero({
   title,
   coverUrl,
+  logoUrl,
   summary,
   categoryName,
   averageRating,
@@ -64,7 +67,8 @@ export function RestaurantDetailHero({
     }
   }
 
-  const logoLines = title.trim().split(/\s+/).slice(0, 2)
+  const logoLines = generatedLogoLines(title)
+  const logoSrc = logoUrl ? apiPath(logoUrl) : null
 
   return (
     <div className="relative overflow-hidden">
@@ -107,15 +111,21 @@ export function RestaurantDetailHero({
       <div className="relative border-b border-white/[0.06] bg-[#0c0e14] px-4 pb-5 pt-0 sm:px-6">
         <div className="-mt-14 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 gap-4">
-            <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-black px-1.5 text-center shadow-xl">
-              {logoLines.map((line) => (
-                <span
-                  key={line}
-                  className="text-[11px] font-bold leading-tight text-[#F5B800] sm:text-xs"
-                >
-                  {line}
-                </span>
-              ))}
+            <div className="flex h-[4.5rem] w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-black shadow-xl">
+              {logoSrc ? (
+                <img src={logoSrc} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center justify-center px-1.5 text-center">
+                  {logoLines.map((line) => (
+                    <span
+                      key={line}
+                      className="text-[11px] font-bold leading-tight text-[#F5B800] sm:text-xs"
+                    >
+                      {line}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="min-w-0 pt-8 sm:pt-10">
               {open ? (

@@ -28,7 +28,11 @@ public class Restaurant
     public string? Slug { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
+    public long? LogoFileId { get; set; }
+    public long? CoverFileId { get; set; }
 
+    public StoredFile? LogoFile { get; set; }
+    public StoredFile? CoverFile { get; set; }
     public FoodCategory FoodCategory { get; set; } = null!;
     public DeliveryZone? DeliveryZone { get; set; }
     public ICollection<FavoriteRestaurant> FavoritedBy { get; set; } = new List<FavoriteRestaurant>();

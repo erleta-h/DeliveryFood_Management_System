@@ -26,6 +26,10 @@ export type RestaurantListItem = {
   previewItems: RestaurantProductPreview[]
   /** Kur sort=proximity dhe ke dërguar koordinata klienti. */
   distanceKm?: number | null
+  /** `/api/files/public/{id}` — logo e personalizuar. */
+  logoUrl?: string | null
+  /** `/api/files/public/{id}` — cover i personalizuar. */
+  coverUrl?: string | null
 }
 
 export type FoodCategoryOption = {
@@ -60,6 +64,8 @@ export type RestaurantSummary = {
   latitude: number | null
   longitude: number | null
   minOrderAmount: number
+  logoUrl?: string | null
+  coverUrl?: string | null
 }
 
 export async function fetchRestaurantSummary(

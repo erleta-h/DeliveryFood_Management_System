@@ -227,6 +227,14 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.Slug)
                 .IsUnique()
                 .HasFilter("[Slug] IS NOT NULL");
+            e.HasOne(x => x.LogoFile)
+                .WithMany()
+                .HasForeignKey(x => x.LogoFileId)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.CoverFile)
+                .WithMany()
+                .HasForeignKey(x => x.CoverFileId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<DeliveryZone>(e =>

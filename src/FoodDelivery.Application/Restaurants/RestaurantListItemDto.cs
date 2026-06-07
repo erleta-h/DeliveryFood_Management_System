@@ -14,4 +14,6 @@ public record RestaurantListItemDto(
     int ReviewCount,
     int EstimatedDeliveryMinutes,
     IReadOnlyList<RestaurantProductPreviewDto> PreviewItems,
-    double? DistanceKm = null);
+    double? DistanceKm = null,
+    string? LogoUrl = null,
+    string? CoverUrl = null);

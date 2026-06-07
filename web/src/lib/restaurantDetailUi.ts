@@ -23,13 +23,20 @@ export function menuItemDescription(
 export function coverImageFromMenu(
   categories: RestaurantMenuCategory[],
   categoryName: string,
+  customCoverUrl?: string | null,
 ): string {
+  if (customCoverUrl) return apiPath(customCoverUrl)
   for (const cat of categories) {
     for (const item of cat.items) {
       if (item.imageUrl) return apiPath(item.imageUrl)
     }
   }
   return imageUrlForFoodCategory(categoryName)
+}
+
+/** Rreshta të emrit për logo të gjeneruar (fallback). */
+export function generatedLogoLines(title: string): string[] {
+  return title.trim().split(/\s+/).slice(0, 2)
 }
 
 export function etaRangeLabel(minutes: number): string {

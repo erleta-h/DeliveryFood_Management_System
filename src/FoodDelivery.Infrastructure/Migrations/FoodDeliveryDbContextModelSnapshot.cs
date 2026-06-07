@@ -1206,6 +1206,12 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
 
+                    b.Property<long?>("LogoFileId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("CoverFileId")
+                        .HasColumnType("bigint");
+
                     b.Property<decimal>("MinOrderAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -1244,7 +1250,11 @@ namespace FoodDelivery.Infrastructure.Migrations
 
                     b.HasIndex("DeliveryZoneId");
 
+                    b.HasIndex("CoverFileId");
+
                     b.HasIndex("FoodCategoryId");
+
+                    b.HasIndex("LogoFileId");
 
                     b.HasIndex("Slug")
                         .IsUnique()
@@ -2221,6 +2231,11 @@ namespace FoodDelivery.Infrastructure.Migrations
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Restaurant", b =>
                 {
+                    b.HasOne("FoodDelivery.Domain.Entities.StoredFile", "CoverFile")
+                        .WithMany()
+                        .HasForeignKey("CoverFileId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("FoodDelivery.Domain.Entities.DeliveryZone", "DeliveryZone")
                         .WithMany("Restaurants")
                         .HasForeignKey("DeliveryZoneId")
@@ -2232,9 +2247,18 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("FoodDelivery.Domain.Entities.StoredFile", "LogoFile")
+                        .WithMany()
+                        .HasForeignKey("LogoFileId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CoverFile");
+
                     b.Navigation("DeliveryZone");
 
                     b.Navigation("FoodCategory");
+
+                    b.Navigation("LogoFile");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.RestaurantStaff", b =>
