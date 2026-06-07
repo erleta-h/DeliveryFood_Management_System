@@ -5,7 +5,7 @@ import { AdminIcon } from '../components/admin/adminIcons'
 import { AdminTopBar } from '../components/admin/AdminTopBar'
 
 import { getVisibleAdminNavGroups } from '../lib/adminNav'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, startOrdersHub } from '../lib/orderHub'
 
 import { adminMainBg, customerShellBg } from '../lib/adminTheme'
 
@@ -85,10 +85,17 @@ export default function AdminLayout() {
       })
     })
 
-    void startOrdersHub(hub, [{ kind: 'admin' }]).catch((err: unknown) =>
-      console.warn('[AdminHub] connection/join failed', err),
+    let cancelled = false
+    void startOrdersHub(hub, [{ kind: 'admin' }], { isCancelled: () => cancelled }).catch(
+      (err: unknown) => {
+        if (cancelled || isHubStartAbortError(err)) return
+        console.warn('[AdminHub] connection/join failed', err)
+      },
     )
-    return () => { hub.stop().catch(() => {}) }
+    return () => {
+      cancelled = true
+      void hub.stop()
+    }
   }, [token])
 
   useEffect(() => {

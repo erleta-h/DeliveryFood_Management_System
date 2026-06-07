@@ -1,10 +1,50 @@
 import * as signalR from '@microsoft/signalr'
 import { apiPath } from './apiBase'
 
+/** StrictMode cleanup ndalon negotiation — mos e loguar si gabim real. */
+function isHubNegotiationAbortLog(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes('stopped during negotiation') || m.includes('connection was stopped')
+}
+
+/** Event-e që serveri dërgon — noop paraprakisht që mos të dalin warning-e kur faqja dëgjon vetëm një pjesë. */
+const ORDERS_HUB_CLIENT_EVENTS = [
+  'driverLocation',
+  'deliveryChatMessage',
+  'deliveryChatSeen',
+  'orderStatus',
+  'customerOrderStatus',
+  'newOrder',
+  'deliveryOffer',
+  'kitchenNotification',
+  'adminNotification',
+  'customerNotification',
+  'supportTicketMessageReceived',
+] as const
+
+function isUnhandledHubMethodLog(message: string): boolean {
+  return /no client method with the name/i.test(message)
+}
+
+const hubLogger: signalR.ILogger = {
+  log(logLevel, message) {
+    if (isHubNegotiationAbortLog(message)) return
+    if (isUnhandledHubMethodLog(message)) return
+    if (logLevel >= signalR.LogLevel.Error) console.error(message)
+    else if (logLevel >= signalR.LogLevel.Warning) console.warn(message)
+  },
+}
+
+function wireOrdersHubNoopHandlers(conn: signalR.HubConnection): void {
+  for (const name of ORDERS_HUB_CLIENT_EVENTS) {
+    conn.on(name, () => {})
+  }
+}
+
 export function createOrdersHubConnection(accessToken: string) {
   const url = apiPath('/hubs/orders')
   const sep = url.includes('?') ? '&' : '?'
-  return new signalR.HubConnectionBuilder()
+  const conn = new signalR.HubConnectionBuilder()
     .withUrl(`${url}${sep}access_token=${encodeURIComponent(accessToken)}`, {
       skipNegotiation: false,
       transport:
@@ -12,8 +52,11 @@ export function createOrdersHubConnection(accessToken: string) {
         signalR.HttpTransportType.ServerSentEvents |
         signalR.HttpTransportType.LongPolling,
     })
+    .configureLogging(hubLogger)
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .build()
+  wireOrdersHubNoopHandlers(conn)
+  return conn
 }
 
 export type OrdersHubJoin =

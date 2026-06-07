@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchKitchenContext, type KitchenStaffContext } from '../lib/kitchenApi'
 import { hasCustomerRole } from '../lib/jwtRoles'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import {
+  createOrdersHubConnection,
+  isHubStartAbortError,
+  startOrdersHub,
+} from '../lib/orderHub'
 import { customerBtnPrimary } from '../lib/customerTheme'
 import { enableStaffCustomerAppMode } from '../lib/staffCustomerApp'
 import { useAuthStore } from '../store/authStore'
@@ -80,10 +84,19 @@ export default function KitchenLayout() {
       },
     )
 
-    hub.start()
-      .then(() => hub.invoke('JoinKitchen'))
-      .catch((err:unknown) => console.warn('[KitchenHub] connection/join failed', err))
-    return () => { hub.stop().catch(() => {}) }
+    let cancelled = false
+    void (async () => {
+      try {
+        await startOrdersHub(hub, [{ kind: 'kitchen' }], { isCancelled: () => cancelled })
+      } catch (err) {
+        if (cancelled || isHubStartAbortError(err)) return
+        console.warn('[KitchenHub] connection/join failed', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+      void hub.stop()
+    }
   }, [token])
 
   useEffect(() => {
