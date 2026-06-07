@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchDriverStatus, postDriverLocation } from '../lib/driverApi'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, startOrdersHub } from '../lib/orderHub'
 import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { useAuthStore } from '../store/authStore'
 import { useDriverAlertsStore } from '../store/driverAlertsStore'
@@ -114,17 +114,15 @@ export default function DriverLayout() {
       useDriverAlertsStore.getState().incrementChatUnread()
     })
     let cancelled = false
-    ;(async () => {
-      try {
-        await startOrdersHub(conn, [{ kind: 'driver' }])
-      } catch (err) {
+    void startOrdersHub(conn, [{ kind: 'driver' }], { isCancelled: () => cancelled }).catch(
+      (err: unknown) => {
+        if (cancelled || isHubStartAbortError(err)) return
         console.warn('[DriverHub] SignalR nuk u lidh.', err)
-      }
-      if (cancelled) return
-    })()
+      },
+    )
     return () => {
       cancelled = true
-      void conn.stop()
+      void conn.stop().catch(() => {})
     }
   }, [token])
 

@@ -12,6 +12,14 @@ export function createOrdersHubConnection(accessToken: string) {
         signalR.HttpTransportType.ServerSentEvents |
         signalR.HttpTransportType.LongPolling,
     })
+    .configureLogging({
+      log: (level, message) => {
+        if (message.includes('stopped during negotiation')) return
+        if (level >= signalR.LogLevel.Warning) {
+          console.warn(`[SignalR] ${message}`)
+        }
+      },
+    })
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .build()
 }
