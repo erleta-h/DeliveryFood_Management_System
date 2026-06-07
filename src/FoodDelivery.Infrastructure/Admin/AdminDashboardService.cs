@@ -1,7 +1,8 @@
 using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.Orders;
 using FoodDelivery.Application.Partners;
-using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Application.Persistence;
+using FoodDelivery.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -9,12 +10,12 @@ namespace FoodDelivery.Infrastructure.Admin;
 
 public sealed class AdminDashboardService : IAdminDashboardService
 {
-    private readonly FoodDeliveryDbContext _db;
+    private readonly IUnitOfWork _uow;
     private readonly ILogger<AdminDashboardService> _log;
 
-    public AdminDashboardService(FoodDeliveryDbContext db, ILogger<AdminDashboardService> log)
+    public AdminDashboardService(IUnitOfWork uow, ILogger<AdminDashboardService> log)
     {
-        _db = db;
+        _uow = uow;
         _log = log;
     }
 
@@ -27,7 +28,8 @@ public sealed class AdminDashboardService : IAdminDashboardService
             startWeek = startWeek.AddDays(-7);
         var startMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var notCancelled = _db.Orders.AsNoTracking().Where(o => o.Status != OrderStatus.Cancelled);
+        var orders = _uow.Repository<Order, long>().Query.AsNoTracking();
+        var notCancelled = orders.Where(o => o.Status != OrderStatus.Cancelled);
 
         var totalOrders = await SafeCountAsync(
             () => notCancelled.CountAsync(cancellationToken),
@@ -64,29 +66,32 @@ public sealed class AdminDashboardService : IAdminDashboardService
             "revMonth",
             cancellationToken);
 
+        var restaurants = _uow.Repository<Restaurant, long>().Query.AsNoTracking();
         var activeRestaurants = await SafeCountAsync(
-            () => _db.Restaurants.AsNoTracking().CountAsync(r => r.IsActive && r.IsApproved, cancellationToken),
+            () => restaurants.CountAsync(r => r.IsActive && r.IsApproved, cancellationToken),
             "activeRestaurants",
             cancellationToken);
 
+        var users = _uow.Repository<User, long>().Query.AsNoTracking();
+        var driverProfiles = _uow.Repository<DriverProfile, long>().Query.AsNoTracking();
         var activeDrivers = await SafeCountAsync(
             () =>
-                (from d in _db.DriverProfiles.AsNoTracking()
-                 join u in _db.Users.AsNoTracking() on d.UserId equals u.Id
+                (from d in driverProfiles
+                 join u in users on d.UserId equals u.Id
                  where u.IsActive
                  select d).CountAsync(cancellationToken),
             "activeDrivers",
             cancellationToken);
 
+        var partnerApps = _uow.Repository<RestaurantPartnerApplication, long>().Query.AsNoTracking();
         var pendingPartnerApps = await SafeCountAsync(
-            () => _db.RestaurantPartnerApplications.AsNoTracking()
-                .CountAsync(a => a.Status == PartnerApplicationStatuses.Pending, cancellationToken),
+            () => partnerApps.CountAsync(a => a.Status == PartnerApplicationStatuses.Pending, cancellationToken),
             "pendingPartnerApps",
             cancellationToken);
 
+        var driverApps = _uow.Repository<DriverApplication, long>().Query.AsNoTracking();
         var pendingDriverApps = await SafeCountAsync(
-            () => _db.DriverApplications.AsNoTracking()
-                .CountAsync(a => a.Status == PartnerApplicationStatuses.Pending, cancellationToken),
+            () => driverApps.CountAsync(a => a.Status == PartnerApplicationStatuses.Pending, cancellationToken),
             "pendingDriverApps",
             cancellationToken);
 
@@ -95,7 +100,7 @@ public sealed class AdminDashboardService : IAdminDashboardService
             {
                 return await (
                     from o in notCancelled.Where(o => o.PlacedAt >= startMonth)
-                    join r in _db.Restaurants.AsNoTracking() on o.RestaurantId equals r.Id
+                    join r in restaurants on o.RestaurantId equals r.Id
                     group o by r.Name into g
                     select new AdminTopRestaurantDto(g.Key, g.Count()))
                     .OrderByDescending(x => x.OrderCount)

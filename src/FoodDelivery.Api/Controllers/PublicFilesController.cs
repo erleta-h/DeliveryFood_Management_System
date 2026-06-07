@@ -1,7 +1,6 @@
-using FoodDelivery.Infrastructure.Data;
+using FoodDelivery.Application.Restaurants;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace FoodDelivery.Api.Controllers;
 
@@ -10,11 +9,11 @@ namespace FoodDelivery.Api.Controllers;
 [Route("api/files")]
 public sealed class PublicFilesController : ControllerBase
 {
-    private readonly FoodDeliveryDbContext _db;
+    private readonly IPublicMenuImageService _menuImages;
 
-    public PublicFilesController(FoodDeliveryDbContext db)
+    public PublicFilesController(IPublicMenuImageService menuImages)
     {
-        _db = db;
+        _menuImages = menuImages;
     }
 
     [HttpGet("public/{id:long}")]
@@ -23,21 +22,12 @@ public sealed class PublicFilesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetMenuImage(long id, CancellationToken cancellationToken)
     {
-        var usedByMenu = await _db.MenuItems.AsNoTracking()
-            .AnyAsync(m => m.ImageFileId == id, cancellationToken);
-        if (!usedByMenu)
+        var result = await _menuImages.GetMenuImageAsync(id, cancellationToken);
+        if (result is null)
             return NotFound();
 
-        var file = await _db.StoredFiles.AsNoTracking() 
-            .FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
-        if (file is null || string.IsNullOrWhiteSpace(file.FilePath))
-            return NotFound();
-
-        var path = file.FilePath;
-        if (!System.IO.File.Exists(path))
-            return NotFound();
-
-        var contentType = GuessContentType(file.Filename);
+        var (path, filename) = result.Value;
+        var contentType = GuessContentType(filename);
         return PhysicalFile(path, contentType);
     }
 

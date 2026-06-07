@@ -379,6 +379,7 @@ public sealed class KitchenMenuService : IKitchenMenuService
             FilePath = fullPath,
             FileSize = totalWritten,
             UploaderId = staffUserId,
+            CreatedById = staffUserId,
             CreatedAt = now,
         };
         _uow.Repository<StoredFile, long>().Add(stored);

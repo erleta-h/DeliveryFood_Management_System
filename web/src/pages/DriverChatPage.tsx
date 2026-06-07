@@ -8,7 +8,8 @@ import {
   upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import * as signalR from '@microsoft/signalr'
 import { fetchDriverOrderDetail, DRIVER_LEG, type DriverOrderDetail } from '../lib/driverApi'
 import { ORDER_STATUS_CANCELLED, ORDER_STATUS_DELIVERED } from '../lib/orderStatusLabels'
 import { useAuthStore } from '../store/authStore'
@@ -34,6 +35,9 @@ export default function DriverChatPage() {
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [hubState, setHubState] = useState<signalR.HubConnectionState>(
+    signalR.HubConnectionState.Disconnected,
+  )
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -85,6 +89,7 @@ export default function DriverChatPage() {
   useEffect(() => {
     if (!token || !orderId) return
     const conn = createOrdersHubConnection(token)
+    wireOrdersHubConnectionState(conn, setHubState)
     conn.on('deliveryChatMessage', (raw: unknown) => {
       const msg = normalizeDeliveryChatMessage(raw)
       if (!msg || msg.orderId !== orderId) return
@@ -102,7 +107,9 @@ export default function DriverChatPage() {
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        setHubState(conn.state)
       } catch (err) {
+        setHubState(signalR.HubConnectionState.Disconnected)
         console.warn('[DriverChat] SignalR nuk u lidh — polling 12s.', err)
       }
       if (cancelled) return
@@ -114,12 +121,13 @@ export default function DriverChatPage() {
   }, [token, orderId])
 
   useEffect(() => {
+    if (isOrdersHubRealtimeActive(hubState)) return
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void loadSilent()
     }, 12_000)
     return () => window.clearInterval(id)
-  }, [loadSilent])
+  }, [loadSilent, hubState])
 
   useEffect(() => {
     scrollToBottom()

@@ -360,6 +360,7 @@ public sealed class SupportTicketService : ISupportTicketService
             FilePath = fullPath,
             FileSize = totalWritten,
             UploaderId = userId,
+            CreatedById = userId,
             CreatedAt = now,
         };
         _uow.Repository<StoredFile, long>().Add(stored);

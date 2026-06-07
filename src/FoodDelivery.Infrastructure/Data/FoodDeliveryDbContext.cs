@@ -235,6 +235,14 @@ public class FoodDeliveryDbContext : DbContext
             e.Property(x => x.MinOrderAmount).HasPrecision(18, 2);
             e.HasIndex(x => x.City);
             e.HasIndex(x => x.IsActive);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<FavoriteRestaurant>(e =>
@@ -277,13 +285,18 @@ public class FoodDeliveryDbContext : DbContext
             // InitialCreate: dbo.Files, kolona UploadedBy (jo StoredFiles / UploaderId).
             e.ToTable("Files");
             e.Property(x => x.UploaderId).HasColumnName("UploadedBy");
-            e.Ignore(x => x.CreatedById);
-            e.Ignore(x => x.UpdatedAt);
-            e.Ignore(x => x.UpdatedById);
             e.HasOne(x => x.Uploader)
                 .WithMany()
                 .HasForeignKey(x => x.UploaderId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.NoAction);
         });
         modelBuilder.Entity<Notification>(e =>
         {
@@ -312,6 +325,14 @@ public class FoodDeliveryDbContext : DbContext
                 .WithMany(x => x.Staff)
                 .HasForeignKey(x => x.RestaurantId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.CreatedById)
+                .OnDelete(DeleteBehavior.NoAction);
+            e.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(x => x.UpdatedById)
+                .OnDelete(DeleteBehavior.NoAction);
             e.HasIndex(x => new { x.UserId, x.RestaurantId }).IsUnique();
         });
         modelBuilder.Entity<Payment>(e =>

@@ -16,7 +16,13 @@ import {
 import { DRIVER_LEG } from '../lib/driverApi'
 import { pickNearestAssignableDriverUserId } from '../lib/kitchenDriverSort'
 import { ReadyOrderDriverAssign } from '../components/kitchen/ReadyOrderDriverAssign'
-import { createOrdersHubConnection } from '../lib/orderHub'
+import {
+  createOrdersHubConnection,
+  isOrdersHubRealtimeActive,
+  startOrdersHub,
+  wireOrdersHubConnectionState,
+} from '../lib/orderHub'
+import * as signalR from '@microsoft/signalr'
 import {
   KitchenOrderDetailsDrawer,
   MerchantCardFooterActions,
@@ -694,6 +700,9 @@ export default function KitchenOrdersPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [pullBusy, setPullBusy] = useState(false)
   const [assignableDrivers, setAssignableDrivers] = useState<KitchenAssignableDriver[]>([])
+  const [hubState, setHubState] = useState<signalR.HubConnectionState>(
+    signalR.HubConnectionState.Disconnected,
+  )
 
   const refresh = useCallback(async () => {
     if (!token) return
@@ -756,7 +765,7 @@ export default function KitchenOrdersPage() {
   }, [token, refresh])
 
   useEffect(() => {
-    if (!token) return
+    if (!token || isOrdersHubRealtimeActive(hubState)) return
     const t = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void refresh().catch((e: unknown) => {
@@ -766,7 +775,7 @@ export default function KitchenOrdersPage() {
       })
     }, 12000)
     return () => window.clearInterval(t)
-  }, [token, refresh])
+  }, [token, refresh, hubState])
 
   useEffect(() => {
     sessionStorage.setItem('fd_kitchen_rush', rush ? '1' : '0')
@@ -775,6 +784,7 @@ export default function KitchenOrdersPage() {
   useEffect(() => {
     if (!token) return
     const conn = createOrdersHubConnection(token)
+    wireOrdersHubConnectionState(conn, setHubState)
     conn.on('newOrder', () => {
       playNewOrderChime()
       void refresh().catch(() => {})
@@ -785,14 +795,14 @@ export default function KitchenOrdersPage() {
     let cancelled = false
     ;(async () => {
       const ctx = await fetchKitchenContext(token)
-      if (ctx.ok !== true) return
+      if (cancelled || ctx.ok !== true) return
       const rid = ctx.context.restaurantId
       if (rid == null) return
       try {
-        await conn.start()
-        if (!cancelled) await conn.invoke('JoinRestaurant', rid)
+        await startOrdersHub(conn, [{ kind: 'restaurant', restaurantId: rid }])
+        if (!cancelled) setHubState(conn.state)
       } catch {
-        /* pa lidhje / CORS */
+        if (!cancelled) setHubState(signalR.HubConnectionState.Disconnected)
       }
     })()
     return () => {

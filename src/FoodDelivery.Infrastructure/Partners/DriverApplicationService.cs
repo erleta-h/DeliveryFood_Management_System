@@ -217,6 +217,7 @@ public sealed class DriverApplicationService : IDriverApplicationService
                 FilePath = fullPath,
                 FileSize = totalWritten,
                 UploaderId = uploaderId,
+                CreatedById = uploaderId,
                 CreatedAt = DateTime.UtcNow,
             };
             _uow.Repository<StoredFile, long>().Add(stored);

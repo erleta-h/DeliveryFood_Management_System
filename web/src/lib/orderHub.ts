@@ -58,6 +58,25 @@ export function wireOrdersHubReconnect(conn: signalR.HubConnection, joins: Order
   })
 }
 
+/** Polling vetëm kur hub-i nuk është i lidhur (disconnected / reconnecting / connecting). */
+export function isOrdersHubRealtimeActive(state: signalR.HubConnectionState): boolean {
+  return state === signalR.HubConnectionState.Connected
+}
+
+/** Sinkronizon state-in e lidhjes për fallback polling. */
+export function wireOrdersHubConnectionState(
+  conn: signalR.HubConnection,
+  setState: (state: signalR.HubConnectionState) => void,
+): void {
+  const sync = () => setState(conn.state)
+  conn.onclose(sync)
+  conn.onreconnecting(sync)
+  conn.onreconnected(() => {
+    sync()
+  })
+  sync()
+}
+
 /** Nis hub-in dhe fut lidhjen në grupet e nevojshme. */
 export async function startOrdersHub(
   conn: signalR.HubConnection,

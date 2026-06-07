@@ -22,6 +22,40 @@ namespace FoodDelivery.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.AccountActivationToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AccountActivationTokens", (string)null);
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.AuditLog", b =>
                 {
                     b.Property<long>("Id")
@@ -91,19 +125,22 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
                     b.Property<decimal?>("MaxDiscountAmount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal?>("MinOrderAmount")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<int?>("MaxUses")
                         .HasColumnType("int");
+
+                    b.Property<decimal?>("MinOrderAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -123,6 +160,43 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Coupons");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.CouponAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CouponId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CouponId");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("CouponAudits", (string)null);
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.CustomerAddress", b =>
@@ -242,6 +316,67 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.ToTable("Deliveries", (string)null);
                 });
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DeliveryZone", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedById")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("DeliveryFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EstimatedDeliveryMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("MinOrderAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("UpdatedById")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("City");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("UpdatedById");
+
+                    b.ToTable("DeliveryZones");
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverApplication", b =>
                 {
                     b.Property<long>("Id")
@@ -249,6 +384,15 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("ActivatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ActivationEmailSentAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ApprovedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -284,6 +428,10 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<byte>("Status")
                         .HasColumnType("tinyint");
 
@@ -291,6 +439,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<long?>("UpdatedById")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("UserId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("VehicleType")
@@ -306,7 +457,48 @@ namespace FoodDelivery.Infrastructure.Migrations
 
                     b.HasIndex("Status");
 
+                    b.HasIndex("UpdatedById");
+
+                    b.HasIndex("UserId");
+
                     b.ToTable("DriverApplications", (string)null);
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverApplicationAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<long>("DriverApplicationId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("DriverApplicationId");
+
+                    b.ToTable("DriverApplicationAudits", (string)null);
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverProfile", b =>
@@ -795,6 +987,43 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.ToTable("OrderStatusHistory");
                 });
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.PartnerApplicationAudit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("CreatedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Detail")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long>("PartnerApplicationId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PartnerApplicationId");
+
+                    b.ToTable("PartnerApplicationAudits", (string)null);
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Payment", b =>
                 {
                     b.Property<long>("Id")
@@ -950,6 +1179,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<long?>("DeliveryZoneId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
 
@@ -982,6 +1214,17 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("OverrideDeliveryFee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("OverrideEstimatedDeliveryMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("OverrideMinOrderAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
 
@@ -998,6 +1241,8 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeliveryZoneId");
 
                     b.HasIndex("FoodCategoryId");
 
@@ -1095,12 +1340,22 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("UpdatedById")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("UserId")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedById");
+
                     b.HasIndex("RestaurantId");
+
+                    b.HasIndex("UpdatedById");
 
                     b.HasIndex("UserId", "RestaurantId")
                         .IsUnique();
@@ -1282,6 +1537,9 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<long?>("CreatedById")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("Entity")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -1301,15 +1559,25 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("UpdatedById")
+                        .HasColumnType("bigint");
+
                     b.Property<long>("UploaderId")
                         .HasColumnType("bigint")
                         .HasColumnName("UploadedBy");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("UpdatedById");
+
                     b.HasIndex("UploaderId");
 
-                    b.ToTable("Files");
+                    b.ToTable("Files", (string)null);
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicket", b =>
@@ -1384,6 +1652,42 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.ToTable("SupportTickets", (string)null);
                 });
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicketAttachment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("StoredFileId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SupportTicketId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UploadedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MessageId");
+
+                    b.HasIndex("StoredFileId");
+
+                    b.HasIndex("SupportTicketId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("SupportTicketAttachments", (string)null);
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicketAudit", b =>
                 {
                     b.Property<long>("Id")
@@ -1414,7 +1718,7 @@ namespace FoodDelivery.Infrastructure.Migrations
 
                     b.HasIndex("SupportTicketId");
 
-                    b.ToTable("SupportTicketAudits");
+                    b.ToTable("SupportTicketAudits", (string)null);
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicketMessage", b =>
@@ -1595,6 +1899,17 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.ToTable("WebPushSubscriptions");
                 });
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.AccountActivationToken", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.AuditLog", b =>
                 {
                     b.HasOne("FoodDelivery.Domain.Entities.User", "User")
@@ -1602,6 +1917,24 @@ namespace FoodDelivery.Infrastructure.Migrations
                         .HasForeignKey("UserId");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.CouponAudit", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.Coupon", "Coupon")
+                        .WithMany("Audits")
+                        .HasForeignKey("CouponId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Coupon");
+
+                    b.Navigation("CreatedBy");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.CustomerAddress", b =>
@@ -1632,6 +1965,54 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Navigation("Driver");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DeliveryZone", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverApplication", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "UpdatedBy")
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("UpdatedBy");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverApplicationAudit", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.DriverApplication", "DriverApplication")
+                        .WithMany("Audits")
+                        .HasForeignKey("DriverApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("DriverApplication");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverProfile", b =>
@@ -1790,6 +2171,24 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.PartnerApplicationAudit", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.RestaurantPartnerApplication", "PartnerApplication")
+                        .WithMany("Audits")
+                        .HasForeignKey("PartnerApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("PartnerApplication");
+                });
+
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Payment", b =>
                 {
                     b.HasOne("FoodDelivery.Domain.Entities.Order", "Order")
@@ -1822,22 +2221,39 @@ namespace FoodDelivery.Infrastructure.Migrations
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Restaurant", b =>
                 {
+                    b.HasOne("FoodDelivery.Domain.Entities.DeliveryZone", "DeliveryZone")
+                        .WithMany("Restaurants")
+                        .HasForeignKey("DeliveryZoneId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FoodDelivery.Domain.Entities.FoodCategory", "FoodCategory")
                         .WithMany("Restaurants")
                         .HasForeignKey("FoodCategoryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("DeliveryZone");
+
                     b.Navigation("FoodCategory");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.RestaurantStaff", b =>
                 {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("FoodDelivery.Domain.Entities.Restaurant", "Restaurant")
                         .WithMany("Staff")
                         .HasForeignKey("RestaurantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("FoodDelivery.Domain.Entities.User", "User")
                         .WithMany("RestaurantStaffMemberships")
@@ -1904,6 +2320,16 @@ namespace FoodDelivery.Infrastructure.Migrations
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.StoredFile", b =>
                 {
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UpdatedById")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("FoodDelivery.Domain.Entities.User", "Uploader")
                         .WithMany()
                         .HasForeignKey("UploaderId")
@@ -1950,6 +2376,40 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Navigation("Restaurant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicketAttachment", b =>
+                {
+                    b.HasOne("FoodDelivery.Domain.Entities.SupportTicketMessage", "Message")
+                        .WithMany()
+                        .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("FoodDelivery.Domain.Entities.StoredFile", "StoredFile")
+                        .WithMany()
+                        .HasForeignKey("StoredFileId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("FoodDelivery.Domain.Entities.SupportTicket", "SupportTicket")
+                        .WithMany()
+                        .HasForeignKey("SupportTicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FoodDelivery.Domain.Entities.User", "UploadedBy")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Message");
+
+                    b.Navigation("StoredFile");
+
+                    b.Navigation("SupportTicket");
+
+                    b.Navigation("UploadedBy");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.SupportTicketAudit", b =>
@@ -2039,12 +2499,24 @@ namespace FoodDelivery.Infrastructure.Migrations
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Coupon", b =>
                 {
+                    b.Navigation("Audits");
+
                     b.Navigation("OrderCoupons");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.CustomerAddress", b =>
                 {
                     b.Navigation("Orders");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DeliveryZone", b =>
+                {
+                    b.Navigation("Restaurants");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.DriverApplication", b =>
+                {
+                    b.Navigation("Audits");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.FoodCategory", b =>
@@ -2088,6 +2560,11 @@ namespace FoodDelivery.Infrastructure.Migrations
                     b.Navigation("Reviews");
 
                     b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("FoodDelivery.Domain.Entities.RestaurantPartnerApplication", b =>
+                {
+                    b.Navigation("Audits");
                 });
 
             modelBuilder.Entity("FoodDelivery.Domain.Entities.Role", b =>

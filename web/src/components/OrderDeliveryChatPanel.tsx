@@ -7,7 +7,8 @@ import {
   upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import * as signalR from '@microsoft/signalr'
 
 function formatTime(utc: string): string {
   return new Date(utc).toLocaleTimeString('sq-AL', {
@@ -39,6 +40,9 @@ export function OrderDeliveryChatPanel({
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [pendingId, setPendingId] = useState<number | null>(null)
+  const [hubState, setHubState] = useState<signalR.HubConnectionState>(
+    signalR.HubConnectionState.Disconnected,
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -73,6 +77,7 @@ export function OrderDeliveryChatPanel({
   useEffect(() => {
     if (!useOwnHubConnection) return
     const conn = createOrdersHubConnection(token)
+    wireOrdersHubConnectionState(conn, setHubState)
     conn.on('deliveryChatMessage', (raw: unknown) => {
       const msg = normalizeDeliveryChatMessage(raw)
       if (!msg || msg.orderId !== orderId) return
@@ -90,7 +95,9 @@ export function OrderDeliveryChatPanel({
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        setHubState(conn.state)
       } catch (err) {
+        setHubState(signalR.HubConnectionState.Disconnected)
         console.warn('[Chat] SignalR nuk u lidh — përdoret polling çdo 12s.', err)
       }
       if (cancelled) return
@@ -102,12 +109,13 @@ export function OrderDeliveryChatPanel({
   }, [token, orderId, useOwnHubConnection])
 
   useEffect(() => {
+    if (!useOwnHubConnection || isOrdersHubRealtimeActive(hubState)) return
     const id = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void loadSilent()
     }, 12_000)
     return () => window.clearInterval(id)
-  }, [loadSilent])
+  }, [loadSilent, hubState, useOwnHubConnection])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })

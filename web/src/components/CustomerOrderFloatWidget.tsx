@@ -16,7 +16,8 @@ import {
   type CustomerOrderDetail,
   type CustomerOrderSummary,
 } from '../lib/ordersApi'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import * as signalR from '@microsoft/signalr'
 import { useAuthStore } from '../store/authStore'
 
 function pickActiveOrder(list: CustomerOrderSummary[]): CustomerOrderSummary | null {
@@ -53,6 +54,9 @@ export function CustomerOrderFloatWidget() {
   const [summary, setSummary] = useState<CustomerOrderSummary | null>(null)
   const [detail, setDetail] = useState<CustomerOrderDetail | null>(null)
   const [liveDriver, setLiveDriver] = useState<{ lat: number; lng: number } | null>(null)
+  const [hubState, setHubState] = useState<signalR.HubConnectionState>(
+    signalR.HubConnectionState.Disconnected,
+  )
   const orderRef = useRef<CustomerOrderDetail | null>(null)
   orderRef.current = detail
 
@@ -89,10 +93,10 @@ export function CustomerOrderFloatWidget() {
   }, [refresh])
 
   useEffect(() => {
-    if (!token || !summary) return
+    if (!token || !summary || isOrdersHubRealtimeActive(hubState)) return
     const t = window.setInterval(() => void refresh(), 14_000)
     return () => window.clearInterval(t)
-  }, [token, summary, refresh])
+  }, [token, summary, refresh, hubState])
 
   useEffect(() => {
     const onVis = () => {
@@ -110,6 +114,7 @@ export function CustomerOrderFloatWidget() {
       return
     }
     const conn = createOrdersHubConnection(token)
+    wireOrdersHubConnectionState(conn, setHubState)
     conn.on('orderStatus', (payload: { orderId: number; status?: number }) => {
       if (payload.orderId !== orderId) return
       if (typeof payload.status === 'number') {
@@ -134,8 +139,9 @@ export function CustomerOrderFloatWidget() {
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        setHubState(conn.state)
       } catch {
-        /* SignalR — widget përdor edhe polling nga refresh */
+        setHubState(signalR.HubConnectionState.Disconnected)
       }
       if (cancelled) return
     })()
