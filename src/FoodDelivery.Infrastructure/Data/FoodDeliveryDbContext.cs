@@ -53,7 +53,7 @@ public class FoodDeliveryDbContext : DbContext
     public DbSet<Delivery> Deliveries => Set<Delivery>();
     public DbSet<DriverProfile> DriverProfiles => Set<DriverProfile>();
 
-
+  
 
     public DbSet<Setting> Settings => Set<Setting>();
 
@@ -409,7 +409,7 @@ public class FoodDeliveryDbContext : DbContext
             e.HasIndex(x => x.Key).IsUnique();
         });
 
-
+    
 
 
         modelBuilder.Entity<WebPushSubscription>(e =>

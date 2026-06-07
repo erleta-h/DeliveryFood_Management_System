@@ -22,9 +22,10 @@
  * ============================================================================
  */
 
-/** Sfondi i plotë i faqes /app — i njëjti gradient si te LandingPage (faqja e parë). */
-export const customerShellBg =
-  'min-h-screen antialiased font-sans text-zinc-200/95 [background-image:radial-gradient(ellipse_120%_80%_at_50%_-15%,rgba(251,146,60,0.14)_0%,transparent_50%),radial-gradient(ellipse_90%_70%_at_100%_90%,rgba(234,88,12,0.08)_0%,transparent_45%),radial-gradient(ellipse_70%_50%_at_0%_80%,rgba(95,115,165,0.12)_0%,transparent_48%),linear-gradient(168deg,#1e2233_0%,#1a1d2b_42%,#171820_100%)]'
+import { landingShellBg } from './landingTheme'
+
+/** Sfondi i plotë i faqes /app — i njëjti gradient si LandingPage (faqja e parë). */
+export const customerShellBg = landingShellBg
 
 /**
  * Karta kryesore e faqes (p.sh. “Shporta”, “Adresat”) — xham i errët si karta “Ku ta dërgojmë”.

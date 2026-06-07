@@ -134,10 +134,10 @@ export default function CustomerLayout() {
             <button
               type="button"
               onClick={() => navigate('/app/addresses')}
-              className="hidden min-w-0 items-center gap-1 rounded-lg border border-white/10 bg-[#141a28] px-2.5 py-1.5 text-left transition hover:border-[#F5B800]/30 sm:flex"
+              className="flex min-w-0 max-w-[11rem] items-center gap-1 rounded-lg border border-white/10 bg-[#141a28] px-2.5 py-1.5 text-left transition hover:border-[#F5B800]/30 sm:max-w-xs"
             >
-              <span className="truncate text-xs font-medium text-zinc-300">{locationLabel}</span>
-              <span className="text-zinc-500" aria-hidden>
+              <span className="truncate text-[11px] font-medium text-zinc-300 sm:text-xs">{locationLabel}</span>
+              <span className="shrink-0 text-zinc-500" aria-hidden>
                 ▾
               </span>
             </button>
