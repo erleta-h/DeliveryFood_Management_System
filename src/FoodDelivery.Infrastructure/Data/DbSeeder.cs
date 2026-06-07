@@ -371,7 +371,76 @@ public static class DbSeeder
         CancellationToken cancellationToken = default)
     {
         await EnsureRbacPermissionsAsync(db, logger, cancellationToken);
+        await EnsurePlatformDefaultSettingsAsync(db, logger, cancellationToken);
         await EnsureCmsDefaultSettingsAsync(db, logger, cancellationToken);
+    }
+
+    /// <summary>Parametra biznesi te platformes — tarifa, support, porosi, shoferë.</summary>
+    private static async Task EnsurePlatformDefaultSettingsAsync(
+        FoodDeliveryDbContext db,
+        ILogger logger,
+        CancellationToken cancellationToken)
+    {
+        var defaults = new (string Key, string Value, string? Description)[]
+        {
+            ("platform.company_name", "FoodDelivery Kosovo", "Emri i kompanisë që shfaqet në platformë dhe komunikime me klientët."),
+            ("platform.company_address", "Prishtinë, Kosovë", "Adresa e biznesit për fatura, footer dhe faqe ligjore."),
+            ("platform.support_email", "support@fooddelivery.com", "Email që u shfaqet klientëve për ndihmë dhe kontakt."),
+            ("platform.support_phone", "+383 44 123 456", "Numri i telefonit për assistencë klientësh."),
+            ("platform.commission_percent", "15", "Përqindja që platforma fiton nga porositë e restoranteve."),
+            ("platform.platform_fee_percent", "5", "Tarifa shtesë e shërbimit që ngarkohet klientit për porosi."),
+            ("platform.default_currency", "EUR", "Monedha kryesore për çmimet dhe pagesat (p.sh. EUR)."),
+            ("platform.tax_percent", "0", "Norma e paracaktuar e taksës ku aplikohet."),
+            ("platform.base_delivery_fee", "2.50", "Tarifa bazë e dorëzimit kur nuk ka override restoranti ose zone."),
+            ("platform.free_delivery_threshold", "20.00", "Shuma minimale e shportës për dorëzim falas."),
+            ("platform.min_order_amount", "5.00", "Vlera minimale e porosisë para checkout-it."),
+            ("platform.default_delivery_minutes", "35", "Koha e vlerësuar e dorëzimit kur mungon ETA specifike."),
+            ("platform.max_delivery_radius_km", "15", "Distanca maksimale e dorëzimit nga restoranti (km)."),
+            ("platform.auto_cancel_unpaid_minutes", "15", "Minuta para anulimit automatik të porosisë së papaguar."),
+            ("platform.order_support_window_minutes", "60", "Kohëzgjatja pas dorëzimit kur klienti mund të hapë support për porosi."),
+            ("platform.driver_auto_offline_minutes", "30", "Shoferi shënohet offline nëse nuk ka aktivitet brenda kësaj kohe."),
+            ("platform.driver_location_stale_minutes", "10", "Sa kohë para se pozicioni GPS të konsiderohet i vjetëruar."),
+            ("platform.driver_max_active_orders", "3", "Numri maksimal i dorëzimeve aktive që një shofer mund të mbajë njëkohësisht."),
+            ("platform.driver_location_update_interval_seconds", "30", "Sa shpesh pritet përditësimi i pozicionit GPS nga aplikacioni i shoferit (sekonda)."),
+            ("platform.require_signed_contract_before_approval", "true", "Restorantet nuk mund të miratohen pa kontratë të nënshkruar."),
+            ("platform.auto_approve_restaurant_applications", "false", "Çdo aplikim restoranti kërkon shqyrtim manual nga admini."),
+            ("platform.max_addresses_per_customer", "10", "Numri maksimal i adresave që një klient mund të ruajë në llogarinë e tij."),
+            ("platform.review_allowed_within_days", "14", "Ditët pas porosisë së përfunduar kur klienti lejohet të lërë vlerësim."),
+            ("platform.max_coupon_discount_amount", "20", "Zbritja maksimale në euro që mund të aplikohet me një kupon."),
+            ("platform.default_coupon_validity_days", "30", "Kohëzgjatja e paracaktuar e vlefshmërisë së kuponave të rinj (ditë)."),
+            ("platform.first_order_coupon_enabled", "true", "Aktivizon promovimin automatik me kupon për porosinë e parë të klientit."),
+            ("platform.support_working_hours", "09:00 - 22:00", "Orari kur support-i live është i disponueshëm për klientët."),
+            ("platform.support_response_target_minutes", "15", "Kohë synimi për përgjigjen e ekipit të support-it."),
+            ("platform.auto_close_ticket_after_days", "7", "Tiketat e support-it mbyllen automatikisht pas ditëve pa aktivitet."),
+            ("platform.target_first_response_minutes", "30", "SLA-ja e synuar për përgjigjen e parë të agjentit ndaj një tikete."),
+            ("platform.facebook_url", "https://facebook.com/fooddelivery", "Linku zyrtar i faqes në Facebook."),
+            ("platform.instagram_url", "https://instagram.com/fooddelivery", "Linku zyrtar i profilit në Instagram."),
+        };
+
+        var now = DateTime.UtcNow;
+        var added = 0;
+
+        foreach (var (key, value, desc) in defaults)
+        {
+            if (await db.Settings.AnyAsync(s => s.Key == key, cancellationToken))
+                continue;
+
+            db.Settings.Add(new Setting
+            {
+                Key = key,
+                Value = value,
+                Description = desc,
+                CreatedAt = now,
+            });
+
+            added++;
+        }
+
+        if (added > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            logger.LogInformation("DbSeeder: u shtuan {N} konfigurime platforme.", added);
+        }
     }
 
     private static async Task EnsureRbacPermissionsAsync(
@@ -489,12 +558,12 @@ public static class DbSeeder
     {
         var defaults = new (string Key, string Value, string? Description)[]
         {
-        ("cms.landing.hero_title", "Porosit ushqimin e preferuar", "Titulli kryesor i landing"),
-        ("cms.landing.hero_highlight", "në derën tënde", "Fragmenti me theks (gradient) në titull"),
+        ("cms.landing.hero_title", "Porosit ushqimin e preferuar", "Titulli kryesor i faqes publike (homepage)."),
+        ("cms.landing.hero_highlight", "në derën tënde", "Fraza e theksuar në seksionin hero."),
         (
             "cms.landing.hero_subtitle",
             "Zbulo restorante të mrekullueshme pranë teje, porosit online dhe shijo ushqimin e preferuar pa dalë nga shtëpia.",
-            "Nëntitulli nën hero"),
+            "Teksti mbështetës nën titullin kryesor të hero."),
         ("cms.landing.hero_cta", "Porosit Tani", "Teksti i butonit kryesor (CTA)"),
         ("cms.landing.hero_background_image", "", "URL e figurës së sfondit të hero (1920×1080 rekomandohet)"),
         ("cms.landing.how_it_works_title", "Si funksionon?", "Titulli i seksionit How It Works"),
@@ -507,7 +576,7 @@ public static class DbSeeder
         ("cms.landing.restaurants_title", "Restorantet më të preferuara", "Titulli i seksionit restorante"),
         ("cms.landing.restaurants_subtitle", "Restorantet më të vlerësuara nga klientët tanë.", "Nëntitulli i seksionit restorante"),
         ("cms.landing.restaurants_cta_label", "Shiko të gjitha", "Teksti i linkut CTA restorante"),
-        ("cms.landing.categories_title", "Kategoritë", "Titulli i seksionit kategoritë"),
+        ("cms.landing.categories_title", "Kategoritë", "Titulli mbi bllokun e kategorive në homepage."),
         ("cms.landing.categories_subtitle", "Gjej ushqimin që të pëlqen.", "Nëntitulli i seksionit kategoritë"),
         ("cms.landing.testimonials_title", "Çfarë thonë klientët", "Titulli i seksionit testimoniale"),
         ("cms.landing.testimonial_1_name", "Arben K.", "Emri i testimonialit 1"),
@@ -517,7 +586,7 @@ public static class DbSeeder
         ("cms.landing.testimonial_3_name", "Driton H.", "Emri i testimonialit 3"),
         ("cms.landing.testimonial_3_quote", "Restorante të shumta dhe çmime të mira.", "Citimi i testimonialit 3"),
         ("cms.landing.footer_tagline", "Ushqim i shpejtë, në derën tënde.", "Tagline në footer"),
-        ("cms.landing.footer_copyright", "© 2026 FoodDelivery. Të gjitha të drejtat e rezervuara.", "Copyright në footer"),
+        ("cms.landing.footer_copyright", "© 2026 FoodDelivery. Të gjitha të drejtat e rezervuara.", "Rreshti i copyright në footer."),
         ("cms.landing.footer_link_restaurants", "Restorantet", "Etiketa e linkut restorante në footer"),
         ("cms.landing.footer_link_categories", "Kategoritë", "Etiketa e linkut kategoritë në footer"),
         ("cms.landing.footer_link_partner", "Bëhu partner", "Etiketa e linkut partner në footer"),

@@ -156,9 +156,9 @@ public sealed class AdminZonesService : IAdminZonesService
         var name = request.Name.Trim();
         var city = request.City.Trim();
         if (string.IsNullOrEmpty(name))
-            return (null, "Emri i zonës është i detyrueshëm.");
+            return (null, "Emri i zonï¿½s ï¿½shtï¿½ i detyrueshï¿½m.");
         if (string.IsNullOrEmpty(city))
-            return (null, "Qyteti është i detyrueshëm.");
+            return (null, "Qyteti ï¿½shtï¿½ i detyrueshï¿½m.");
 
         var sort = request.SortOrder ?? await _db.DeliveryZones.CountAsync(cancellationToken) + 1;
         var now = DateTime.UtcNow;
@@ -195,7 +195,7 @@ public sealed class AdminZonesService : IAdminZonesService
         {
             var trimmed = n.Trim();
             if (string.IsNullOrEmpty(trimmed))
-                return (null, "Emri i zonës nuk mund të jetë bosh.");
+                return (null, "Emri i zonï¿½s nuk mund tï¿½ jetï¿½ bosh.");
             zone.Name = trimmed;
         }
 
@@ -203,28 +203,28 @@ public sealed class AdminZonesService : IAdminZonesService
         {
             var trimmed = c.Trim();
             if (string.IsNullOrEmpty(trimmed))
-                return (null, "Qyteti nuk mund të jetë bosh.");
+                return (null, "Qyteti nuk mund tï¿½ jetï¿½ bosh.");
             zone.City = trimmed;
         }
 
         if (request.DeliveryFee is { } df)
         {
             if (df < 0)
-                return (null, "Tarifa nuk mund të jetë negative.");
+                return (null, "Tarifa nuk mund tï¿½ jetï¿½ negative.");
             zone.DeliveryFee = df;
         }
 
         if (request.MinOrderAmount is { } mo)
         {
             if (mo < 0)
-                return (null, "Minimumi i porosisë nuk mund të jetë negative.");
+                return (null, "Minimumi i porosisï¿½ nuk mund tï¿½ jetï¿½ negative.");
             zone.MinOrderAmount = mo;
         }
 
         if (request.EstimatedDeliveryMinutes is { } eta)
         {
             if (eta < 1 || eta > 300)
-                return (null, "Koha e dorëzimit duhet të jetë 1–300 minuta.");
+                return (null, "Koha e dorï¿½zimit duhet tï¿½ jetï¿½ 1ï¿½300 minuta.");
             zone.EstimatedDeliveryMinutes = eta;
         }
 
@@ -251,7 +251,7 @@ public sealed class AdminZonesService : IAdminZonesService
 
         var hasRestaurants = await _db.Restaurants.AnyAsync(r => r.DeliveryZoneId == id, cancellationToken);
         if (hasRestaurants)
-            return "Zona ka restorante të lidhura — zhvendosi ose hiq lidhjen para fshirjes.";
+            return "Zona ka restorante tï¿½ lidhura ï¿½ zhvendosi ose hiq lidhjen para fshirjes.";
 
         _db.DeliveryZones.Remove(zone);
         await _db.SaveChangesAsync(cancellationToken);
@@ -277,11 +277,11 @@ public sealed class AdminZonesService : IAdminZonesService
     private static string? ValidateTerms(decimal fee, decimal minOrder, int minutes)
     {
         if (fee < 0)
-            return "Tarifa nuk mund të jetë negative.";
+            return "Tarifa nuk mund tï¿½ jetï¿½ negative.";
         if (minOrder < 0)
-            return "Minimumi i porosisë nuk mund të jetë negative.";
+            return "Minimumi i porosisï¿½ nuk mund tï¿½ jetï¿½ negative.";
         if (minutes < 1 || minutes > 300)
-            return "Koha e dorëzimit duhet të jetë 1–300 minuta.";
+            return "Koha e dorï¿½zimit duhet tï¿½ jetï¿½ 1ï¿½300 minuta.";
         return null;
     }
 }

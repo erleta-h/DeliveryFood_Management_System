@@ -1395,6 +1395,18 @@ export async function adminUpsertSetting(
   return { ok: false, message: await readApiMessage(res) }
 }
 
+export async function adminDeleteSetting(
+  token: string,
+  key: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/settings/${encodeURIComponent(key)}`), {
+    method: 'DELETE',
+    headers: { ...authHeader(token) },
+  })
+  if (res.status === 204) return { ok: true }
+  return { ok: false, message: await readApiMessage(res) }
+}
+
 // --- Audit ---
 
 export type AdminAuditRow = {
