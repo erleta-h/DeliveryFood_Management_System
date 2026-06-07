@@ -1,4 +1,4 @@
-import { apiPath } from './apiBase'
+import { fetchWithAuth } from './apiClient'
 
 function authHeader(token: string) {
   return { Authorization: `Bearer ${token}` }
@@ -18,7 +18,7 @@ export async function fetchAdminNotifications(
   token: string,
   take = 25,
 ): Promise<AdminNotificationRow[]> {
-  const res = await fetch(apiPath(`/api/admin/notifications?take=${take}`), {
+  const res = await fetchWithAuth(`/api/admin/notifications?take=${take}`, {
     headers: { ...authHeader(token) },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -26,7 +26,7 @@ export async function fetchAdminNotifications(
 }
 
 export async function fetchAdminNotificationUnreadCount(token: string): Promise<number> {
-  const res = await fetch(apiPath('/api/admin/notifications/unread-count'), {
+  const res = await fetchWithAuth('/api/admin/notifications/unread-count', {
     headers: { ...authHeader(token) },
   })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -35,7 +35,7 @@ export async function fetchAdminNotificationUnreadCount(token: string): Promise<
 }
 
 export async function markAdminNotificationRead(token: string, id: number): Promise<boolean> {
-  const res = await fetch(apiPath(`/api/admin/notifications/${id}/read`), {
+  const res = await fetchWithAuth(`/api/admin/notifications/${id}/read`, {
     method: 'POST',
     headers: { ...authHeader(token) },
   })
@@ -43,7 +43,7 @@ export async function markAdminNotificationRead(token: string, id: number): Prom
 }
 
 export async function markAllAdminNotificationsRead(token: string): Promise<boolean> {
-  const res = await fetch(apiPath('/api/admin/notifications/read-all'), {
+  const res = await fetchWithAuth('/api/admin/notifications/read-all', {
     method: 'POST',
     headers: { ...authHeader(token) },
   })

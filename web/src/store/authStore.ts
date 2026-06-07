@@ -88,12 +88,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       let expiresAtUtc = localStorage.getItem(EXPIRES_KEY)
 
       let hadSession = sessionStorage.getItem(HAD_SESSION_KEY) === '1'
-      if (!hadSession && token) {
+      if (!hadSession && token && !accessTokenExpired(expiresAtUtc)) {
         sessionStorage.setItem(HAD_SESSION_KEY, '1')
         hadSession = true
       }
 
-      if ((!token || accessTokenExpired(expiresAtUtc)) && hadSession) {
+      if (!token && hadSession) {
         const fromCookie = await bootstrapSessionFromCookie()
         if (fromCookie) {
           token = get().token
@@ -130,6 +130,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       set({ token, expiresAtUtc, user, loading: false })
+      sessionStorage.setItem(HAD_SESSION_KEY, '1')
     } catch {
       clearPersistedSession()
       set({ token: null, expiresAtUtc: null, user: null, loading: false })
