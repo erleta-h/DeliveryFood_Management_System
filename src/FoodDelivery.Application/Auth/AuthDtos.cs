@@ -8,7 +8,9 @@ public record RegisterCustomerRequest(
     string Phone,
     string Line1,
     string City,
-    string? PostalCode);
+    string? PostalCode,
+    double? Latitude = null,
+    double? Longitude = null);
 
 public record LoginRequest(string Email, string Password);
 

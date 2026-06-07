@@ -52,6 +52,8 @@ export async function registerCustomer(body: {
   line1: string
   city: string
   postalCode?: string
+  latitude?: number
+  longitude?: number
 }): Promise<{ ok: true; data: AuthResponse } | { ok: false; error: string }> {
   try {
     const res = await fetch(apiPath('/api/auth/register'), {

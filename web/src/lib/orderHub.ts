@@ -50,7 +50,11 @@ async function invokeHubJoins(conn: signalR.HubConnection, joins: OrdersHubJoin[
 }
 
 /** Pas reconnect, SignalR nuk rikthen grupet — duhet JoinOrder/JoinDriver përsëri. */
+const reconnectWired = new WeakSet<signalR.HubConnection>()
+
 export function wireOrdersHubReconnect(conn: signalR.HubConnection, joins: OrdersHubJoin[]): void {
+  if (reconnectWired.has(conn)) return
+  reconnectWired.add(conn)
   conn.onreconnected(() => {
     void invokeHubJoins(conn, joins).catch((err) => {
       console.warn('[SignalR] re-join pas reconnect dështoi:', err)
@@ -81,8 +85,21 @@ export function wireOrdersHubConnectionState(
 export async function startOrdersHub(
   conn: signalR.HubConnection,
   joins: OrdersHubJoin[],
+  opts?: { isCancelled?: () => boolean },
 ): Promise<void> {
   wireOrdersHubReconnect(conn, joins)
-  await conn.start()
-  await invokeHubJoins(conn, joins)
+  if (conn.state === signalR.HubConnectionState.Disconnected) {
+    await conn.start()
+  }
+  if (opts?.isCancelled?.()) return
+  if (conn.state === signalR.HubConnectionState.Connected) {
+    await invokeHubJoins(conn, joins)
+  }
+}
+
+/** Mos loguar gabime kur cleanup (StrictMode / unmount) ndalon start-in gjatë negotiation. */
+export function isHubStartAbortError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  return err.name === 'AbortError' || msg.includes('stopped during negotiation') || msg.includes('connection was stopped')
 }

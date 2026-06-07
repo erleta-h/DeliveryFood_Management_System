@@ -216,11 +216,12 @@ export async function postDriverLocation(
   latitude: number,
   longitude: number,
 ): Promise<void> {
-  await fetch(apiPath('/api/driver/me/location'), {
+  const res = await fetch(apiPath('/api/driver/me/location'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader(token) },
     body: JSON.stringify({ latitude, longitude }),
   })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
 }
 
 export async function fetchDriverDeliveries(token: string): Promise<DriverDeliveryRow[]> {

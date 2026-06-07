@@ -96,6 +96,14 @@ public static class DependencyInjection
         services.AddScoped<ISupportTicketService, SupportTicketService>();
         services.AddScoped<IStripePaymentService, StripePaymentService>();
         services.AddHttpClient(GoogleMapsDistanceService.HttpClientName);
+        services.AddHttpClient(NominatimGeocodingService.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
+        services.AddScoped<GoogleGeocodingService>();
+        services.AddScoped<NominatimGeocodingService>();
+        services.AddScoped<IGeocodingService, CompositeGeocodingService>();
         services.AddScoped<IGoogleMapsDistanceService, GoogleMapsDistanceService>();
         services.AddScoped<ICustomerDrivingPreviewService, CustomerDrivingPreviewService>();
         services.Configure<GoogleMapsSettings>(configuration.GetSection(GoogleMapsSettings.SectionName));

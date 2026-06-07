@@ -1,12 +1,14 @@
 ﻿using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.Coupons;
 using FoodDelivery.Application.Delivery;
+using FoodDelivery.Application.Maps;
 using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Orders;
 using FoodDelivery.Application.Realtime; // Shtuar për Realtime Notifier
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Auth;
+using FoodDelivery.Infrastructure.Maps;
 using Microsoft.EntityFrameworkCore;
 
 namespace FoodDelivery.Infrastructure.Orders;
@@ -19,17 +21,20 @@ public sealed class OrdersService : IOrdersService
     private readonly IOrderRealtimeNotifier _realtime;
     private readonly INotificationPublisher _notifications;
     private readonly ICouponService _coupons;
+    private readonly IGeocodingService _geocoding;
 
     public OrdersService(
         IUnitOfWork uow,
         IOrderRealtimeNotifier realtime,
         INotificationPublisher notifications,
-        ICouponService coupons)
+        ICouponService coupons,
+        IGeocodingService geocoding)
     {
         _uow = uow;
         _realtime = realtime;
         _notifications = notifications;
         _coupons = coupons;
+        _geocoding = geocoding;
     }
 
     public async Task<(PlaceOrderResponse? Response, string? Error)> PlaceOrderAsync(
@@ -302,6 +307,29 @@ public sealed class OrdersService : IOrdersService
 
         var reviewSlots = BuildReviewSlots(order, delivery, driverDto);
 
+        var customerLat = order.CustomerAddress.Latitude;
+        var customerLng = order.CustomerAddress.Longitude;
+        if (customerLat is null || customerLng is null)
+        {
+            var (geoLat, geoLng) = await _geocoding.GeocodeAddressAsync(
+                order.CustomerAddress.Line1,
+                order.CustomerAddress.City,
+                order.CustomerAddress.PostalCode,
+                cancellationToken);
+            if (geoLat is not null
+                && geoLng is not null
+                && GeoCoordinateValidation.IsSafe(geoLat.Value, geoLng.Value))
+            {
+                customerLat = geoLat;
+                customerLng = geoLng;
+                await TryPersistCustomerAddressCoordinatesAsync(
+                    order.CustomerAddressId,
+                    geoLat.Value,
+                    geoLng.Value,
+                    cancellationToken);
+            }
+        }
+
         return new CustomerOrderDetailDto(
             order.Id,
             order.OrderNumber,
@@ -323,8 +351,8 @@ public sealed class OrdersService : IOrdersService
             items,
             order.Restaurant.Latitude,
             order.Restaurant.Longitude,
-            order.CustomerAddress.Latitude,
-            order.CustomerAddress.Longitude,
+            customerLat,
+            customerLng,
             driverProfile?.LastLatitude,
             driverProfile?.LastLongitude,
             chatAvailable,
@@ -530,5 +558,24 @@ public sealed class OrdersService : IOrdersService
         }
 
         return true;
+    }
+
+    private async Task TryPersistCustomerAddressCoordinatesAsync(
+        long addressId,
+        double latitude,
+        double longitude,
+        CancellationToken cancellationToken)
+    {
+        var addr = await _uow.Repository<CustomerAddress, long>().Query
+            .FirstOrDefaultAsync(
+                a => a.Id == addressId && a.Latitude == null && a.Longitude == null,
+                cancellationToken);
+        if (addr is null)
+            return;
+
+        addr.Latitude = latitude;
+        addr.Longitude = longitude;
+        addr.UpdatedAt = DateTime.UtcNow;
+        await _uow.SaveChangesAsync(cancellationToken);
     }
 }

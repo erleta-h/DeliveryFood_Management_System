@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { fetchDriverStatus, postDriverLocation } from '../lib/driverApi'
 import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
@@ -19,6 +19,17 @@ export default function DriverLayout() {
   const [driverOnline, setDriverOnline] = useState(false)
   const [gpsHint, setGpsHint] = useState<string | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const lastLocationPostWarnAt = useRef(0)
+
+  const reportLocationPostFailure = useCallback((err: unknown) => {
+    console.warn('[DriverLayout] Nuk u dërgua lokacioni në server.', err)
+    const now = Date.now()
+    if (now - lastLocationPostWarnAt.current < 30_000) return
+    lastLocationPostWarnAt.current = now
+    setGpsHint(
+      'GPS lexohet, por serveri nuk e pranoi lokacionin — kontrollo internetin dhe që je Online.',
+    )
+  }, [])
 
   const refreshDriverOnline = useCallback(async () => {
     if (!token) {
@@ -58,8 +69,9 @@ export default function DriverLayout() {
     setGpsHint(null)
     const id = navigator.geolocation.watchPosition(
       (pos) => {
-        setGpsHint(null)
-        void postDriverLocation(token, pos.coords.latitude, pos.coords.longitude).catch(() => {})
+        void postDriverLocation(token, pos.coords.latitude, pos.coords.longitude)
+          .then(() => setGpsHint(null))
+          .catch(reportLocationPostFailure)
       },
       (err: GeolocationPositionError) => {
         if (err.code === 1) {
@@ -81,7 +93,7 @@ export default function DriverLayout() {
       { enableHighAccuracy: false, maximumAge: 20000, timeout: 30000 },
     )
     return () => navigator.geolocation.clearWatch(id)
-  }, [token, driverOnline])
+  }, [token, driverOnline, reportLocationPostFailure])
 
   useEffect(() => {
     if (!token) return

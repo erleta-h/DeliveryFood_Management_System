@@ -14,7 +14,7 @@ import {
   isCourierEnRouteToCustomer,
   isTerminalOrderStatus,
 } from '../lib/orderStatusLabels'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, startOrdersHub } from '../lib/orderHub'
 import {
   clearStripeCheckoutOrderSession,
   FULFILLMENT_PICKUP,
@@ -209,11 +209,19 @@ export default function OrderDetailPage() {
       setChatRefresh((s) => s + 1)
       if (m.senderRole === 'driver') setUnreadChat((n) => n + 1)
     })
+    conn.on('deliveryChatSeen', (raw: unknown) => {
+      if (!raw || typeof raw !== 'object') return
+      const r = raw as Record<string, unknown>
+      const oid = Number(r.orderId ?? r.OrderId)
+      if (oid !== orderId) return
+      setChatRefresh((s) => s + 1)
+    })
     let cancelled = false
     ;(async () => {
       try {
-        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        await startOrdersHub(conn, [{ kind: 'order', orderId }], { isCancelled: () => cancelled })
       } catch (err) {
+        if (cancelled || isHubStartAbortError(err)) return
         console.warn('[OrderDetail] SignalR nuk u lidh.', err)
       }
       if (cancelled) return

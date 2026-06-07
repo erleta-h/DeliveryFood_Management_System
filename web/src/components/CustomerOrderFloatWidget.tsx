@@ -16,7 +16,7 @@ import {
   type CustomerOrderDetail,
   type CustomerOrderSummary,
 } from '../lib/ordersApi'
-import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
 import * as signalR from '@microsoft/signalr'
 import { useAuthStore } from '../store/authStore'
 
@@ -138,10 +138,12 @@ export function CustomerOrderFloatWidget() {
     let cancelled = false
     ;(async () => {
       try {
-        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        await startOrdersHub(conn, [{ kind: 'order', orderId }], { isCancelled: () => cancelled })
         setHubState(conn.state)
-      } catch {
+      } catch (err) {
+        if (cancelled || isHubStartAbortError(err)) return
         setHubState(signalR.HubConnectionState.Disconnected)
+        console.warn('[OrderFloatWidget] SignalR nuk u lidh.', err)
       }
       if (cancelled) return
     })()

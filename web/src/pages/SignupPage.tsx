@@ -160,6 +160,7 @@ export default function SignupPage() {
       line1: line1.trim(),
       city: city.trim(),
       postalCode: postalCode.trim() || undefined,
+      ...(marker != null ? { latitude: marker[0], longitude: marker[1] } : {}),
     })
     setBusy(false)
     if (r.ok) navigate('/app', { replace: true })

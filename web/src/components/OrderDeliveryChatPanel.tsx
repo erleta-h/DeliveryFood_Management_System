@@ -7,7 +7,7 @@ import {
   upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
 import * as signalR from '@microsoft/signalr'
 
 function formatTime(utc: string): string {
@@ -94,9 +94,10 @@ export function OrderDeliveryChatPanel({
     let cancelled = false
     ;(async () => {
       try {
-        await startOrdersHub(conn, [{ kind: 'order', orderId }])
+        await startOrdersHub(conn, [{ kind: 'order', orderId }], { isCancelled: () => cancelled })
         setHubState(conn.state)
       } catch (err) {
+        if (cancelled || isHubStartAbortError(err)) return
         setHubState(signalR.HubConnectionState.Disconnected)
         console.warn('[Chat] SignalR nuk u lidh — përdoret polling çdo 12s.', err)
       }

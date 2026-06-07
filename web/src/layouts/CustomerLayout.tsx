@@ -2,7 +2,7 @@ import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
 import { CustomerOrderFloatWidget } from '../components/CustomerOrderFloatWidget'
 import { hasAdminRole, hasCustomerRole, hasRestaurantStaffRole } from '../lib/jwtRoles'
-import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
+import { createOrdersHubConnection, isHubStartAbortError, startOrdersHub } from '../lib/orderHub'
 import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { customerShellBg } from '../lib/customerTheme'
 import { ORDER_STATUS_CANCELLED } from '../lib/orderStatusLabels'
@@ -94,10 +94,15 @@ export default function CustomerLayout() {
       useCustomerNotificationsStore.getState().bumpUnread()
     })
 
-    void startOrdersHub(hub, [{ kind: 'customer' }]).catch((err: unknown) =>
-      console.warn('[CustomerHub] connection/join failed', err),
-    )
-    return () => { hub.stop().catch(() => {}) }
+    let cancelled = false
+    void startOrdersHub(hub, [{ kind: 'customer' }], { isCancelled: () => cancelled }).catch((err: unknown) => {
+      if (cancelled || isHubStartAbortError(err)) return
+      console.warn('[CustomerHub] connection/join failed', err)
+    })
+    return () => {
+      cancelled = true
+      void hub.stop().catch(() => {})
+    }
   }, [token])
 
   useEffect(() => {

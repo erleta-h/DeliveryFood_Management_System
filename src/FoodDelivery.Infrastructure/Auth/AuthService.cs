@@ -5,6 +5,7 @@ using FoodDelivery.Application.Persistence;
 using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Data;
 using FoodDelivery.Infrastructure.Drivers;
+using FoodDelivery.Infrastructure.Maps;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -88,6 +89,13 @@ public sealed class AuthService : IAuthService
             IsDefault = true,
             CreatedAt = now,
         };
+        if (request.Latitude is not null
+            && request.Longitude is not null
+            && GeoCoordinateValidation.IsSafe(request.Latitude.Value, request.Longitude.Value))
+        {
+            customerAddr.Latitude = request.Latitude;
+            customerAddr.Longitude = request.Longitude;
+        }
         _uow.Repository<CustomerAddress, long>().Add(customerAddr);
 
         await _uow.SaveChangesAsync(cancellationToken);
@@ -237,7 +245,8 @@ public sealed class AuthService : IAuthService
             addr.UpdatedAt = DateTime.UtcNow;
         }
 
-        if (request.Latitude is not null && request.Longitude is not null)
+        if (request.Latitude is not null && request.Longitude is not null
+            && GeoCoordinateValidation.IsSafe(request.Latitude.Value, request.Longitude.Value))
         {
             addr.Latitude = request.Latitude;
             addr.Longitude = request.Longitude;
