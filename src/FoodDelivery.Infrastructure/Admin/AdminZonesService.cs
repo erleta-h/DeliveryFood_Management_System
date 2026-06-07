@@ -147,6 +147,7 @@ public sealed class AdminZonesService : IAdminZonesService
 
     public async Task<(DeliveryZoneDetailDto? Result, string? Error)> CreateAsync(
         CreateDeliveryZoneRequest request,
+        long? adminUserId = null,
         CancellationToken cancellationToken = default)
     {
         var err = ValidateTerms(request.DeliveryFee, request.MinOrderAmount, request.EstimatedDeliveryMinutes);
@@ -174,6 +175,7 @@ public sealed class AdminZonesService : IAdminZonesService
             IsActive = request.IsActive,
             SortOrder = sort,
             CreatedAt = now,
+            CreatedById = adminUserId,
         };
 
         _db.DeliveryZones.Add(zone);
@@ -185,6 +187,7 @@ public sealed class AdminZonesService : IAdminZonesService
     public async Task<(DeliveryZoneDetailDto? Result, string? Error)> UpdateAsync(
         long id,
         UpdateDeliveryZoneRequest request,
+        long? adminUserId = null,
         CancellationToken cancellationToken = default)
     {
         var zone = await _db.DeliveryZones.FirstOrDefaultAsync(z => z.Id == id, cancellationToken);
@@ -238,6 +241,7 @@ public sealed class AdminZonesService : IAdminZonesService
             zone.SortOrder = so;
 
         zone.UpdatedAt = DateTime.UtcNow;
+        zone.UpdatedById = adminUserId;
         await _db.SaveChangesAsync(cancellationToken);
 
         return (await GetDetailAsync(id, cancellationToken), null);

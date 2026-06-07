@@ -7,5 +7,10 @@ public interface IAdminDataPortService
         string format,
         CancellationToken cancellationToken = default);
 
-    Task<string?> ImportAsync(string resource, string format, Stream body, CancellationToken cancellationToken = default);
+    Task<string?> ImportAsync(
+        string resource,
+        string format,
+        Stream body,
+        long? adminUserId = null,
+        CancellationToken cancellationToken = default);
 }

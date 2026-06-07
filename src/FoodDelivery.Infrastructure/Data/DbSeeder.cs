@@ -210,12 +210,19 @@ public static class DbSeeder
                 .FirstAsync(cancellationToken);
         }
 
+        // Admin seed runs before this; leave null only if admin user is missing.
+        var adminUserId = await db.Users.AsNoTracking()
+            .Where(u => u.Email == AdminSeedEmail)
+            .Select(u => (long?)u.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
         db.RestaurantStaff.Add(new RestaurantStaff
         {
             UserId = user.Id,
             RestaurantId = restaurantId,
             Title = "Operator porosish",
             CreatedAt = now,
+            CreatedById = adminUserId,
         });
 
         await db.SaveChangesAsync(cancellationToken);

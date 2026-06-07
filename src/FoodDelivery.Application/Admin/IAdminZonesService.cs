@@ -20,11 +20,13 @@ public interface IAdminZonesService
 
     Task<(DeliveryZoneDetailDto? Result, string? Error)> CreateAsync(
         CreateDeliveryZoneRequest request,
+        long? adminUserId = null,
         CancellationToken cancellationToken = default);
 
     Task<(DeliveryZoneDetailDto? Result, string? Error)> UpdateAsync(
         long id,
         UpdateDeliveryZoneRequest request,
+        long? adminUserId = null,
         CancellationToken cancellationToken = default);
 
     Task<string?> DeleteAsync(long id, CancellationToken cancellationToken = default);

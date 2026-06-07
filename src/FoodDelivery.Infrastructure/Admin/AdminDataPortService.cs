@@ -56,6 +56,7 @@ public sealed class AdminDataPortService : IAdminDataPortService
         string resource,
         string format,
         Stream body,
+        long? adminUserId = null,
         CancellationToken cancellationToken = default)
     {
         var r = resource.Trim().ToLowerInvariant();
@@ -70,7 +71,7 @@ public sealed class AdminDataPortService : IAdminDataPortService
             "coupons" when f is "json" => await ImportCouponsJsonAsync(text, cancellationToken),
             "coupons" when f is "csv" => await ImportCouponsCsvAsync(text, cancellationToken),
             "cms" when f is "json" => await ImportCmsJsonAsync(text, cancellationToken),
-            "restaurants" when f is "csv" => await ImportRestaurantsCsvAsync(text, cancellationToken),
+            "restaurants" when f is "csv" => await ImportRestaurantsCsvAsync(text, adminUserId, cancellationToken),
             _ => "Burim/format i mbështetur: coupons+json, coupons+csv, cms+json, restaurants+csv.",
         };
     }
@@ -635,7 +636,10 @@ public sealed class AdminDataPortService : IAdminDataPortService
         return null;
     }
 
-    private async Task<string?> ImportRestaurantsCsvAsync(string csv, CancellationToken cancellationToken)
+    private async Task<string?> ImportRestaurantsCsvAsync(
+        string csv,
+        long? adminUserId,
+        CancellationToken cancellationToken)
     {
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (lines.Length < 2)
@@ -728,6 +732,7 @@ public sealed class AdminDataPortService : IAdminDataPortService
                         Restaurant = restaurant,
                         Title = "Administrator restoranti",
                         CreatedAt = now,
+                        CreatedById = adminUserId,
                     });
                 }
             }

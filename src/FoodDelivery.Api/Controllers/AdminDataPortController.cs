@@ -1,5 +1,6 @@
 using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.Security;
+using FoodDelivery.Api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -37,7 +38,7 @@ public sealed class AdminDataPortController : ControllerBase
             await using var ms = new MemoryStream();
             await Request.Body.CopyToAsync(ms, cancellationToken);
             ms.Position = 0;
-            var err = await _svc.ImportAsync(resource, format, ms, cancellationToken);
+            var err = await _svc.ImportAsync(resource, format, ms, User.GetUserId(), cancellationToken);
             if (err is not null)
                 return BadRequest(new { message = err });
             return NoContent();

@@ -13,6 +13,8 @@ public class DeliveryZone
     public int SortOrder { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public long? CreatedById { get; set; }
+    public long? UpdatedById { get; set; }
 
     public ICollection<Restaurant> Restaurants { get; set; } = new List<Restaurant>();
 }

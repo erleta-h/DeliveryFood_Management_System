@@ -1,4 +1,5 @@
 using FoodDelivery.Application.Admin;
+using FoodDelivery.Api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -70,7 +71,7 @@ public sealed class AdminZonesController : ControllerBase
         [FromBody] CreateDeliveryZoneRequest body,
         CancellationToken cancellationToken)
     {
-        var (result, err) = await _svc.CreateAsync(body, cancellationToken);
+        var (result, err) = await _svc.CreateAsync(body, User.GetUserId(), cancellationToken);
         if (err is not null)
             return BadRequest(new { message = err });
         return CreatedAtAction(nameof(GetOne), new { id = result!.Id }, result);
@@ -85,7 +86,7 @@ public sealed class AdminZonesController : ControllerBase
         [FromBody] UpdateDeliveryZoneRequest body,
         CancellationToken cancellationToken)
     {
-        var (result, err) = await _svc.UpdateAsync(id, body, cancellationToken);
+        var (result, err) = await _svc.UpdateAsync(id, body, User.GetUserId(), cancellationToken);
         if (err is not null)
         {
             if (err.Contains("nuk u gjet"))
