@@ -128,7 +128,17 @@ function CollaborateCard({
   )
 }
 
-export function LandingCollaborateSection() {
+type Props = {
+  partnerEyebrow?: string
+  partnerTitle?: string
+  partnerBody?: string
+}
+
+export function LandingCollaborateSection({
+  partnerEyebrow = 'Për restorante & biznese',
+  partnerTitle = 'Bëhu partner me ne',
+  partnerBody = 'Listo menunë, prano porosi dhe rrit shitjet me mijëra klientë çdo ditë.',
+}: Props) {
   return (
     <section aria-labelledby="collab-heading" className="mt-16 w-full sm:mt-20">
       <h2
@@ -141,9 +151,9 @@ export function LandingCollaborateSection() {
       <div className="mt-5 grid gap-5 sm:gap-6 lg:grid-cols-2">
         <CollaborateCard
           accent="partner"
-          eyebrow="Për restorante & biznese"
-          title="Bëhu partner me ne"
-          description="Listo menunë, prano porosi dhe rrit shitjet me mijëra klientë çdo ditë."
+          eyebrow={partnerEyebrow}
+          title={partnerTitle}
+          description={partnerBody}
           ctaTo="/partner"
           ctaLabel="Apliko si partner"
           loginTo="/partner/login"
@@ -156,7 +166,7 @@ export function LandingCollaborateSection() {
           description="Prano porosi, merr nga restoranti dhe dorëzo te klienti."
           ctaTo="/driver/apply"
           ctaLabel="Apliko si driver"
-          loginTo="/login?next=driver"
+          loginTo="/driver/login"
           loginPrefix="Ke llogari?"
         />
       </div>

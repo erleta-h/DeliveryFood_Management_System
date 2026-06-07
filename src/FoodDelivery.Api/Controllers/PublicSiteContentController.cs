@@ -9,8 +9,13 @@ namespace FoodDelivery.Api.Controllers;
 public sealed class PublicSiteContentController : ControllerBase
 {
     private readonly IPublicSiteContentService _site;
+    private readonly IPublicLandingService _landing;
 
-    public PublicSiteContentController(IPublicSiteContentService site) => _site = site;
+    public PublicSiteContentController(IPublicSiteContentService site, IPublicLandingService landing)
+    {
+        _site = site;
+        _landing = landing;
+    }
 
     [HttpGet("site-content")]
     [AllowAnonymous]
@@ -19,5 +24,13 @@ public sealed class PublicSiteContentController : ControllerBase
     {
         var dto = await _site.GetLandingAsync(cancellationToken);
         return Ok(dto);
+    }
+
+    [HttpGet("landing-data")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(PublicLandingDataDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<PublicLandingDataDto>> LandingData(CancellationToken cancellationToken)
+    {
+        return Ok(await _landing.GetLandingDataAsync(cancellationToken));
     }
 }

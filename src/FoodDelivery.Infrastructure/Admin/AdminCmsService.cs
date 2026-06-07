@@ -18,7 +18,7 @@ public sealed class AdminCmsService : IAdminCmsService
         return await _uow.Repository<Setting, long>().Query.AsNoTracking()
             .Where(s => s.Key.StartsWith(Prefix))
             .OrderBy(s => s.Key)
-            .Select(s => new AdminCmsEntryDto(s.Key, s.Value, s.Description))
+            .Select(s => new AdminCmsEntryDto(s.Key, s.Value, s.Description, s.UpdatedAt))
             .ToListAsync(cancellationToken);
     }
 

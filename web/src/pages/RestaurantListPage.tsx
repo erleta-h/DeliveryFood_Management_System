@@ -20,6 +20,7 @@ import {
   buildBrowseSections,
   computeHeroStats,
 } from '../lib/restaurantBrowseSections'
+import { coverImageForRestaurant } from '../lib/restaurantCardImages'
 import {
   fetchRestaurantCategories,
   searchRestaurants,
@@ -65,6 +66,10 @@ export default function RestaurantListPage() {
   }, [items, priceTier, openNow, quickFilters])
 
   const heroStats = useMemo(() => computeHeroStats(items), [items])
+  const heroPreviewImages = useMemo(
+    () => items.slice(0, 3).map((r) => coverImageForRestaurant(r)),
+    [items],
+  )
   const sections = useMemo(() => buildBrowseSections(displayedItems), [displayedItems])
 
   const searchSuggestions = useMemo(() => {
@@ -176,6 +181,7 @@ export default function RestaurantListPage() {
       <RestaurantHero
         stats={heroStats}
         cityLabel={user?.city ?? undefined}
+        previewImages={heroPreviewImages}
         onOpenDeliveryMap={() => setEntryDeliveryMapOpen(true)}
         searchSlot={
           <RestaurantSearchBar

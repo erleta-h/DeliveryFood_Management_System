@@ -40,18 +40,11 @@ export function buildBrowseSections(items: RestaurantListItem[]): BrowseSection[
   const featured = byRating.slice(0, Math.min(5, items.length))
   const featuredIds = new Set(featured.map((r) => r.id))
 
-  const popular = [...items]
-    .filter((r) => !featuredIds.has(r.id))
-    .sort((a, b) => b.reviewCount - a.reviewCount || b.averageRating - a.averageRating)
-    .slice(0, 8)
-
-  const popularIds = new Set([...featuredIds, ...popular.map((r) => r.id)])
-
   const offers = items
-    .filter((r) => !popularIds.has(r.id) && (isFreeDelivery(r.deliveryFee) || r.deliveryFee <= 1))
+    .filter((r) => !featuredIds.has(r.id) && (isFreeDelivery(r.deliveryFee) || r.deliveryFee <= 1))
     .slice(0, 6)
 
-  const offerIds = new Set([...popularIds, ...offers.map((r) => r.id)])
+  const offerIds = new Set([...featuredIds, ...offers.map((r) => r.id)])
 
   const fast = items
     .filter((r) => !offerIds.has(r.id) && r.estimatedDeliveryMinutes <= 30)
@@ -66,19 +59,10 @@ export function buildBrowseSections(items: RestaurantListItem[]): BrowseSection[
   if (featured.length > 0) {
     sections.push({
       id: 'featured',
-      title: 'Të rekomanduara',
+      title: 'Restorantet më të mira',
       subtitle: 'Vlerësimi më i lartë në zonën tënde',
       items: featured,
       layout: 'carousel',
-    })
-  }
-  if (popular.length > 0) {
-    sections.push({
-      id: 'popular',
-      title: 'Popullore pranë teje',
-      subtitle: 'Më shumë porosi dhe vlerësime',
-      items: popular,
-      layout: 'grid',
     })
   }
   if (offers.length > 0) {

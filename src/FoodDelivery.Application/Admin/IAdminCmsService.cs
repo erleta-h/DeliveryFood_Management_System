@@ -1,6 +1,6 @@
 ﻿namespace FoodDelivery.Application.Admin;
 
-public sealed record AdminCmsEntryDto(string Key, string? Value, string? Description);
+public sealed record AdminCmsEntryDto(string Key, string? Value, string? Description, DateTime? UpdatedAt);
 
 public interface IAdminCmsService
 {
