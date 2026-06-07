@@ -130,16 +130,17 @@ export function CustomerOrderFloatWidget() {
         setLiveDriver({ lat: payload.latitude, lng: payload.longitude })
       },
     )
-    let stopped = false
+    let cancelled = false
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
       } catch {
         /* SignalR — widget përdor edhe polling nga refresh */
       }
+      if (cancelled) return
     })()
     return () => {
-      stopped = true
+      cancelled = true
       setLiveDriver(null)
       void conn.stop()
     }
