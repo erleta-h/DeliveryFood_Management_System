@@ -7,5 +7,7 @@ public interface IAdminFinanceService
         int pageSize,
         DateTime? fromUtc,
         DateTime? toUtc,
+        int? status,
+        string? provider,
         CancellationToken cancellationToken = default);
 }

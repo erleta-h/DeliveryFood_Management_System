@@ -207,7 +207,7 @@ export function KitchenOrderDetailsDrawer({
     focusPrep || order.status === S.Confirmed || order.status === S.Preparing
 
   async function handlePrimaryClick() {
-    if (primaryStatus == null || busy) return
+    if (!order || primaryStatus == null || busy) return
     if (order.status === S.Confirmed && primaryStatus === S.Preparing) {
       const m = Math.round(Number(prepValue))
       if (!Number.isFinite(m) || m < 5 || m > 300) return

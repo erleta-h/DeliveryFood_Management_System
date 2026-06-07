@@ -4,10 +4,12 @@ import { AdminTableSkeleton } from '../components/admin/AdminSkeleton'
 import {
   adminPatchRestaurant,
   fetchAdminRestaurants,
+  fetchDeliveryZoneOptions,
   type AdminRestaurantListResult,
   type AdminRestaurantRow,
+  type DeliveryZoneOption,
 } from '../lib/adminApi'
-import { adminFilterBtn, customerBtnGhost, customerField } from '../lib/adminTheme'
+import { adminFilterBtn, customerBtnGhost, customerBtnPrimary, customerField, customerSelect } from '../lib/adminTheme'
 import { useAuthStore } from '../store/authStore'
 
 type RestaurantFilter = 'all' | 'active' | 'inactive' | 'pending' | 'approved'
@@ -46,6 +48,13 @@ export default function AdminRestaurantsPage() {
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [zones, setZones] = useState<DeliveryZoneOption[]>([])
+  const [tariffRow, setTariffRow] = useState<AdminRestaurantRow | null>(null)
+  const [tariffZoneId, setTariffZoneId] = useState('')
+  const [tariffFee, setTariffFee] = useState('')
+  const [tariffMin, setTariffMin] = useState('')
+  const [tariffEta, setTariffEta] = useState('')
+  const [useOverride, setUseOverride] = useState(false)
 
   const pageSize = 20
 
@@ -57,6 +66,49 @@ export default function AdminRestaurantsPage() {
   useEffect(() => {
     setPage(1)
   }, [searchDebounced, filter])
+
+  useEffect(() => {
+    if (!token) return
+    void fetchDeliveryZoneOptions(token)
+      .then(setZones)
+      .catch(() => setZones([]))
+  }, [token])
+
+  function openTariffs(r: AdminRestaurantRow) {
+    setTariffRow(r)
+    setTariffZoneId(r.deliveryZoneId != null ? String(r.deliveryZoneId) : '')
+    setUseOverride(r.hasDeliveryOverride)
+    setTariffFee(r.overrideDeliveryFee != null ? String(r.overrideDeliveryFee) : String(r.effectiveDeliveryFee))
+    setTariffMin(r.overrideMinOrderAmount != null ? String(r.overrideMinOrderAmount) : String(r.effectiveMinOrderAmount))
+    setTariffEta(
+      r.overrideEstimatedDeliveryMinutes != null
+        ? String(r.overrideEstimatedDeliveryMinutes)
+        : String(r.effectiveEstimatedDeliveryMinutes),
+    )
+  }
+
+  async function saveTariffs() {
+    if (!token || !tariffRow) return
+    setBusyId(tariffRow.id)
+    setMsg(null)
+    const body: Parameters<typeof adminPatchRestaurant>[2] = {
+      deliveryZoneId: tariffZoneId ? Number(tariffZoneId) : 0,
+    }
+    if (useOverride) {
+      body.overrideDeliveryFee = Number(tariffFee)
+      body.overrideMinOrderAmount = Number(tariffMin)
+      body.overrideEstimatedDeliveryMinutes = Number(tariffEta)
+    } else {
+      body.clearDeliveryOverrides = true
+    }
+    const r = await adminPatchRestaurant(token, tariffRow.id, body)
+    setBusyId(null)
+    if (!r.ok) setMsg(r.message)
+    else {
+      setTariffRow(null)
+      void load()
+    }
+  }
 
   const load = useCallback(async () => {
     if (!token) return
@@ -184,6 +236,7 @@ export default function AdminRestaurantsPage() {
                   <th className="px-4 py-3">Qyteti</th>
                   <th className="px-4 py-3">Statusi</th>
                   <th className="px-4 py-3">Porosi</th>
+                  <th className="px-4 py-3">Zona</th>
                   <th className="px-4 py-3">Dërgesë</th>
                   <th className="px-4 py-3 text-right">Veprime</th>
                 </tr>
@@ -213,11 +266,20 @@ export default function AdminRestaurantsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 tabular-nums text-gray-600">{r.orderCount}</td>
+                      <td className="px-4 py-3 text-xs text-gray-600">
+                        {r.deliveryZoneName ?? '—'}
+                        {r.hasDeliveryOverride ? (
+                          <span className="mt-0.5 block text-violet-600">Override</span>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 tabular-nums text-gray-600">
-                        {Number(r.deliveryFee).toFixed(2)} €
+                        {Number(r.effectiveDeliveryFee).toFixed(2)} €
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap justify-end gap-2">
+                          <button type="button" disabled={busyId === r.id} className={customerBtnGhost} onClick={() => openTariffs(r)}>
+                            Tarifat
+                          </button>
                           <button
                             type="button"
                             disabled={busyId === r.id}
@@ -267,6 +329,56 @@ export default function AdminRestaurantsPage() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {tariffRow ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Tarifat — {tariffRow.name}</h2>
+            <p className="mt-1 text-xs text-gray-500">Zona default + override opsional për marrëveshje specifike.</p>
+            <div className="mt-4 space-y-3">
+              <label className="block text-xs text-gray-500">
+                Zona e dërgesës
+                <select value={tariffZoneId} onChange={(e) => setTariffZoneId(e.target.value)} className={customerSelect}>
+                  <option value="">Pa zonë (legacy)</option>
+                  {zones.map((z) => (
+                    <option key={z.id} value={String(z.id)}>
+                      {z.name} ({z.city}){z.isActive ? '' : ' — jo aktiv'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={useOverride} onChange={(e) => setUseOverride(e.target.checked)} />
+                Përdor tarifa specifike (override)
+              </label>
+              {useOverride ? (
+                <>
+                  <label className="block text-xs text-gray-500">
+                    Tarifa dërgese (€)
+                    <input value={tariffFee} onChange={(e) => setTariffFee(e.target.value)} type="number" step="0.01" className={customerField} />
+                  </label>
+                  <label className="block text-xs text-gray-500">
+                    Minimumi (€)
+                    <input value={tariffMin} onChange={(e) => setTariffMin(e.target.value)} type="number" step="0.01" className={customerField} />
+                  </label>
+                  <label className="block text-xs text-gray-500">
+                    Koha (min)
+                    <input value={tariffEta} onChange={(e) => setTariffEta(e.target.value)} type="number" className={customerField} />
+                  </label>
+                </>
+              ) : null}
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={customerBtnGhost} onClick={() => setTariffRow(null)}>
+                Anulo
+              </button>
+              <button type="button" className={customerBtnPrimary} disabled={busyId === tariffRow.id} onClick={() => void saveTariffs()}>
+                Ruaj
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )
