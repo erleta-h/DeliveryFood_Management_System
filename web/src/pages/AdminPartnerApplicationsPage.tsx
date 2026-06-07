@@ -1,113 +1,256 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AdminEmptyState } from '../components/admin/AdminEmptyState'
+import { AdminIcon } from '../components/admin/adminIcons'
 import { AdminTableSkeleton } from '../components/admin/AdminSkeleton'
+import { PartnerApplicationApproveModal } from '../components/admin/partnerApplications/PartnerApplicationApproveModal'
+import { PartnerApplicationCredentialsModal } from '../components/admin/partnerApplications/PartnerApplicationCredentialsModal'
+import { PartnerApplicationDetailsDrawer } from '../components/admin/partnerApplications/PartnerApplicationDetailsDrawer'
 import {
   approvePartnerApplication,
   fetchPartnerApplications,
   rejectPartnerApplication,
-  resetPartnerStaffPassword,
   type ApprovePartnerResult,
   type PartnerApplicationRow,
+  type PartnerApplicationStats,
   type ResetPartnerStaffPasswordResult,
 } from '../lib/adminApi'
 import {
   adminFilterBtn,
-  adminSuccessBanner,
   customerBtnGhost,
-  customerBtnPrimary,
-  customerCardMuted,
   customerField,
+  customerPanelSubtitle,
 } from '../lib/adminTheme'
+import {
+  PARTNER_APP_APPROVED,
+  PARTNER_APP_CONTACTED,
+  PARTNER_APP_PENDING,
+  PARTNER_APP_REJECTED,
+  formatVenueLocations,
+  partnerApplicationStatsFromRows,
+  partnerApplicationStatusBadgeClass,
+  partnerApplicationStatusLabel,
+  partnerApplicationStatusSubtext,
+  partnerCanActOn,
+  type PartnerAppStatusFilter,
+} from '../lib/partnerApplicationStatus'
 import { useAuthStore } from '../store/authStore'
 
-const S_PENDING = 0
-const S_CONTACTED = 1
-const S_APPROVED = 2
-const S_REJECTED = 9
+const PAGE_SIZE = 5
 
-type PartnerFilter = 'all' | 'pending' | 'contacted' | 'approved' | 'rejected'
-
-function statusLabel(s: number): string {
-  switch (s) {
-    case S_PENDING:
-      return 'Në pritje'
-    case S_CONTACTED:
-      return 'Kontaktuar'
-    case S_APPROVED:
-      return 'Miratuar'
-    case S_REJECTED:
-      return 'Refuzuar'
-    default:
-      return `Status ${s}`
+function formatApplied(iso: string): string {
+  try {
+    const d = new Date(iso)
+    return `${d.toLocaleDateString('sq-AL')} · ${d.toLocaleTimeString('sq-AL', { hour: '2-digit', minute: '2-digit' })}`
+  } catch {
+    return iso
   }
 }
 
-function statusBadgeClass(s: number): string {
-  switch (s) {
-    case S_PENDING:
-      return 'bg-amber-100 text-amber-800'
-    case S_CONTACTED:
-      return 'bg-sky-100 text-sky-800'
-    case S_APPROVED:
-      return 'bg-emerald-100 text-emerald-800'
-    case S_REJECTED:
-      return 'bg-red-100 text-red-700'
-    default:
-      return 'bg-gray-100 text-gray-700'
-  }
+function exportCsv(rows: PartnerApplicationRow[]) {
+  const header = [
+    'ID',
+    'VenueName',
+    'BusinessType',
+    'City',
+    'OwnerFirst',
+    'OwnerLast',
+    'Email',
+    'Phone',
+    'Locations',
+    'Status',
+    'CreatedAt',
+  ]
+  const lines = rows.map((r) =>
+    [
+      r.id,
+      r.venueName,
+      r.businessType ?? '',
+      r.city,
+      r.contactFirstName,
+      r.contactLastName,
+      r.email,
+      r.phone ?? '',
+      r.venueCountLabel ?? '',
+      r.status,
+      r.createdAtUtc,
+    ]
+      .map((c) => `"${String(c).replace(/"/g, '""')}"`)
+      .join(','),
+  )
+  const blob = new Blob([[header.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `partner-applications-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
 
-function matchesFilter(r: PartnerApplicationRow, filter: PartnerFilter) {
+function matchesStatus(r: PartnerApplicationRow, filter: PartnerAppStatusFilter): boolean {
   switch (filter) {
     case 'pending':
-      return r.status === S_PENDING
+      return r.status === PARTNER_APP_PENDING
     case 'contacted':
-      return r.status === S_CONTACTED
+      return r.status === PARTNER_APP_CONTACTED
     case 'approved':
-      return r.status === S_APPROVED
+      return r.status === PARTNER_APP_APPROVED
     case 'rejected':
-      return r.status === S_REJECTED
+      return r.status === PARTNER_APP_REJECTED
     default:
       return true
   }
 }
 
+function KpiCard({
+  label,
+  value,
+  hint,
+  icon,
+  tone,
+}: {
+  label: string
+  value: number
+  hint: string
+  icon: ReactNode
+  tone: string
+}) {
+  return (
+    <div className="rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${tone}`}>{icon}</div>
+      </div>
+      <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</p>
+      {hint ? <p className="mt-0.5 text-xs text-gray-400">{hint}</p> : null}
+    </div>
+  )
+}
+
+function RowActionsMenu({
+  row,
+  onView,
+  onApprove,
+  onReject,
+}: {
+  row: PartnerApplicationRow
+  onView: () => void
+  onApprove: () => void
+  onReject: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const canAct = partnerCanActOn(row.status)
+
+  useEffect(() => {
+    if (!open) return
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [open])
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+        aria-label="Më shumë veprime"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        ⋮
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+            onClick={() => {
+              setOpen(false)
+              onView()
+            }}
+          >
+            Shiko detajet
+          </button>
+          {canAct ? (
+            <>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm text-violet-700 hover:bg-violet-50"
+                onClick={() => {
+                  setOpen(false)
+                  onApprove()
+                }}
+              >
+                Mirato
+              </button>
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                onClick={() => {
+                  setOpen(false)
+                  onReject()
+                }}
+              >
+                Refuzo
+              </button>
+            </>
+          ) : null}
+          {row.status === PARTNER_APP_APPROVED ? (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+              onClick={() => {
+                setOpen(false)
+                onView()
+              }}
+            >
+              Mbështetje (fjalëkalim)
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export default function AdminPartnerApplicationsPage() {
   const token = useAuthStore((s) => s.token)
-  const [search, setSearch] = useState('')
-  const [searchDebounced, setSearchDebounced] = useState('')
-  const [filter, setFilter] = useState<PartnerFilter>('all')
-  const [page, setPage] = useState(1)
-  const [rows, setRows] = useState<PartnerApplicationRow[]>([])
+  const [allRows, setAllRows] = useState<PartnerApplicationRow[]>([])
+  const [stats, setStats] = useState<PartnerApplicationStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<number | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
-  const [lastApprove, setLastApprove] = useState<ApprovePartnerResult | null>(null)
-  const [lastReset, setLastReset] = useState<ResetPartnerStaffPasswordResult | null>(null)
-  const [resetPwDraft, setResetPwDraft] = useState<Record<number, string>>({})
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [resetAcknowledged, setResetAcknowledged] = useState<Record<number, boolean>>({})
+  const [busyId, setBusyId] = useState<number | null>(null)
 
-  const pageSize = 20
+  const [searchDraft, setSearchDraft] = useState('')
+  const [statusDraft, setStatusDraft] = useState<PartnerAppStatusFilter>('all')
+  const [cityDraft, setCityDraft] = useState('')
+  const [dateFromDraft, setDateFromDraft] = useState('')
+  const [dateToDraft, setDateToDraft] = useState('')
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setSearchDebounced(search), 300)
-    return () => window.clearTimeout(t)
-  }, [search])
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<PartnerAppStatusFilter>('all')
+  const [cityFilter, setCityFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    setPage(1)
-  }, [searchDebounced, filter])
+  const [viewRow, setViewRow] = useState<PartnerApplicationRow | null>(null)
+  const [approveRow, setApproveRow] = useState<PartnerApplicationRow | null>(null)
+  const [credentials, setCredentials] = useState<
+    | { kind: 'approve'; data: ApprovePartnerResult }
+    | { kind: 'reset'; data: ResetPartnerStaffPasswordResult }
+    | null
+  >(null)
 
   const load = useCallback(async () => {
     if (!token) return
     setError(null)
-    const list = await fetchPartnerApplications(token, {
-      search: searchDebounced || undefined,
-    })
-    setRows(list)
-  }, [token, searchDebounced])
+    const list = await fetchPartnerApplications(token)
+    setAllRows(list)
+    setStats(partnerApplicationStatsFromRows(list))
+  }, [token])
 
   useEffect(() => {
     if (!token) {
@@ -128,159 +271,254 @@ export default function AdminPartnerApplicationsPage() {
     }
   }, [token, load])
 
-  const filtered = useMemo(() => rows.filter((r) => matchesFilter(r, filter)), [rows, filter])
-  const total = filtered.length
-  const pageItems = useMemo(() => {
-    const start = (page - 1) * pageSize
-    return filtered.slice(start, start + pageSize)
+  const cities = useMemo(() => {
+    const set = new Set(allRows.map((r) => r.city.trim()).filter(Boolean))
+    return [...set].sort((a, b) => a.localeCompare(b, 'sq'))
+  }, [allRows])
+
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    return allRows.filter((r) => {
+      if (!matchesStatus(r, statusFilter)) return false
+      if (cityFilter && r.city !== cityFilter) return false
+      if (dateFrom) {
+        const from = new Date(`${dateFrom}T00:00:00`)
+        if (new Date(r.createdAtUtc) < from) return false
+      }
+      if (dateTo) {
+        const to = new Date(`${dateTo}T23:59:59.999`)
+        if (new Date(r.createdAtUtc) > to) return false
+      }
+      if (!term) return true
+      const hay = [
+        r.venueName,
+        r.city,
+        r.email,
+        r.contactFirstName,
+        r.contactLastName,
+        r.phone ?? '',
+        r.businessType ?? '',
+      ]
+        .join(' ')
+        .toLowerCase()
+      return hay.includes(term)
+    })
+  }, [allRows, search, statusFilter, cityFilter, dateFrom, dateTo])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, statusFilter, cityFilter, dateFrom, dateTo])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
   }, [filtered, page])
 
-  async function onApprove(id: number) {
-    if (!token) return
+  const pageNumbers = useMemo(() => {
+    const max = 5
+    let start = Math.max(1, page - Math.floor(max / 2))
+    const end = Math.min(totalPages, start + max - 1)
+    start = Math.max(1, end - max + 1)
+    const nums: number[] = []
+    for (let i = start; i <= end; i++) nums.push(i)
+    return nums
+  }, [page, totalPages])
+
+  function applyFilters() {
+    setSearch(searchDraft)
+    setStatusFilter(statusDraft)
+    setCityFilter(cityDraft)
+    setDateFrom(dateFromDraft)
+    setDateTo(dateToDraft)
+  }
+
+  function clearFilters() {
+    setSearchDraft('')
+    setStatusDraft('all')
+    setCityDraft('')
+    setDateFromDraft('')
+    setDateToDraft('')
+    setSearch('')
+    setStatusFilter('all')
+    setCityFilter('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  async function confirmApprove(initialPassword?: string) {
+    if (!token || !approveRow) return
+    setBusyId(approveRow.id)
     setActionMsg(null)
-    setLastApprove(null)
-    setLastReset(null)
-    setBusyId(id)
-    const r = await approvePartnerApplication(token, id)
+    const id = approveRow.id
+    const r = await approvePartnerApplication(token, id, initialPassword)
     setBusyId(null)
+    setApproveRow(null)
+    if (viewRow?.id === id) setViewRow(null)
     if (r.ok) {
-      setLastApprove(r.data)
-      setActionMsg(
-        'Restoranti u krijua. Dërgo kredencialet partnerit përmes kanalit të sigurt (jo chat publik).',
-      )
+      setCredentials({ kind: 'approve', data: r.data })
+      setActionMsg('Restoranti u krijua. Dërgo kredencialet partnerit përmes kanalit të sigurt.')
       await load()
     } else setActionMsg(r.message)
   }
 
-  async function onResetStaffPassword(id: number) {
-    if (!token) return
-    setActionMsg(null)
-    setLastApprove(null)
-    setLastReset(null)
-    setBusyId(id)
-    const custom = resetPwDraft[id]?.trim()
-    const r = await resetPartnerStaffPassword(token, id, custom ? custom : null)
-    setBusyId(null)
-    if (r.ok) {
-      setLastReset(r.data)
-      setResetPwDraft((d) => {
-        const next = { ...d }
-        delete next[id]
-        return next
-      })
-      setResetAcknowledged((a) => {
-        const next = { ...a }
-        delete next[id]
-        return next
-      })
-      setExpandedId(null)
-      setActionMsg(
-        'Fjalëkalimi u rivendos. Dërgo vlerën e re te partneri — sesionet e vjetra u anuluan.',
-      )
-    } else setActionMsg(r.message)
+  function openReject(row: PartnerApplicationRow) {
+    if (!window.confirm(`Të refuzohet aplikimi i «${row.venueName}»?`)) return
+    void (async () => {
+      if (!token) return
+      setBusyId(row.id)
+      setActionMsg(null)
+      const r = await rejectPartnerApplication(token, row.id)
+      setBusyId(null)
+      if (r.ok) {
+        setActionMsg('Aplikimi u shënua si refuzuar.')
+        setViewRow((v) => (v?.id === row.id ? null : v))
+        await load()
+      } else setActionMsg(r.message)
+    })()
   }
 
-  async function onReject(id: number) {
-    if (!token) return
-    if (!window.confirm('Të refuzohet ky aplikim?')) return
-    setActionMsg(null)
-    setBusyId(id)
-    const r = await rejectPartnerApplication(token, id)
-    setBusyId(null)
-    if (r.ok) {
-      setActionMsg('Aplikimi u shënua si refuzuar.')
-      await load()
-    } else setActionMsg(r.message)
-  }
+  const statCards = stats
+    ? [
+        {
+          label: 'Totali aplikimeve',
+          value: stats.total,
+          hint: 'Të gjitha aplikimet',
+          tone: 'bg-violet-50 text-violet-600',
+          icon: <AdminIcon name="restaurant" size={18} />,
+        },
+        {
+          label: 'Në pritje',
+          value: stats.pending,
+          hint: 'Duke pritur shqyrtim',
+          tone: 'bg-amber-50 text-amber-600',
+          icon: <span className="text-base">⏳</span>,
+        },
+        {
+          label: 'Kontaktuar',
+          value: stats.contacted,
+          hint: 'Kontakt i kryer',
+          tone: 'bg-sky-50 text-sky-600',
+          icon: <span className="text-base">📞</span>,
+        },
+        {
+          label: 'Miratuar',
+          value: stats.approved,
+          hint: 'Restorante të krijuara',
+          tone: 'bg-emerald-50 text-emerald-600',
+          icon: <span className="text-base">✓</span>,
+        },
+        {
+          label: 'Refuzuar',
+          value: stats.rejected,
+          hint: 'Aplikime të refuzuara',
+          tone: 'bg-red-50 text-red-600',
+          icon: <span className="text-base">✕</span>,
+        },
+      ]
+    : []
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Aplikimet partner</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Mirato aplikimet pas kontratës; krijohen restoranti dhe kredencialet e stafit.
-        </p>
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">Aplikimet Partner</h1>
+          <p className={customerPanelSubtitle}>
+            Mirato aplikimet pas kontratës; krijohen restoranti dhe kredencialet e stafit.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={customerBtnGhost + ' shrink-0'}
+          onClick={() => exportCsv(filtered)}
+          disabled={filtered.length === 0}
+        >
+          ↓ Eksporto CSV
+        </button>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-        <label className="min-w-[200px] flex-1">
-          <span className="mb-1 block text-xs text-gray-500">Kërko sipas emrit, qytetit ose emailit</span>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Venue, qytet, email…"
-            className={customerField}
-          />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ['all', 'Të gjithë'],
-              ['pending', 'Në pritje'],
-              ['contacted', 'Kontaktuar'],
-              ['approved', 'Miratuar'],
-              ['rejected', 'Refuzuar'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={adminFilterBtn(filter === key)}
-            >
-              {label}
-            </button>
+      {!loading && stats ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          {statCards.map((c) => (
+            <KpiCard key={c.label} {...c} />
           ))}
         </div>
+      ) : null}
+
+      <div className="rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
+          <label className="lg:col-span-2">
+            <span className="mb-1 block text-xs font-medium text-gray-500">Kërko restorantin…</span>
+            <input
+              type="search"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder="Emër, qytet, email…"
+              className={customerField}
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-gray-500">Statusi</span>
+            <select
+              className={customerField}
+              value={statusDraft}
+              onChange={(e) => setStatusDraft(e.target.value as PartnerAppStatusFilter)}
+            >
+              <option value="all">Të gjitha</option>
+              <option value="pending">Në pritje</option>
+              <option value="contacted">Kontaktuar</option>
+              <option value="approved">Miratuar</option>
+              <option value="rejected">Refuzuar</option>
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-gray-500">Qyteti</span>
+            <select className={customerField} value={cityDraft} onChange={(e) => setCityDraft(e.target.value)}>
+              <option value="">Të gjitha</option>
+              {cities.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-gray-500">Nga data</span>
+            <input
+              type="date"
+              className={customerField}
+              value={dateFromDraft}
+              onChange={(e) => setDateFromDraft(e.target.value)}
+            />
+          </label>
+          <label>
+            <span className="mb-1 block text-xs font-medium text-gray-500">Deri data</span>
+            <input
+              type="date"
+              className={customerField}
+              value={dateToDraft}
+              onChange={(e) => setDateToDraft(e.target.value)}
+            />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className={adminFilterBtn(true)} onClick={applyFilters}>
+            Filtro
+          </button>
+          <button type="button" className={customerBtnGhost} onClick={clearFilters}>
+            Pastro
+          </button>
+        </div>
       </div>
 
-      {actionMsg ? <p className={adminSuccessBanner}>{actionMsg}</p> : null}
-      {error ? (
-        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </p>
+      {actionMsg ? (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">{actionMsg}</div>
       ) : null}
+      {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
-      {lastApprove ? (
-        <div className={`${customerCardMuted} space-y-2 border-emerald-200 font-mono text-sm`}>
-          <p className="text-xs font-sans font-semibold uppercase tracking-wide text-emerald-700">
-            Kredencialet e krijuara (kopjo një herë)
-          </p>
-          <p>
-            <span className="text-gray-500">Email:</span> {lastApprove.staffEmail}
-          </p>
-          <p>
-            <span className="text-gray-500">Fjalëkalim:</span> {lastApprove.temporaryPassword}
-          </p>
-          <p>
-            <span className="text-gray-500">Restoranti:</span> {lastApprove.restaurantName} ({lastApprove.restaurantSlug})
-          </p>
-        </div>
-      ) : null}
+      {loading ? <AdminTableSkeleton rows={5} /> : null}
 
-      {lastReset ? (
-        <div className={`${customerCardMuted} space-y-2 border-sky-200 font-mono text-sm`}>
-          <p className="text-xs font-sans font-semibold uppercase tracking-wide text-sky-700">
-            Fjalëkalimi i ri (kopjo dhe dërgo te partneri)
-          </p>
-          <p>
-            <span className="text-gray-500">Email:</span> {lastReset.staffEmail}
-          </p>
-          <p>
-            <span className="text-gray-500">Fjalëkalim:</span> {lastReset.newPassword}
-          </p>
-        </div>
-      ) : null}
-
-      {loading ? (
-        <>
-          <p className="text-sm text-gray-500">Duke ngarkuar aplikimet…</p>
-          <AdminTableSkeleton rows={6} />
-        </>
-      ) : null}
-
-      {!loading && total === 0 ? (
+      {!loading && filtered.length === 0 ? (
         <AdminEmptyState
           icon="📝"
           title="Nuk ka aplikime për këtë filtër"
@@ -288,182 +526,166 @@ export default function AdminPartnerApplicationsPage() {
         />
       ) : null}
 
-      {!loading && total > 0 ? (
+      {!loading && filtered.length > 0 ? (
         <>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+              <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                 <tr>
                   <th className="px-4 py-3">Restoranti</th>
-                  <th className="px-4 py-3">Kontakti</th>
+                  <th className="px-4 py-3">Pronari</th>
+                  <th className="px-4 py-3">Qyteti</th>
+                  <th className="px-4 py-3">Lokacione</th>
                   <th className="px-4 py-3">Statusi</th>
-                  <th className="px-4 py-3">Data</th>
-                  <th className="px-4 py-3 text-right">Veprime</th>
+                  <th className="px-4 py-3">Data aplikimit</th>
+                  <th className="px-4 py-3 text-right">Veprimet</th>
                 </tr>
               </thead>
-              <tbody>
-                {pageItems.map((r) => {
-                  const canAct = r.status !== S_APPROVED && r.status !== S_REJECTED
-                  const busy = busyId === r.id
-                  const expanded = expandedId === r.id
-                  return (
-                    <Fragment key={r.id}>
-                      <tr className="border-b border-gray-100 transition hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-100 text-sm font-semibold text-violet-700">
-                              {(r.venueName[0] ?? '?').toUpperCase()}
-                            </span>
-                            <div>
-                              <div className="font-medium text-gray-900">{r.venueName}</div>
-                              <div className="text-xs text-gray-500">{r.city}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-gray-800">
-                            {r.contactFirstName} {r.contactLastName}
-                          </div>
-                          <div className="text-xs text-gray-500">{r.email}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusBadgeClass(r.status)}`}
-                          >
-                            {statusLabel(r.status)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-gray-500">
-                          {new Date(r.createdAtUtc).toLocaleString('sq-AL')}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {canAct ? (
-                              <>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void onApprove(r.id)}
-                                  className={`${customerBtnPrimary} px-3 py-1.5 text-xs`}
-                                >
-                                  {busy ? '…' : 'Mirato'}
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={busy}
-                                  onClick={() => void onReject(r.id)}
-                                  className={`${customerBtnGhost} px-3 py-1.5 text-xs text-red-600`}
-                                >
-                                  Refuzo
-                                </button>
-                              </>
-                            ) : null}
-                            {r.status === S_APPROVED ? (
-                              <button
-                                type="button"
-                                className={customerBtnGhost}
-                                onClick={() => setExpandedId(expanded ? null : r.id)}
-                              >
-                                {expanded ? 'Mbyll' : 'Mbështetje'}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                      {expanded && r.status === S_APPROVED ? (
-                        <tr key={`${r.id}-detail`} className="border-b border-gray-100 bg-gray-50">
-                          <td colSpan={5} className="px-4 py-4">
-                            <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">
-                                Rivendosje fjalëkalimi (mbështetje)
-                              </p>
-                              <p className="mt-1 max-w-prose text-xs leading-relaxed text-gray-600">
-                                Vetëm kur partneri nuk arrin të kyçet dhe ka kërkuar zyrtarisht rivendosje.
-                              </p>
-                              <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-md border border-amber-200 bg-white px-3 py-2.5">
-                                <input
-                                  type="checkbox"
-                                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-                                  checked={resetAcknowledged[r.id] ?? false}
-                                  onChange={(e) =>
-                                    setResetAcknowledged((a) => ({
-                                      ...a,
-                                      [r.id]: e.target.checked,
-                                    }))
-                                  }
-                                />
-                                <span className="text-xs text-gray-700">
-                                  Konfirmoj kërkesën e dokumentuar për humbje aksesi.
-                                </span>
-                              </label>
-                              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <div className="min-w-0 flex-1">
-                                  <label
-                                    htmlFor={`rpw-${r.id}`}
-                                    className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500"
-                                  >
-                                    Fjalëkalim i ri (opsional)
-                                  </label>
-                                  <input
-                                    id={`rpw-${r.id}`}
-                                    type="password"
-                                    autoComplete="new-password"
-                                    value={resetPwDraft[r.id] ?? ''}
-                                    onChange={(e) =>
-                                      setResetPwDraft((d) => ({
-                                        ...d,
-                                        [r.id]: e.target.value,
-                                      }))
-                                    }
-                                    disabled={!resetAcknowledged[r.id]}
-                                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-45"
-                                    placeholder="Bosh = gjenero automatikisht"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={busy || !resetAcknowledged[r.id]}
-                                  onClick={() => void onResetStaffPassword(r.id)}
-                                  className={`${customerBtnPrimary} shrink-0 px-3 py-2 text-xs disabled:opacity-40`}
-                                >
-                                  {busy ? '…' : 'Rivendos'}
-                                </button>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  )
-                })}
+              <tbody className="divide-y divide-gray-100">
+                {pageRows.map((r) => (
+                  <tr key={r.id} className="transition hover:bg-gray-50/80">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-sm font-bold text-violet-800">
+                          {(r.venueName[0] ?? '?').toUpperCase()}
+                        </span>
+                        <div>
+                          <p className="font-medium text-gray-900">{r.venueName}</p>
+                          <p className="text-xs text-gray-500">{r.businessType?.trim() || 'Partner'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800">
+                        {r.contactFirstName} {r.contactLastName}
+                      </p>
+                      <p className="text-xs text-gray-500">{r.email}</p>
+                      {r.phone ? <p className="text-xs text-gray-400">{r.phone}</p> : null}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{r.city}</td>
+                    <td className="px-4 py-3 text-gray-600">{formatVenueLocations(r.venueCountLabel)}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${partnerApplicationStatusBadgeClass(r.status)}`}
+                      >
+                        {partnerApplicationStatusLabel(r.status)}
+                      </span>
+                      <p className="mt-0.5 text-xs text-gray-400">{partnerApplicationStatusSubtext(r.status)}</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{formatApplied(r.createdAtUtc)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          type="button"
+                          className={customerBtnGhost + ' text-xs'}
+                          onClick={() => setViewRow(r)}
+                        >
+                          Shiko
+                        </button>
+                        <RowActionsMenu
+                          row={r}
+                          onView={() => setViewRow(r)}
+                          onApprove={() => setApproveRow(r)}
+                          onReject={() => openReject(r)}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-gray-500">
-            <span>
-              Faqja {page} · {total} total
-            </span>
-            <div className="flex gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500">
+              Duke shfaqur {(page - 1) * PAGE_SIZE + 1} deri {Math.min(page * PAGE_SIZE, filtered.length)} nga{' '}
+              {filtered.length} rezultate
+            </p>
+            <div className="flex items-center gap-1">
               <button
                 type="button"
-                className={customerBtnGhost}
+                className={customerBtnGhost + ' px-2.5 py-1.5 text-xs'}
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                ← Mëparshme
+                ←
               </button>
+              {pageNumbers.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={
+                    n === page
+                      ? 'flex h-8 min-w-8 items-center justify-center rounded-lg bg-violet-600 px-2 text-xs font-semibold text-white'
+                      : customerBtnGhost + ' h-8 min-w-8 px-2 py-1.5 text-xs'
+                  }
+                  onClick={() => setPage(n)}
+                >
+                  {n}
+                </button>
+              ))}
               <button
                 type="button"
-                className={customerBtnGhost}
-                disabled={page * pageSize >= total}
-                onClick={() => setPage((p) => p + 1)}
+                className={customerBtnGhost + ' px-2.5 py-1.5 text-xs'}
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               >
-                Tjetër →
+                →
               </button>
             </div>
           </div>
         </>
+      ) : null}
+
+      {approveRow ? (
+        <PartnerApplicationApproveModal
+          row={approveRow}
+          busy={busyId === approveRow.id}
+          onClose={() => setApproveRow(null)}
+          onConfirm={(pw) => void confirmApprove(pw)}
+        />
+      ) : null}
+
+      {viewRow ? (
+        <PartnerApplicationDetailsDrawer
+          row={allRows.find((x) => x.id === viewRow.id) ?? viewRow}
+          busy={busyId === viewRow.id}
+          onClose={() => setViewRow(null)}
+          onUpdated={() => void load()}
+          onApprove={(row) => {
+            setViewRow(null)
+            setApproveRow(row)
+          }}
+          onReject={(row) => openReject(row)}
+          onResetSuccess={(email, newPassword) => {
+            setCredentials({
+              kind: 'reset',
+              data: { staffEmail: email, newPassword },
+            })
+            setActionMsg('Fjalëkalimi u rivendos. Dërgo vlerën e re te partneri — sesionet e vjetra u anuluan.')
+            void load()
+          }}
+        />
+      ) : null}
+
+      {credentials?.kind === 'approve' ? (
+        <PartnerApplicationCredentialsModal
+          title="Kredencialet e krijuara"
+          subtitle="Kopjo dhe dërgo te partneri përmes kanalit të sigurt (jo chat publik)."
+          data={credentials.data}
+          passwordKey="temporaryPassword"
+          onClose={() => setCredentials(null)}
+        />
+      ) : null}
+
+      {credentials?.kind === 'reset' ? (
+        <PartnerApplicationCredentialsModal
+          title="Fjalëkalimi i ri"
+          subtitle="Kopjo dhe dërgo te partneri — sesionet e vjetra u anuluan."
+          data={credentials.data}
+          passwordKey="newPassword"
+          onClose={() => setCredentials(null)}
+        />
       ) : null}
     </div>
   )

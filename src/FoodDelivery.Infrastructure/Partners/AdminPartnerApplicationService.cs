@@ -5,6 +5,7 @@ using FoodDelivery.Domain.Entities;
 using FoodDelivery.Infrastructure.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 
 namespace FoodDelivery.Infrastructure.Partners;
 
@@ -12,13 +13,16 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
 {
     private readonly FoodDeliveryDbContext _db;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly IHostEnvironment _env;
 
     public AdminPartnerApplicationService(
         FoodDeliveryDbContext db,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        IHostEnvironment env)
     {
         _db = db;
         _passwordHasher = passwordHasher;
+        _env = env;
     }
 
     public async Task<IReadOnlyList<PartnerApplicationListItemDto>> ListAsync(
@@ -35,8 +39,169 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
                 a.City,
                 a.Email,
                 a.ContactFirstName,
-                a.ContactLastName))
+                a.ContactLastName,
+                a.Phone,
+                a.BusinessType,
+                a.VenueCountLabel,
+                a.StreetAddress,
+                a.Message))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<PartnerApplicationDetailDto?> GetDetailAsync(
+        long applicationId,
+        CancellationToken cancellationToken = default)
+    {
+        var app = await _db.RestaurantPartnerApplications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
+        if (app is null)
+            return null;
+
+        var contract = await LoadContractDtoAsync(applicationId, cancellationToken);
+        var history = await BuildHistoryAsync(applicationId, app.CreatedAt, cancellationToken);
+
+        return new PartnerApplicationDetailDto(
+            app.Id,
+            app.CreatedAt,
+            app.Status,
+            app.VenueName,
+            app.City,
+            app.Email,
+            app.ContactFirstName,
+            app.ContactLastName,
+            app.Phone,
+            app.BusinessType,
+            app.VenueCountLabel,
+            app.StreetAddress,
+            app.Message,
+            app.Country,
+            app.PostalCode,
+            contract is not null,
+            contract,
+            history);
+    }
+
+    public async Task<string?> MarkContactedAsync(
+        long applicationId,
+        long actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var app = await _db.RestaurantPartnerApplications
+            .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
+        if (app is null)
+            return "Aplikimi nuk u gjet.";
+        if (app.Status != PartnerApplicationStatuses.Pending)
+            return "Vetëm aplikimet në pritje mund të shënohen si kontaktuar.";
+
+        var now = DateTime.UtcNow;
+        app.Status = PartnerApplicationStatuses.Contacted;
+        PartnerApplicationAuditWriter.Add(
+            _db,
+            app.Id,
+            PartnerApplicationAuditEventTypes.MarkedAsContacted,
+            null,
+            actorUserId,
+            now);
+        await _db.SaveChangesAsync(cancellationToken);
+        return null;
+    }
+
+    public async Task<(PartnerContractDocumentDto? Contract, string? Error)> UploadContractAsync(
+        long applicationId,
+        string fileName,
+        Stream content,
+        long sizeBytes,
+        long actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var validation = PartnerApplicationContractFileHelper.ValidatePdf(fileName, sizeBytes);
+        if (validation is not null)
+            return (null, validation);
+
+        var app = await _db.RestaurantPartnerApplications
+            .AsNoTracking()
+            .FirstOrDefaultAsync(a => a.Id == applicationId, cancellationToken);
+        if (app is null)
+            return (null, "Aplikimi nuk u gjet.");
+        if (app.Status is PartnerApplicationStatuses.Approved or PartnerApplicationStatuses.Rejected)
+            return (null, "Nuk mund të ngarkohet kontrata për aplikime të përfunduara.");
+
+        var entityId = PartnerApplicationContractFileHelper.EntityId(applicationId);
+        var existing = await _db.StoredFiles
+            .FirstOrDefaultAsync(
+                f => f.Entity == PartnerApplicationContractFileHelper.EntityName && f.EntityId == entityId,
+                cancellationToken);
+
+        var now = DateTime.UtcNow;
+        var root = Path.GetFullPath(Path.Combine(_env.ContentRootPath, PartnerApplicationContractFileHelper.RelativeRoot));
+        Directory.CreateDirectory(root);
+        var safeName = Path.GetFileName(fileName);
+        if (string.IsNullOrWhiteSpace(safeName))
+            safeName = "kontrata.pdf";
+        var diskName = $"{applicationId}_{Guid.NewGuid():N}{Path.GetExtension(safeName)}";
+        var physicalPath = Path.Combine(root, diskName);
+
+        await using (var fs = File.Create(physicalPath))
+        {
+            await content.CopyToAsync(fs, cancellationToken);
+        }
+
+        var isReplace = existing is not null;
+        if (existing is not null)
+        {
+            PartnerApplicationContractFileHelper.TryDeletePhysical(existing.FilePath);
+            existing.Filename = safeName;
+            existing.FilePath = physicalPath;
+            existing.FileSize = sizeBytes;
+            existing.UpdatedAt = now;
+            existing.UpdatedById = actorUserId;
+            existing.UploaderId = actorUserId;
+        }
+        else
+        {
+            _db.StoredFiles.Add(new StoredFile
+            {
+                CreatedAt = now,
+                CreatedById = actorUserId,
+                Entity = PartnerApplicationContractFileHelper.EntityName,
+                EntityId = entityId,
+                FilePath = physicalPath,
+                FileSize = sizeBytes,
+                Filename = safeName,
+                UploaderId = actorUserId,
+            });
+        }
+
+        PartnerApplicationAuditWriter.Add(
+            _db,
+            applicationId,
+            isReplace
+                ? PartnerApplicationAuditEventTypes.ContractReplaced
+                : PartnerApplicationAuditEventTypes.ContractUploaded,
+            safeName,
+            actorUserId,
+            now);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        var dto = await LoadContractDtoAsync(applicationId, cancellationToken);
+        return (dto, null);
+    }
+
+    public async Task<(string? PhysicalPath, string? ContentType, string? Error)> GetContractFileAsync(
+        long applicationId,
+        CancellationToken cancellationToken = default)
+    {
+        var entityId = PartnerApplicationContractFileHelper.EntityId(applicationId);
+        var file = await _db.StoredFiles.AsNoTracking()
+            .FirstOrDefaultAsync(
+                f => f.Entity == PartnerApplicationContractFileHelper.EntityName && f.EntityId == entityId,
+                cancellationToken);
+        if (file is null || string.IsNullOrWhiteSpace(file.FilePath))
+            return (null, null, "Kontrata nuk u gjet.");
+        if (!File.Exists(file.FilePath))
+            return (null, null, "Skedari mungon në disk.");
+        return (file.FilePath, "application/pdf", null);
     }
 
     public async Task<(ApprovePartnerApplicationResultDto? Result, string? Error)> ApproveAsync(
@@ -52,6 +217,9 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
 
         if (app.Status is PartnerApplicationStatuses.Approved or PartnerApplicationStatuses.Rejected)
             return (null, "Ky aplikim është përfunduar — nuk mund të miratohet përsëri.");
+
+        if (!await HasContractAsync(applicationId, cancellationToken))
+            return (null, "Ngarko kontratën e partnerit para miratimit.");
 
         var email = app.Email.Trim().ToLowerInvariant();
         if (await _db.Users.AnyAsync(u => u.Email == email, cancellationToken))
@@ -79,6 +247,13 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
             return (null, "Fjalëkalimi duhet të ketë të paktën 6 karaktere.");
 
         var now = DateTime.UtcNow;
+
+        long? zoneId = await _db.DeliveryZones.AsNoTracking()
+            .Where(z => z.IsActive && z.City == app.City.Trim())
+            .OrderBy(z => z.SortOrder)
+            .Select(z => (long?)z.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
         var restaurant = new Restaurant
         {
             Name = app.VenueName.Trim(),
@@ -86,6 +261,7 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
             AddressLine = app.StreetAddress.Trim(),
             City = app.City.Trim(),
             FoodCategoryId = categoryId.Value,
+            DeliveryZoneId = zoneId,
             DeliveryFee = 1.50m,
             AverageRating = 0,
             ReviewCount = 0,
@@ -133,6 +309,13 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
         });
 
         app.Status = PartnerApplicationStatuses.Approved;
+        PartnerApplicationAuditWriter.Add(
+            _db,
+            app.Id,
+            PartnerApplicationAuditEventTypes.ApplicationApproved,
+            $"Restoranti {restaurant.Name} u krijua.",
+            approvedByUserId,
+            now);
         await _db.SaveChangesAsync(cancellationToken);
 
         await DbSeeder.AddMenuForSingleRestaurantAsync(_db, restaurant.Id, now, cancellationToken);
@@ -147,7 +330,7 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
 
     public async Task<string?> RejectAsync(
         long applicationId,
-        long _rejectedByUserId,
+        long rejectedByUserId,
         CancellationToken cancellationToken = default)
     {
         var app = await _db.RestaurantPartnerApplications
@@ -159,7 +342,15 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
         if (app.Status == PartnerApplicationStatuses.Rejected)
             return "Aplikimi është tashmë refuzuar.";
 
+        var now = DateTime.UtcNow;
         app.Status = PartnerApplicationStatuses.Rejected;
+        PartnerApplicationAuditWriter.Add(
+            _db,
+            app.Id,
+            PartnerApplicationAuditEventTypes.ApplicationRejected,
+            null,
+            rejectedByUserId,
+            now);
         await _db.SaveChangesAsync(cancellationToken);
         return null;
     }
@@ -231,8 +422,103 @@ public sealed class AdminPartnerApplicationService : IAdminPartnerApplicationSer
             CreatedAt = now,
         });
 
+        PartnerApplicationAuditWriter.Add(
+            _db,
+            applicationId,
+            PartnerApplicationAuditEventTypes.StaffPasswordReset,
+            user.Email,
+            adminUserId,
+            now);
+
         await _db.SaveChangesAsync(cancellationToken);
         return (new ResetPartnerStaffPasswordResultDto(user.Email, password), null);
+    }
+
+    private async Task<bool> HasContractAsync(long applicationId, CancellationToken cancellationToken)
+    {
+        var entityId = PartnerApplicationContractFileHelper.EntityId(applicationId);
+        return await _db.StoredFiles.AsNoTracking().AnyAsync(
+            f => f.Entity == PartnerApplicationContractFileHelper.EntityName && f.EntityId == entityId,
+            cancellationToken);
+    }
+
+    private async Task<PartnerContractDocumentDto?> LoadContractDtoAsync(
+        long applicationId,
+        CancellationToken cancellationToken)
+    {
+        var entityId = PartnerApplicationContractFileHelper.EntityId(applicationId);
+        var file = await _db.StoredFiles.AsNoTracking()
+            .FirstOrDefaultAsync(
+                f => f.Entity == PartnerApplicationContractFileHelper.EntityName && f.EntityId == entityId,
+                cancellationToken);
+        if (file is null)
+            return null;
+
+        string? uploaderName = null;
+        if (file.UploaderId > 0)
+        {
+            uploaderName = await _db.Users.AsNoTracking()
+                .Where(u => u.Id == file.UploaderId)
+                .Select(u => u.FirstName + " " + u.LastName)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        var uploadedAt = file.UpdatedAt ?? file.CreatedAt;
+        return new PartnerContractDocumentDto(
+            file.Filename,
+            file.FileSize,
+            uploadedAt,
+            uploaderName,
+            $"/api/admin/partner-applications/{applicationId}/contract");
+    }
+
+    private async Task<IReadOnlyList<PartnerApplicationAuditEntryDto>> BuildHistoryAsync(
+        long applicationId,
+        DateTime createdAt,
+        CancellationToken cancellationToken)
+    {
+        List<PartnerApplicationAudit> audits;
+        try
+        {
+            audits = await _db.PartnerApplicationAudits.AsNoTracking()
+                .Where(a => a.PartnerApplicationId == applicationId)
+                .OrderBy(a => a.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
+        }
+        catch
+        {
+            audits = [];
+        }
+
+        if (audits.Count == 0)
+        {
+            return
+            [
+                new PartnerApplicationAuditEntryDto(
+                    PartnerApplicationAuditEventTypes.ApplicationSubmitted,
+                    null,
+                    createdAt,
+                    null),
+            ];
+        }
+
+        var actorIds = audits
+            .Where(a => a.CreatedByUserId is not null)
+            .Select(a => a.CreatedByUserId!.Value)
+            .Distinct()
+            .ToList();
+        var actors = actorIds.Count == 0
+            ? new Dictionary<long, string>()
+            : await _db.Users.AsNoTracking()
+                .Where(u => actorIds.Contains(u.Id))
+                .Select(u => new { u.Id, Name = u.FirstName + " " + u.LastName })
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
+        return audits.Select(a =>
+        {
+            string? actor = a.CreatedByUserId is long id && actors.TryGetValue(id, out var n) ? n : null;
+            return new PartnerApplicationAuditEntryDto(a.EventType, a.Detail, a.CreatedAtUtc, actor);
+        }).ToList();
     }
 
     private async Task<string> EnsureUniqueSlugAsync(string baseSlug, CancellationToken cancellationToken)

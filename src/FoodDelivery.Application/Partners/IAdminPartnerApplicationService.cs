@@ -4,6 +4,25 @@ public interface IAdminPartnerApplicationService
 {
     Task<IReadOnlyList<PartnerApplicationListItemDto>> ListAsync(CancellationToken cancellationToken = default);
 
+    Task<PartnerApplicationDetailDto?> GetDetailAsync(long applicationId, CancellationToken cancellationToken = default);
+
+    Task<string?> MarkContactedAsync(
+        long applicationId,
+        long actorUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<(PartnerContractDocumentDto? Contract, string? Error)> UploadContractAsync(
+        long applicationId,
+        string fileName,
+        Stream content,
+        long sizeBytes,
+        long actorUserId,
+        CancellationToken cancellationToken = default);
+
+    Task<(string? PhysicalPath, string? ContentType, string? Error)> GetContractFileAsync(
+        long applicationId,
+        CancellationToken cancellationToken = default);
+
     Task<(ApprovePartnerApplicationResultDto? Result, string? Error)> ApproveAsync(
         long applicationId,
         ApprovePartnerApplicationRequest request,

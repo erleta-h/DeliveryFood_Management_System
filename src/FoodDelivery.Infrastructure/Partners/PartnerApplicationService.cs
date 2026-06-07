@@ -73,6 +73,22 @@ public sealed class PartnerApplicationService : IPartnerApplicationService
         _db.RestaurantPartnerApplications.Add(entity);
         await _db.SaveChangesAsync(cancellationToken);
 
+        try
+        {
+            PartnerApplicationAuditWriter.Add(
+                _db,
+                entity.Id,
+                PartnerApplicationAuditEventTypes.ApplicationSubmitted,
+                null,
+                null,
+                entity.CreatedAt);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            /* audit table mund të mungojë deri sa të aplikohet migrimi */
+        }
+
         await _notifications.NotifyUsersInRolesAsync(
             AdminNotifyRoles,
             "Aplikim i ri partner",
