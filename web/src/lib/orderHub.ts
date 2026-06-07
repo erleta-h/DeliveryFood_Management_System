@@ -1,10 +1,55 @@
 import * as signalR from '@microsoft/signalr'
 import { apiPath } from './apiBase'
 
+/** StrictMode / navigim i shpejtë — ndalon start-in para se të mbarojë; jo gabim real. */
+function isHubBenignAbortMessage(message: string): boolean {
+  const m = message.toLowerCase()
+  return (
+    m.includes('stopped during negotiation') ||
+    m.includes('connection was stopped') ||
+    m.includes('before stop() was called') ||
+    m.includes('failed to start the httpconnection')
+  )
+}
+
+/** Event-e që serveri dërgon — noop paraprakisht që mos të dalin warning-e kur faqja dëgjon vetëm një pjesë. */
+const ORDERS_HUB_CLIENT_EVENTS = [
+  'driverLocation',
+  'deliveryChatMessage',
+  'deliveryChatSeen',
+  'orderStatus',
+  'customerOrderStatus',
+  'newOrder',
+  'deliveryOffer',
+  'kitchenNotification',
+  'adminNotification',
+  'customerNotification',
+  'supportTicketMessageReceived',
+] as const
+
+function isUnhandledHubMethodLog(message: string): boolean {
+  return /no client method with the name/i.test(message)
+}
+
+const hubLogger: signalR.ILogger = {
+  log(logLevel, message) {
+    if (isHubBenignAbortMessage(message)) return
+    if (isUnhandledHubMethodLog(message)) return
+    if (logLevel >= signalR.LogLevel.Error) console.error(message)
+    else if (logLevel >= signalR.LogLevel.Warning) console.warn(message)
+  },
+}
+
+function wireOrdersHubNoopHandlers(conn: signalR.HubConnection): void {
+  for (const name of ORDERS_HUB_CLIENT_EVENTS) {
+    conn.on(name, () => {})
+  }
+}
+
 export function createOrdersHubConnection(accessToken: string) {
   const url = apiPath('/hubs/orders')
   const sep = url.includes('?') ? '&' : '?'
-  return new signalR.HubConnectionBuilder()
+  const conn = new signalR.HubConnectionBuilder()
     .withUrl(`${url}${sep}access_token=${encodeURIComponent(accessToken)}`, {
       skipNegotiation: false,
       transport:
@@ -12,16 +57,11 @@ export function createOrdersHubConnection(accessToken: string) {
         signalR.HttpTransportType.ServerSentEvents |
         signalR.HttpTransportType.LongPolling,
     })
-    .configureLogging({
-      log: (level, message) => {
-        if (message.includes('stopped during negotiation')) return
-        if (level >= signalR.LogLevel.Warning) {
-          console.warn(`[SignalR] ${message}`)
-        }
-      },
-    })
+    .configureLogging(hubLogger)
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000])
     .build()
+  wireOrdersHubNoopHandlers(conn)
+  return conn
 }
 
 export type OrdersHubJoin =
@@ -105,9 +145,9 @@ export async function startOrdersHub(
   }
 }
 
-/** Mos loguar gabime kur cleanup (StrictMode / unmount) ndalon start-in gjatë negotiation. */
+/** Mos loguar gabime kur cleanup (StrictMode / unmount) ndalon start-in. */
 export function isHubStartAbortError(err: unknown): boolean {
   if (!(err instanceof Error)) return false
-  const msg = err.message.toLowerCase()
-  return err.name === 'AbortError' || msg.includes('stopped during negotiation') || msg.includes('connection was stopped')
+  if (err.name === 'AbortError') return true
+  return isHubBenignAbortMessage(err.message)
 }

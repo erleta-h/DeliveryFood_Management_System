@@ -799,7 +799,9 @@ export default function KitchenOrdersPage() {
       const rid = ctx.context.restaurantId
       if (rid == null) return
       try {
-        await startOrdersHub(conn, [{ kind: 'restaurant', restaurantId: rid }])
+        await startOrdersHub(conn, [{ kind: 'restaurant', restaurantId: rid }], {
+          isCancelled: () => cancelled,
+        })
         if (!cancelled) setHubState(conn.state)
       } catch {
         if (!cancelled) setHubState(signalR.HubConnectionState.Disconnected)

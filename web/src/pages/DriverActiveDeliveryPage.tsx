@@ -412,8 +412,16 @@ export default function DriverActiveDeliveryPage() {
     setError(null)
     try {
       const d = await fetchDriverOrderDetail(token, orderId)
-      if (!d) setError('Porosia nuk u gjet.')
-      else setDetail(d)
+      if (!d) {
+        setDetail((prev) => {
+          if (prev) return prev
+          setError('Kjo porosi është përfunduar ose nuk është më aktive.')
+          return null
+        })
+        return
+      }
+      setDetail(d)
+      if (d.driverLegStatus === DRIVER_LEG.completed) setCompleted(true)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Gabim.')
     } finally {
@@ -426,15 +434,18 @@ export default function DriverActiveDeliveryPage() {
   }, [load])
 
   useEffect(() => {
-    if (!token) return
+    if (!token || completed || detail?.driverLegStatus === DRIVER_LEG.completed) return
     const t = window.setInterval(() => {
       if (document.visibilityState !== 'visible') return
       void load()
     }, 5000)
     return () => window.clearInterval(t)
-  }, [token, load])
+  }, [token, load, completed, detail?.driverLegStatus])
 
-  async function action(fn: () => Promise<{ ok: true } | { ok: false; message: string }>) {
+  async function action(
+    fn: () => Promise<{ ok: true } | { ok: false; message: string }>,
+    opts?: { reload?: boolean },
+  ) {
     if (!token) return
     setBusy(true)
     setError(null)
@@ -444,6 +455,7 @@ export default function DriverActiveDeliveryPage() {
       setError(r.message)
       return
     }
+    if (opts?.reload === false || completed) return
     void load()
   }
 
@@ -463,7 +475,16 @@ export default function DriverActiveDeliveryPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[#0a0e17] p-4">
         <BackHeader title="Dërgesa" onBack={goBack} />
-        <p className="mt-4 text-sm text-red-300">{error}</p>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          <p className="max-w-sm text-sm leading-relaxed text-zinc-300">{error}</p>
+          <button
+            type="button"
+            onClick={goBack}
+            className="mt-6 flex min-h-[48px] w-full max-w-xs items-center justify-center rounded-xl bg-emerald-600 text-sm font-semibold text-white transition hover:bg-emerald-500"
+          >
+            Kthehu te paneli
+          </button>
+        </div>
       </div>
     )
   }
@@ -511,7 +532,7 @@ export default function DriverActiveDeliveryPage() {
               const r = await postDriverDelivered(token!, orderId)
               if (r.ok) setCompleted(true)
               return r
-            })
+            }, { reload: false })
           }
           onBack={goBack}
         />

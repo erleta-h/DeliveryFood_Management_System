@@ -8,7 +8,13 @@ import {
   upsertDeliveryChatMessage,
   type DeliveryChatMessage,
 } from '../lib/deliveryChatApi'
-import { createOrdersHubConnection, isOrdersHubRealtimeActive, startOrdersHub, wireOrdersHubConnectionState } from '../lib/orderHub'
+import {
+  createOrdersHubConnection,
+  isHubStartAbortError,
+  isOrdersHubRealtimeActive,
+  startOrdersHub,
+  wireOrdersHubConnectionState,
+} from '../lib/orderHub'
 import * as signalR from '@microsoft/signalr'
 import { fetchDriverOrderDetail, DRIVER_LEG, type DriverOrderDetail } from '../lib/driverApi'
 import { ORDER_STATUS_CANCELLED, ORDER_STATUS_DELIVERED } from '../lib/orderStatusLabels'
@@ -106,9 +112,10 @@ export default function DriverChatPage() {
     let cancelled = false
     ;(async () => {
       try {
-        await startOrdersHub(conn, [{ kind: 'order', orderId }])
-        setHubState(conn.state)
+        await startOrdersHub(conn, [{ kind: 'order', orderId }], { isCancelled: () => cancelled })
+        if (!cancelled) setHubState(conn.state)
       } catch (err) {
+        if (cancelled || isHubStartAbortError(err)) return
         setHubState(signalR.HubConnectionState.Disconnected)
         console.warn('[DriverChat] SignalR nuk u lidh — polling 12s.', err)
       }
