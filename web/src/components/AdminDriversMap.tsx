@@ -48,7 +48,7 @@ export function AdminDriversMap({ drivers, className }: Props) {
   const center: [number, number] = [drivers[0].lat, drivers[0].lng]
 
   const wrapper =
-    'h-72 w-full overflow-hidden rounded-xl border border-white/[0.08]' +
+    'h-72 w-full overflow-hidden rounded-xl border border-gray-200 bg-white' +
     (className ? ` ${className}` : '')
 
   return (
