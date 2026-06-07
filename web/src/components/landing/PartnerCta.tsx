@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom'
-import { LANDING_IMAGES, landingBtnGold, landingGlassCard } from '../../lib/landingTheme'
+import { LANDING_IMAGES, landingBtnGold, landingGlassCard, landingLiftHover } from '../../lib/landingTheme'
 
 export function PartnerCta() {
   return (
     <section className="mx-auto max-w-7xl px-6 lg:px-10">
       <div className="grid gap-5 lg:grid-cols-2">
-        <article className={`${landingGlassCard} relative overflow-hidden p-8 lg:p-10`}>
+        <article className={`${landingGlassCard} ${landingLiftHover} relative overflow-hidden p-8 lg:p-10`}>
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-cover bg-center opacity-40"
             style={{ backgroundImage: `url(${LANDING_IMAGES.partner})` }}
@@ -23,7 +23,7 @@ export function PartnerCta() {
           </div>
         </article>
 
-        <article className={`${landingGlassCard} relative overflow-hidden p-8 lg:p-10`}>
+        <article className={`${landingGlassCard} ${landingLiftHover} relative overflow-hidden p-8 lg:p-10`}>
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-cover bg-center opacity-40"
             style={{ backgroundImage: `url(${LANDING_IMAGES.driver})` }}

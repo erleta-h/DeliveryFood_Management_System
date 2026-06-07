@@ -1,6 +1,6 @@
 import type { PublicLandingStats } from '../../lib/publicLandingApi'
 import { formatStatPlus } from '../../lib/publicLandingApi'
-import { landingGlassCard, landingTextGold } from '../../lib/landingTheme'
+import { landingGlassCard, landingLiftHover, landingTextGold } from '../../lib/landingTheme'
 
 type Props = {
   stats: PublicLandingStats | null
@@ -58,7 +58,10 @@ export function StatsBar({ stats }: Props) {
               : formatStatPlus(raw)
           if (display === '—') return null
           return (
-            <div key={item.key} className="flex items-center gap-3">
+            <div
+              key={item.key}
+              className={`flex items-center gap-3 rounded-xl border border-transparent p-3 ${landingLiftHover} hover:bg-white/[0.03]`}
+            >
               <span
                 className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg ${item.iconBg}`}
                 aria-hidden

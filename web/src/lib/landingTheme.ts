@@ -12,6 +12,8 @@ export const landingGlassCard =
 
   'rounded-2xl border border-white/[0.08] bg-[#141824]/70 shadow-[0_20px_60px_-24px_rgba(0,0,0,0.65)] backdrop-blur-md'
 
+export const landingLiftHover =
+  'transition-all duration-300 ease-out hover:-translate-y-2 hover:scale-[1.02] hover:border-white/[0.14] hover:shadow-[0_28px_72px_-22px_rgba(0,0,0,0.8)]'
 
 
 export const landingSearchBar =
