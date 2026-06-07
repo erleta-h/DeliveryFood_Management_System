@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom'
+import { ScooterIcon } from './landing/landingIcons'
 
 type Props = {
   className?: string
   /** Hyrje “moderne”: blur që largohet + Food/Delivery me vonesë të vogël. */
   entrance?: boolean
+  /** Ikona e skuterit para logos (landing mockup). */
+  withIcon?: boolean
   /** Ku të çojë klikimi (default: ballina). */
   to?: string
   /** Madhësi më e vogël për header në /app — i njëjti font Fraunces. */
@@ -20,6 +23,7 @@ const sizeCompactDelivery = 'text-lg font-bold sm:text-xl tracking-[-0.02em]'
 export function BrandLogo({
   className = '',
   entrance = false,
+  withIcon = false,
   to = '/',
   compact = false,
 }: Props) {
@@ -27,7 +31,12 @@ export function BrandLogo({
   const sd = compact ? sizeCompactDelivery : sizeLandingDelivery
 
   return (
-    <span className={`inline-flex ${entrance ? 'animate-site-logo-wrap' : ''}`}>
+    <span className={`inline-flex items-center gap-2.5 ${entrance ? 'animate-site-logo-wrap' : ''}`}>
+      {withIcon ? (
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#ffc107]/15 text-[#ffc107]">
+          <ScooterIcon className="h-6 w-6" />
+        </span>
+      ) : null}
       <Link
         to={to}
         className={`group inline-flex select-none items-baseline gap-0.5 no-underline ${className}`}

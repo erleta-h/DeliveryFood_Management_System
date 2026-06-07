@@ -98,16 +98,17 @@ export default function DriverChatPage() {
       const seenAt = String(r.seenAtUtc ?? r.SeenAtUtc ?? new Date().toISOString())
       setMessages((prev) => prev.map((m) => m.senderRole === 'driver' && !m.seenAtUtc ? { ...m, seenAtUtc: seenAt } : m))
     })
-    let stopped = false
+    let cancelled = false
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
       } catch (err) {
         console.warn('[DriverChat] SignalR nuk u lidh — polling 12s.', err)
       }
+      if (cancelled) return
     })()
     return () => {
-      stopped = true
+      cancelled = true
       void conn.stop()
     }
   }, [token, orderId])

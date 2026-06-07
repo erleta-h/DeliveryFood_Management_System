@@ -1,14 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
-import { DriverApplyDemoAside } from './../components/DriverApplyDemoAside'
+import { DriverApplyDemoAside, driverApplyShellBg } from './../components/DriverApplyDemoAside'
 import {
   customerBtnPrimary,
   customerCard,
   customerFieldPartner,
   customerLabelForm,
   customerPanelSubtitle,
-  customerShellBg,
 } from '../lib/customerTheme'
 import { LicensePlateInputField, validateLicensePlateField } from '../components/LicensePlateInputField'
 import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
@@ -125,7 +124,7 @@ export default function DriverApplyPage() {
 
   if (done) {
     return (
-      <div className={`${customerShellBg} relative min-h-screen px-4 pb-16 pt-6 sm:px-8`}>
+      <div className={`${driverApplyShellBg} px-4 pb-16 pt-6 sm:px-8`}>
         <Link
           to="/"
           className={`${backIconBtnClass} absolute left-4 top-5 z-10 sm:left-8 sm:top-7`}
@@ -150,7 +149,7 @@ export default function DriverApplyPage() {
   }
 
   return (
-    <div className={`${customerShellBg} relative min-h-screen px-4 pb-20 pt-6 sm:px-8`}>
+    <div className={`${driverApplyShellBg} px-4 pb-20 pt-6 sm:px-8`}>
       <Link
         to="/"
         className={`${backIconBtnClass} absolute left-4 top-5 z-10 sm:left-8 sm:top-7`}
@@ -162,9 +161,9 @@ export default function DriverApplyPage() {
         <BrandLogo />
       </header>
 
-      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.08fr)] lg:items-start lg:gap-10">
+      <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:items-start lg:gap-12">
         <DriverApplyDemoAside className="order-2 lg:order-1" />
-        <section className={`${customerCard} order-1 mx-auto w-full max-w-xl lg:order-2 lg:mx-0 lg:max-w-none`}>
+        <section className={`${customerCard} animate-auth-panel-in-delayed order-1 mx-auto w-full max-w-xl sm:max-w-2xl lg:order-2 lg:mx-0 lg:max-w-none`}>
           <h1 className="text-2xl font-bold text-zinc-100">Apliko si Deliver</h1>
           <p className={customerPanelSubtitle}>
             Plotëso të dhënat dhe ngarko dokumentet. Pas miratimit nga admini, merrni email me link aktivizimi për të

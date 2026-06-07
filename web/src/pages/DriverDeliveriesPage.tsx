@@ -262,7 +262,7 @@ export default function DriverDeliveriesPage() {
             <button
               type="button"
               onClick={() => void toggleOnline()}
-              className={`relative h-8 w-[52px] rounded-full transition-colors duration-200 ${
+              className={`relative inline-flex h-8 w-[3.25rem] shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ${
                 status?.isOnline
                   ? 'bg-emerald-500 shadow-[0_0_12px_rgba(52,211,153,0.3)]'
                   : 'bg-zinc-700'
@@ -271,8 +271,8 @@ export default function DriverDeliveriesPage() {
               aria-checked={!!status?.isOnline}
             >
               <span
-                className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
-                  status?.isOnline ? 'translate-x-[22px]' : 'translate-x-[2px]'
+                className={`block h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
+                  status?.isOnline ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>
@@ -280,21 +280,30 @@ export default function DriverDeliveriesPage() {
         </div>
       </div>
 
-      {/* ── Stats row ── */}
+      {/* ── Stats row — prek për detaje ── */}
       <div className="px-4 pt-3">
         <div className="grid grid-cols-3 gap-2.5">
-          <div className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center">
+          <Link
+            to="/driver/history"
+            className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center transition hover:border-white/[0.14] hover:bg-[#151d2e] active:scale-[0.98]"
+          >
             <p className="text-xl font-bold text-white">{earnings?.todayDeliveriesCount ?? activeJobs.length}</p>
             <p className="mt-0.5 text-[11px] font-medium text-zinc-500">Porosi</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center">
+          </Link>
+          <Link
+            to="/driver/earnings"
+            className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center transition hover:border-emerald-500/25 hover:bg-[#151d2e] active:scale-[0.98]"
+          >
             <p className="text-xl font-bold text-emerald-400">{fmtMoney(earnings?.todayTotal ?? 0)}</p>
             <p className="mt-0.5 text-[11px] font-medium text-zinc-500">Fitimi</p>
-          </div>
-          <div className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center">
+          </Link>
+          <Link
+            to="/driver/stats"
+            className="rounded-2xl border border-white/[0.08] bg-[#111827] px-3 py-3.5 text-center transition hover:border-white/[0.14] hover:bg-[#151d2e] active:scale-[0.98]"
+          >
             <p className="text-xl font-bold text-white">{fmtOnlineTime(onlineSeconds)}</p>
             <p className="mt-0.5 text-[11px] font-medium text-zinc-500">Koha</p>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -433,27 +442,6 @@ export default function DriverDeliveriesPage() {
           </p>
         </div>
       )}
-
-      {/* ── Quick links ── */}
-      <div className="px-4 pt-6">
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { to: '/driver/stats', label: 'Stats', icon: 'M16 8v8M12 11v5M8 14v2M4 2h16a2 2 0 012 2v16a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2z' },
-            { to: '/driver/support', label: 'Support', icon: 'M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01M12 2a10 10 0 100 20 10 10 0 000-20z' },
-          ].map((link) => (
-            <Link
-              key={link.to}
-              to={link.to}
-              className="flex flex-col items-center gap-1.5 rounded-xl border border-white/[0.06] bg-[#111827]/60 px-2 py-3 text-zinc-500 transition hover:border-white/[0.12] hover:bg-[#111827] hover:text-zinc-300"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                <path d={link.icon} />
-              </svg>
-              <span className="text-[10px] font-medium">{link.label}</span>
-            </Link>
-          ))}
-        </div>
-      </div>
 
       {/* ── Order detail modal ── */}
       {detailFor != null && (

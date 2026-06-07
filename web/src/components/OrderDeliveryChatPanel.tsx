@@ -86,16 +86,17 @@ export function OrderDeliveryChatPanel({
       const seenAt = String(r.seenAtUtc ?? r.SeenAtUtc ?? new Date().toISOString())
       setItems((prev) => prev.map((m) => m.senderRole === 'customer' && !m.seenAtUtc ? { ...m, seenAtUtc: seenAt } : m))
     })
-    let stopped = false
+    let cancelled = false
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'order', orderId }])
       } catch (err) {
         console.warn('[Chat] SignalR nuk u lidh — përdoret polling çdo 12s.', err)
       }
+      if (cancelled) return
     })()
     return () => {
-      stopped = true
+      cancelled = true
       void conn.stop()
     }
   }, [token, orderId, useOwnHubConnection])

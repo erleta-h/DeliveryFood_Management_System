@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { BrandLogo } from '../components/BrandLogo'
+import { BagIcon, ClockIcon, ShopIcon } from '../components/landing/landingIcons'
 import {
   PartnerCountryPicker,
   PartnerIconInput,
@@ -10,11 +11,139 @@ import {
   partnerIcons,
 } from '../components/partner/PartnerApplyFields'
 import { PhoneInputField, validatePhoneField } from '../components/PhoneInputField'
-import { customerPanelSubtitle, customerShellBg } from '../lib/customerTheme'
+import { customerPanelSubtitle } from '../lib/customerTheme'
+import { landingBtnGold, landingGlassCard, landingTextGold, LANDING_IMAGES } from '../lib/landingTheme'
 import { submitPartnerApplication } from './../lib/partnerApi'
 
 const backIconBtnClass =
-  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.14] bg-white/[0.05] text-lg leading-none text-zinc-200 transition hover:border-amber-400/30 hover:bg-amber-500/10 hover:text-amber-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-amber-400/30'
+  'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/[0.1] bg-[#161922]/80 text-lg leading-none text-zinc-200 transition hover:border-[#ffc107]/30 hover:bg-[#ffc107]/10 hover:text-amber-50 focus-visible:outline focus-visible:ring-2 focus-visible:ring-[#ffc107]/20'
+
+const PARTNER_BENEFITS: { icon: ReactNode; text: string }[] = [
+  { icon: <ShopIcon className="h-[1.15rem] w-[1.15rem]" />, text: 'Shfaq restorantin në platformë' },
+  { icon: <BagIcon className="h-[1.15rem] w-[1.15rem]" />, text: 'Prano porosi nga klientët' },
+  { icon: partnerIcons.card, text: 'Menaxho menunë dhe çmimet' },
+  { icon: <ClockIcon className="h-[1.15rem] w-[1.15rem]" />, text: 'Ndiq porositë në kohë reale' },
+]
+
+const PARTNER_STEPS = [
+  { n: 1, title: 'Shqyrtojmë', sub: 'Aplikimin tënd' },
+  { n: 2, title: 'Të kontaktojmë', sub: 'Për detajet' },
+  { n: 3, title: 'Hapim llogarinë', sub: 'Pas kontratës' },
+  { n: 4, title: 'Filloni', sub: 'Të pranoni porosi' },
+] as const
+
+function PartnerApplyBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+      <div className="animate-auth-hero-in absolute inset-0">
+        <img
+          src={LANDING_IMAGES.partnerApplyBg}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-[78%_center] opacity-[0.38] lg:opacity-[0.45]"
+        />
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0a0c12] via-[#0a0c12]/90 via-[48%] to-[#0a0c12]/55" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0c12]/85 via-[#0a0c12]/20 to-[#0a0c12]/60" />
+    </div>
+  )
+}
+
+function PartnerApplyShell({ children, backTo = '/' }: { children: ReactNode; backTo?: string }) {
+  return (
+    <div className="relative min-h-screen overflow-x-clip bg-[#0a0c12] text-zinc-200/95 antialiased">
+      <PartnerApplyBackground />
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-20 sm:px-8">
+        <div className="relative mb-8 flex items-center justify-center pt-6 sm:mb-10 sm:pt-8">
+          <Link
+            to={backTo}
+            className={`${backIconBtnClass} animate-site-nav absolute left-0 top-6 sm:top-8`}
+            aria-label="Kthehu te ballina"
+          >
+            ←
+          </Link>
+          <div className="animate-site-logo-wrap">
+            <BrandLogo withIcon />
+          </div>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function PartnerApplyLeftPanel({ onApplyClick }: { onApplyClick: () => void }) {
+  return (
+    <div className="relative order-2 hidden lg:block lg:order-1">
+      <p className="animate-auth-hero-caption-in text-xs font-semibold uppercase tracking-[0.14em] text-[#ffc107]">
+        Për restorante
+      </p>
+      <h1 className="animate-auth-stagger-in mt-3 text-[2.15rem] font-extrabold leading-[1.12] tracking-tight text-white xl:text-[2.45rem]" style={{ animationDelay: '0.48s' }}>
+        Rrit biznesin me{' '}
+        <span className={landingTextGold}>FoodDelivery</span>
+      </h1>
+      <p
+        className="animate-auth-stagger-in mt-4 max-w-md text-base leading-relaxed text-zinc-400"
+        style={{ animationDelay: '0.56s' }}
+      >
+        Listo restorantin, arrij klientë të rinj dhe menaxho porositë nga një panel i vetëm. Aplikimi
+        është fillim — llogaria hapet pas miratimit dhe kontratës.
+      </p>
+
+      <ul className="mt-8 space-y-4">
+        {PARTNER_BENEFITS.map(({ icon, text }, index) => (
+          <li
+            key={text}
+            className="animate-auth-stagger-in flex items-center gap-3.5"
+            style={{ animationDelay: `${0.64 + index * 0.07}s` }}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#ffc107]/25 bg-[#ffc107]/10 text-[#ffc107]">
+              {icon}
+            </span>
+            <span className="text-sm font-medium text-zinc-200">{text}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div
+        className="animate-auth-stagger-in mt-8 rounded-2xl border border-white/[0.08] bg-[#141824]/55 p-5 backdrop-blur-sm"
+        style={{ animationDelay: '0.96s' }}
+      >
+        <p className="text-sm font-semibold text-zinc-200">Çka ndodh pas aplikimit?</p>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {PARTNER_STEPS.map((step, index) => (
+            <div
+              key={step.n}
+              className="animate-auth-stagger-in text-center"
+              style={{ animationDelay: `${1.04 + index * 0.06}s` }}
+            >
+              <span className="mx-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#ffc107]/15 text-xs font-bold text-[#ffc107]">
+                {step.n}
+              </span>
+              <p className="mt-2 text-[11px] font-semibold leading-snug text-zinc-200">{step.title}</p>
+              <p className="mt-0.5 text-[10px] leading-snug text-zinc-500">{step.sub}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onApplyClick}
+        className={`${landingBtnGold} animate-auth-stagger-in mt-8 gap-2 px-6 py-3`}
+        style={{ animationDelay: '1.28s' }}
+      >
+        <span className="opacity-90">{partnerIcons.user}</span>
+        Apliko si partner
+      </button>
+      <p className="animate-auth-stagger-in mt-5 text-sm text-zinc-500" style={{ animationDelay: '1.36s' }}>
+        Ke tashmë kontratë?{' '}
+        <Link to="/partner/login" className={`font-semibold ${landingTextGold} hover:text-amber-300`}>
+          Hyr
+        </Link>
+      </p>
+    </div>
+  )
+}
 
 const businessTypes = ['Restorant', 'Kafene / bar', 'Fast food', 'Tjetër']
 const venueCounts = [
@@ -33,6 +162,7 @@ function buildOptionalMessage(businessNumber: string, message: string): string |
 }
 
 export default function PartnerApplyPage() {
+  const formRef = useRef<HTMLElement>(null)
   const [country, setCountry] = useState('Kosovë')
   const [businessType, setBusinessType] = useState(businessTypes[2])
   const [venueCountLabel, setVenueCountLabel] = useState(venueCounts[0].value)
@@ -83,20 +213,14 @@ export default function PartnerApplyPage() {
     else setError(r.message)
   }
 
+  function scrollToForm() {
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   if (done) {
     return (
-      <div className={`${customerShellBg} relative min-h-screen px-4 pb-16 pt-6 sm:px-8`}>
-        <Link
-          to="/"
-          className={`${backIconBtnClass} absolute left-4 top-5 z-10 sm:left-8 sm:top-7`}
-          aria-label="Kthehu te ballina"
-        >
-          ←
-        </Link>
-        <header className="mx-auto mb-10 flex justify-center pt-1">
-          <BrandLogo />
-        </header>
-        <section className="mx-auto max-w-lg rounded-2xl border border-white/[0.1] bg-[#222636]/80 p-8 text-center text-zinc-100 shadow-[0_20px_56px_-12px_rgba(15,18,30,0.55)] backdrop-blur-md">
+      <PartnerApplyShell>
+        <section className={`${landingGlassCard} animate-auth-panel-in mx-auto max-w-lg p-8 text-center`}>
           <h1 className="text-2xl font-bold text-zinc-100">Faleminderit!</h1>
           <p className={`${customerPanelSubtitle} mx-auto max-w-md`}>
             Aplikimi u regjistrua. Ekipi ynë do të shqyrtojë të dhënat dhe do t’ju kontaktojë për hapat e
@@ -104,49 +228,31 @@ export default function PartnerApplyPage() {
             derisa të finalizohet procesi.
           </p>
         </section>
-      </div>
+      </PartnerApplyShell>
     )
   }
 
   return (
-    <div className={`${customerShellBg} relative min-h-screen px-4 pb-20 pt-6 sm:px-8`}>
-      <Link
-        to="/"
-        className={`${backIconBtnClass} absolute left-4 top-5 z-10 sm:left-8 sm:top-7`}
-        aria-label="Kthehu te ballina"
-      >
-        ←
-      </Link>
-      <header className="mx-auto mb-8 flex justify-center pt-1">
-        <BrandLogo />
-      </header>
+    <PartnerApplyShell>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start lg:gap-12">
+        <PartnerApplyLeftPanel onApplyClick={scrollToForm} />
 
-      <div className="mx-auto grid max-w-5xl gap-10 lg:grid-cols-[1fr_minmax(0,26rem)] lg:items-start">
-        <div className="hidden lg:block">
-          <p className="text-sm font-semibold uppercase tracking-wider text-amber-400/90">
-            Për biznese të çdo madhësie
-          </p>
-          <h1 className="mt-2 text-4xl font-extrabold leading-tight text-zinc-50">
-            Rritemi bashkë
+        <section
+          id="partner-apply-form"
+          ref={formRef}
+          className="animate-auth-panel-in-delayed order-1 mx-auto w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#1c2030]/90 p-5 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.55)] backdrop-blur-md sm:p-7 lg:order-2 lg:mx-0"
+        >
+          <h1 className="animate-auth-stagger-in text-xl font-bold text-zinc-100 lg:hidden" style={{ animationDelay: '0.35s' }}>
+            Bëhu partner
           </h1>
-          <p className="mt-4 max-w-md text-lg leading-relaxed text-zinc-400">
-            Listo restorantin te FoodDelivery dhe arrij klientë të rinj. Kjo është aplikim fillimor —
-            pa llogari ende. Pas miratimit, të ndihmojmë me onboarding dhe menunë.
-          </p>
-          <p className="mt-6 text-sm">
-            <Link
-              to="/partner/login"
-              className="font-semibold text-amber-400/95 underline-offset-4 hover:text-amber-300 hover:underline"
-            >
-              Ke tashmë kontratë? Hyr
-            </Link>
-          </p>
-        </div>
-
-        <section className="mx-auto w-full max-w-lg rounded-2xl border border-white/[0.08] bg-[#1c2030]/90 p-5 shadow-[0_24px_64px_-16px_rgba(0,0,0,0.55)] sm:p-7 lg:mx-0">
-          <h1 className="text-xl font-bold text-zinc-100 lg:hidden">Bëhu partner</h1>
-          <p className={`${customerPanelSubtitle} lg:hidden`}>
+          <p className={`${customerPanelSubtitle} animate-auth-stagger-in lg:hidden`} style={{ animationDelay: '0.42s' }}>
             Plotëso formularin. Nuk krijohet llogari derisa të kontaktojmë dhe të finalizohet marrëveshja.
+          </p>
+          <p className="mb-4 text-sm text-zinc-500 lg:hidden">
+            Ke tashmë kontratë?{' '}
+            <Link to="/partner/login" className={`font-semibold ${landingTextGold} hover:text-amber-300`}>
+              Hyr
+            </Link>
           </p>
           <p className={`${customerPanelSubtitle} mb-6 hidden lg:block`}>
             Të dhënat shkojnë te ekipi ynë. Logimi në app për stafin krijohet vetëm pas hapave të
@@ -312,6 +418,6 @@ export default function PartnerApplyPage() {
           </form>
         </section>
       </div>
-    </div>
+    </PartnerApplyShell>
   )
 }

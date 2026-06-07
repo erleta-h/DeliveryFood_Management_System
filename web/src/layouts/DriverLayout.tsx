@@ -101,16 +101,17 @@ export default function DriverLayout() {
       if (!m || m.senderRole === 'driver') return
       useDriverAlertsStore.getState().incrementChatUnread()
     })
-    let stopped = false
+    let cancelled = false
     ;(async () => {
       try {
         await startOrdersHub(conn, [{ kind: 'driver' }])
       } catch (err) {
         console.warn('[DriverHub] SignalR nuk u lidh.', err)
       }
+      if (cancelled) return
     })()
     return () => {
-      stopped = true
+      cancelled = true
       void conn.stop()
     }
   }, [token])
@@ -163,22 +164,36 @@ export default function DriverLayout() {
           </div>
         </div>
 
-        {/* Notification bell */}
-        <NavLink
-          to="/driver/notifications"
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-zinc-300 active:bg-white/10"
-          aria-label="Njoftime"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          {bellUnread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-              {bellUnread > 9 ? '9+' : bellUnread}
-            </span>
-          )}
-        </NavLink>
+        {/* Njoftime & mbështetje */}
+        <div className="flex items-center gap-2">
+          <NavLink
+            to="/driver/support"
+            className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-zinc-300 active:bg-white/10"
+            aria-label="Mbështetja"
+            title="Mbështetja"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </NavLink>
+          <NavLink
+            to="/driver/notifications"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-zinc-300 active:bg-white/10"
+            aria-label="Njoftime"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            {bellUnread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                {bellUnread > 9 ? '9+' : bellUnread}
+              </span>
+            )}
+          </NavLink>
+        </div>
       </header>
 
       {/* GPS hint banner */}
@@ -234,6 +249,13 @@ export default function DriverLayout() {
                 className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
               >
                 Histori
+              </Link>
+              <Link
+                to="/driver/stats"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/5"
+              >
+                Statistikat
               </Link>
               <Link
                 to="/driver/profile"
