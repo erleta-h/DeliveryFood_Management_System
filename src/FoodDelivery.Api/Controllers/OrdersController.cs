@@ -84,4 +84,23 @@ public class OrdersController : ControllerBase
         var ok = await _orders.HideOrderFromCustomerHistoryAsync(userId.Value, id, cancellationToken);
         return ok ? NoContent() : NotFound();
     }
+
+    /// <summary>Klienti lë vlerësim pas porosisë së dorëzuar (restorant ose deliver).</summary>
+    [HttpPost("my/{id:long}/reviews")]
+    [ProducesResponseType(typeof(SubmitOrderReviewResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<SubmitOrderReviewResponse>> SubmitReview(
+        long id,
+        [FromBody] SubmitOrderReviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var (response, error) = await _orders.SubmitOrderReviewAsync(userId.Value, id, request, cancellationToken);
+        if (response is null)
+            return BadRequest(new { message = error });
+
+        return Created($"/api/orders/my/{id}", response);
+    }
 }

@@ -32,8 +32,7 @@ public static class DbSeeder
         {
             await SeedMenusForRestaurantsWithoutMenuAsync(db, logger, cancellationToken);
             await EnsureKitchenStaffUserAsync(db, passwordHasher, logger, cancellationToken, null);
-            await RestaurantReviewsSeeder.EnsureSampleReviewsAsync(db, passwordHasher, logger, cancellationToken);
-            logger.LogInformation("DbSeeder: restorantet ekzistojnë — menu/stafi/vlerësime u verifikuan.");
+            logger.LogInformation("DbSeeder: restorantet ekzistojnë — menu/stafi u verifikuan.");
             return;
         }
 
@@ -80,8 +79,6 @@ public static class DbSeeder
             logger,
             cancellationToken,
             restaurants[0].Id);
-
-        await RestaurantReviewsSeeder.EnsureSampleReviewsAsync(db, passwordHasher, logger, cancellationToken);
 
         logger.LogInformation(
             "DbSeeder: u shtuan kategoritë, {ResCount} restorante, menu dhe artikuj.",

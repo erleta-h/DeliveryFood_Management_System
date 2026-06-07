@@ -12,6 +12,9 @@ public class Review
     public int Rating { get; set; }
     public long? RestaurantId { get; set; }
     public int Subject { get; set; }
+    /// <summary>0=Publik, 1=Fshehur, 2=Raportuar.</summary>
+    public int Status { get; set; }
+    public int ReportCount { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public long? UpdatedById { get; set; }
 

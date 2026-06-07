@@ -1,3 +1,4 @@
+using FoodDelivery.Application.Admin;
 using FoodDelivery.Application.Delivery;
 using FoodDelivery.Application.Persistence;
 using FoodDelivery.Application.Restaurants;
@@ -332,7 +333,10 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
 
         var rows = await _uow.Repository<Review, long>().Query
             .AsNoTracking()
-            .Where(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject)
+            .Where(r =>
+                r.RestaurantId == restaurantId &&
+                r.Subject == restaurantSubject &&
+                r.Status == ReviewModerationStatus.Public)
             .OrderByDescending(r => r.CreatedAt)
             .Take(limit)
             .Select(r => new
@@ -358,13 +362,20 @@ public sealed class RestaurantCatalogService : IRestaurantCatalogService
 
         var total = await _uow.Repository<Review, long>().Query
             .AsNoTracking()
-            .CountAsync(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject, cancellationToken)
+            .CountAsync(r =>
+                r.RestaurantId == restaurantId &&
+                r.Subject == restaurantSubject &&
+                r.Status == ReviewModerationStatus.Public,
+                cancellationToken)
             .ConfigureAwait(false);
 
         var avg = total > 0
             ? await _uow.Repository<Review, long>().Query
                 .AsNoTracking()
-                .Where(r => r.RestaurantId == restaurantId && r.Subject == restaurantSubject)
+                .Where(r =>
+                    r.RestaurantId == restaurantId &&
+                    r.Subject == restaurantSubject &&
+                    r.Status == ReviewModerationStatus.Public)
                 .AverageAsync(r => (double)r.Rating, cancellationToken)
                 .ConfigureAwait(false)
             : 0;
