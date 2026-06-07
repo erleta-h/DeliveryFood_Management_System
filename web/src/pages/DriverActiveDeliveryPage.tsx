@@ -415,7 +415,7 @@ export default function DriverActiveDeliveryPage() {
       if (!d) {
         setDetail((prev) => {
           if (prev) return prev
-          setError('Porosia nuk u gjet.')
+          setError('Kjo porosi është përfunduar ose nuk është më aktive.')
           return null
         })
         return
@@ -475,7 +475,16 @@ export default function DriverActiveDeliveryPage() {
     return (
       <div className="flex min-h-screen flex-col bg-[#0a0e17] p-4">
         <BackHeader title="Dërgesa" onBack={goBack} />
-        <p className="mt-4 text-sm text-red-300">{error}</p>
+        <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
+          <p className="max-w-sm text-sm leading-relaxed text-zinc-300">{error}</p>
+          <button
+            type="button"
+            onClick={goBack}
+            className="mt-6 flex min-h-[48px] w-full max-w-xs items-center justify-center rounded-xl bg-emerald-600 text-sm font-semibold text-white transition hover:bg-emerald-500"
+          >
+            Kthehu te paneli
+          </button>
+        </div>
       </div>
     )
   }

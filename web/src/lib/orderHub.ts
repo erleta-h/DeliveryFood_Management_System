@@ -1,10 +1,15 @@
 import * as signalR from '@microsoft/signalr'
 import { apiPath } from './apiBase'
 
-/** StrictMode cleanup ndalon negotiation — mos e loguar si gabim real. */
-function isHubNegotiationAbortLog(message: string): boolean {
+/** StrictMode / navigim i shpejtë — ndalon start-in para se të mbarojë; jo gabim real. */
+function isHubBenignAbortMessage(message: string): boolean {
   const m = message.toLowerCase()
-  return m.includes('stopped during negotiation') || m.includes('connection was stopped')
+  return (
+    m.includes('stopped during negotiation') ||
+    m.includes('connection was stopped') ||
+    m.includes('before stop() was called') ||
+    m.includes('failed to start the httpconnection')
+  )
 }
 
 /** Event-e që serveri dërgon — noop paraprakisht që mos të dalin warning-e kur faqja dëgjon vetëm një pjesë. */
@@ -28,7 +33,7 @@ function isUnhandledHubMethodLog(message: string): boolean {
 
 const hubLogger: signalR.ILogger = {
   log(logLevel, message) {
-    if (isHubNegotiationAbortLog(message)) return
+    if (isHubBenignAbortMessage(message)) return
     if (isUnhandledHubMethodLog(message)) return
     if (logLevel >= signalR.LogLevel.Error) console.error(message)
     else if (logLevel >= signalR.LogLevel.Warning) console.warn(message)
@@ -140,9 +145,9 @@ export async function startOrdersHub(
   }
 }
 
-/** Mos loguar gabime kur cleanup (StrictMode / unmount) ndalon start-in gjatë negotiation. */
+/** Mos loguar gabime kur cleanup (StrictMode / unmount) ndalon start-in. */
 export function isHubStartAbortError(err: unknown): boolean {
   if (!(err instanceof Error)) return false
-  const msg = err.message.toLowerCase()
-  return err.name === 'AbortError' || msg.includes('stopped during negotiation') || msg.includes('connection was stopped')
+  if (err.name === 'AbortError') return true
+  return isHubBenignAbortMessage(err.message)
 }
