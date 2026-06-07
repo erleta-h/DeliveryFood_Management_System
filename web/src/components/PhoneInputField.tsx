@@ -10,7 +10,7 @@ import {
 } from '../lib/phoneInput'
 import { customerLabelForm, customerLabelSm } from '../lib/customerTheme'
 
-type Variant = 'customer' | 'partner' | 'driver'
+type Variant = 'customer' | 'partner' | 'driver' | 'landing'
 
 type Props = {
   id?: string
@@ -21,6 +21,7 @@ type Props = {
   disabled?: boolean
   hint?: string
   example?: string
+  hideExample?: boolean
   variant?: Variant
   className?: string
 }
@@ -40,6 +41,12 @@ function FlagImg({ country }: { country: string }) {
 }
 
 function shellClass(variant: Variant) {
+  if (variant === 'landing') {
+    return (
+      'flex h-11 min-h-[44px] items-stretch overflow-visible rounded-xl border border-white/[0.08] bg-[#161922]/80 transition ' +
+      'focus-within:border-[#ffc107]/25 focus-within:ring-1 focus-within:ring-[#ffc107]/10'
+    )
+  }
   const focus =
     variant === 'partner'
       ? 'focus-within:border-amber-400/45 focus-within:ring-amber-400/15'
@@ -57,6 +64,7 @@ const nationalInputBase =
   'min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-0'
 
 function labelClass(variant: Variant) {
+  if (variant === 'landing') return 'text-sm font-medium text-zinc-300'
   return variant === 'customer' ? customerLabelSm : customerLabelForm
 }
 
@@ -69,6 +77,7 @@ export function PhoneInputField({
   disabled,
   hint,
   example = PHONE_EXAMPLE_NATIONAL,
+  hideExample = false,
   variant = 'customer',
   className,
 }: Props) {
@@ -96,7 +105,7 @@ export function PhoneInputField({
         {label}
       </label>
 
-      <div className={`${shellClass(variant)} mt-1.5 ${disabled ? 'opacity-55' : ''}`}>
+      <div className={`${shellClass(variant)} mt-1 ${disabled ? 'opacity-55' : ''}`}>
         <DialPicker
           id={`${id}-dial`}
           selected={selectedOpt}
@@ -116,24 +125,26 @@ export function PhoneInputField({
           onChange={(e) => onNationalChange(e.target.value)}
           placeholder={example}
           className={nationalInputBase}
-          aria-describedby={hint || example ? `${id}-help` : undefined}
+          aria-describedby={!hideExample && (hint || example) ? `${id}-help` : undefined}
         />
       </div>
 
-      <p id={`${id}-help`} className="mt-1.5 text-xs text-zinc-500">
-        {hint ? (
-          <>
-            {hint}
-            <span className="mt-1 block text-zinc-600">
-              Shembull: <span className="font-medium text-zinc-500">{example}</span>
-            </span>
-          </>
-        ) : (
-          <>
-            Shembull: <span className="font-medium text-zinc-400">{example}</span>
-          </>
-        )}
-      </p>
+      {!hideExample ? (
+        <p id={`${id}-help`} className="mt-1.5 text-xs text-zinc-500">
+          {hint ? (
+            <>
+              {hint}
+              <span className="mt-1 block text-zinc-600">
+                Shembull: <span className="font-medium text-zinc-500">{example}</span>
+              </span>
+            </>
+          ) : (
+            <>
+              Shembull: <span className="font-medium text-zinc-400">{example}</span>
+            </>
+          )}
+        </p>
+      ) : null}
     </div>
   )
 }
