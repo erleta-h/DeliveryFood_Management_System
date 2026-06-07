@@ -22,7 +22,6 @@ import {
   customerPanelSubtitle,
 } from '../lib/adminTheme'
 import {
-  DRIVER_APP_APPROVED_WAITING,
   DRIVER_APP_PENDING,
   driverApplicationStatusBadgeClass,
   driverApplicationStatusLabel,
@@ -269,7 +268,9 @@ export default function AdminDriverApplicationsPage() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       {loading ? <AdminTableSkeleton rows={5} /> : null}
-      {!loading && rows.length === 0 ? <AdminEmptyState title="Nuk ka aplikime" subtitle="Ndrysho filtrat ose prit aplikime të reja." /> : null}
+      {!loading && rows.length === 0 ? (
+        <AdminEmptyState icon="📋" title="Nuk ka aplikime" description="Ndrysho filtrat ose prit aplikime të reja." />
+      ) : null}
 
       {!loading && rows.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">

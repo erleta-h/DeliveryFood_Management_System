@@ -773,6 +773,7 @@ export type AdminCouponRow = {
   code: string
   discountPercent: number
   maxDiscountAmount: number | null
+  minOrderAmount: number | null
   maxUses: number | null
   usesCount: number
   isActive: boolean
@@ -805,6 +806,54 @@ export async function fetchAdminCouponDetail(token: string, id: number): Promise
   return res.json() as Promise<AdminCouponDetail>
 }
 
+export type AdminCouponUseRow = {
+  orderId: number
+  orderNumber: string
+  placedAtUtc: string
+  discountAmount: number
+  orderTotal: number
+  customerEmail: string
+}
+
+export type AdminCouponUsesResult = {
+  items: AdminCouponUseRow[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export async function fetchAdminCouponUses(
+  token: string,
+  id: number,
+  page = 1,
+  pageSize = 20,
+): Promise<AdminCouponUsesResult> {
+  const p = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+  const res = await fetch(apiPath(`/api/admin/coupons/${id}/uses?${p}`), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminCouponUsesResult>
+}
+
+export type AdminCouponHistoryRow = {
+  eventType: string
+  detail: string | null
+  createdAtUtc: string
+  actorName: string | null
+}
+
+export type AdminCouponHistoryResult = {
+  items: AdminCouponHistoryRow[]
+}
+
+export async function fetchAdminCouponHistory(
+  token: string,
+  id: number,
+): Promise<AdminCouponHistoryResult> {
+  const res = await fetch(apiPath(`/api/admin/coupons/${id}/history`), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminCouponHistoryResult>
+}
+
 export async function fetchAdminCoupons(
   token: string,
   q: {
@@ -832,6 +881,7 @@ export async function adminCreateCoupon(
     code: string
     discountPercent: number
     maxDiscountAmount?: number | null
+    minOrderAmount?: number | null
     maxUses?: number | null
     validFrom?: string | null
     validTo?: string | null
@@ -847,6 +897,28 @@ export async function adminCreateCoupon(
     const j = (await res.json()) as { id: number }
     return { ok: true, id: j.id }
   }
+  return { ok: false, message: await readApiMessage(res) }
+}
+
+export async function adminUpdateCoupon(
+  token: string,
+  id: number,
+  body: {
+    discountPercent: number
+    maxDiscountAmount?: number | null
+    minOrderAmount?: number | null
+    maxUses?: number | null
+    validFrom?: string | null
+    validTo?: string | null
+    isActive: boolean
+  },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/coupons/${id}`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 204) return { ok: true }
   return { ok: false, message: await readApiMessage(res) }
 }
 

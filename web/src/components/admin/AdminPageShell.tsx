@@ -14,24 +14,24 @@ type Props = {
 
 export function AdminPageShell({ title, intro, titleBadge, actions, filters, children, fill }: Props) {
   return (
-    <div className={fill ? 'flex min-h-0 flex-1 flex-col gap-4' : 'space-y-4'}>
+    <div className={fill ? 'flex min-h-0 flex-1 flex-col gap-3' : 'space-y-4'}>
       <div className="shrink-0 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-4 sm:px-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="border-b border-gray-100 px-4 py-3 sm:px-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
                 {titleBadge}
-                <h1 className="text-xl font-semibold tracking-tight text-gray-900 sm:text-2xl">{title}</h1>
+                <h1 className="text-lg font-semibold tracking-tight text-gray-900 sm:text-xl">{title}</h1>
               </div>
               {intro ? (
-                <div className="mt-1.5 max-w-3xl text-sm leading-relaxed text-gray-500">{intro}</div>
+                <div className="mt-1 max-w-3xl text-sm leading-snug text-gray-500">{intro}</div>
               ) : null}
             </div>
-            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+            {actions ? <div className="flex shrink-0 flex-wrap items-center gap-1.5">{actions}</div> : null}
           </div>
         </div>
         {filters ? (
-          <div className="bg-gray-50/60 px-4 py-3.5 sm:px-6">{filters}</div>
+          <div className="bg-gray-50/60 px-4 py-2.5 sm:px-5">{filters}</div>
         ) : null}
       </div>
 

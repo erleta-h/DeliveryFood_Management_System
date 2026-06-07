@@ -1,9 +1,13 @@
 /**
- * Tema e çelët vetëm për /admin — sfond i bardhë / gri i lehtë, karta të bardha.
+ * Tema admin — sidebar i errët; zona e përmbajtjes e çelët me karta të bardha.
  * Emrat e eksporteve përputhen me customerTheme që faqet admin të importojnë këtu.
  */
 
-export const customerShellBg = 'h-[100dvh] overflow-hidden bg-[#f3f4f6] text-gray-900 antialiased font-sans'
+export const customerShellBg =
+  'h-[100dvh] overflow-hidden antialiased font-sans text-gray-900 bg-gray-50'
+
+/** Sfondi i zonës kryesore (djathtas) — i çelët, i ndarë nga sidebar-i */
+export const adminMainBg = 'bg-gray-50'
 
 /** Karta e përmbajtjes së faqes admin */
 export const adminContentCard =

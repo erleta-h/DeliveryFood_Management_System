@@ -330,8 +330,9 @@ export default function AdminPromotionsPage() {
 
       {createOpen ? (
         <CouponCreateModal
+          mode="create"
           onClose={() => setCreateOpen(false)}
-          onCreated={refreshAll}
+          onSaved={refreshAll}
           onMessage={setMsg}
         />
       ) : null}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
 import { AdminIcon } from '../components/admin/adminIcons'
 import { AdminTopBar } from '../components/admin/AdminTopBar'
@@ -7,7 +7,7 @@ import { AdminTopBar } from '../components/admin/AdminTopBar'
 import { getVisibleAdminNavGroups } from '../lib/adminNav'
 import { createOrdersHubConnection, startOrdersHub } from '../lib/orderHub'
 
-import { customerShellBg } from '../lib/adminTheme'
+import { adminMainBg, customerShellBg } from '../lib/adminTheme'
 
 import { useAuthStore } from '../store/authStore'
 import {
@@ -26,8 +26,6 @@ function navClass(isActive: boolean) {
 }
 
 export default function AdminLayout() {
-  const logout = useAuthStore((s) => s.logout)
-  const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
   const navigate = useNavigate()
   const navGroups = getVisibleAdminNavGroups(token)
@@ -99,36 +97,20 @@ export default function AdminLayout() {
     return () => clearTimeout(t)
   }, [adminToast, clearToast])
 
-  function handleLogout() {
-    logout()
-    setSidebarOpen(false)
-    navigate('/login?next=admin', { replace: true })
-  }
-
-  const initials =
-    `${user?.firstName?.trim()?.[0] ?? ''}${user?.lastName?.trim()?.[0] ?? ''}`.toUpperCase() ||
-    (user?.email?.[0] ?? 'A').toUpperCase()
-
   return (
     <div className={`${customerShellBg} flex`}>
-      <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between gap-3 border-b border-gray-800 bg-[#0f1419] px-4 py-3 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:hidden">
         <button
           type="button"
-          className="rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200"
+          className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700"
           onClick={() => setSidebarOpen((o) => !o)}
           aria-expanded={sidebarOpen}
           aria-controls="admin-sidebar"
         >
           Menu
         </button>
-        <span className="text-sm font-medium text-gray-200">Platform Admin</span>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-lg border border-red-500/40 bg-red-500/10 px-2 py-2 text-xs font-medium text-red-300"
-        >
-          Dil
-        </button>
+        <span className="text-sm font-medium text-gray-900">Platform Admin</span>
+        <span className="w-[52px]" aria-hidden />
       </header>
 
       <aside
@@ -149,12 +131,6 @@ export default function AdminLayout() {
                 <p className="text-[11px] text-gray-500">Paneli i kontrollit</p>
               </div>
             </div>
-            <Link
-              to="/"
-              className="mt-4 inline-flex items-center gap-1 text-xs text-gray-500 transition hover:text-violet-300"
-            >
-              ← Ballina publike
-            </Link>
           </div>
 
           <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4" aria-label="Admin">
@@ -200,34 +176,6 @@ export default function AdminLayout() {
               </div>
             ))}
           </nav>
-
-          <div className="shrink-0 border-t border-gray-800/80 p-3">
-            <div className="mb-3 flex items-center gap-3 rounded-xl bg-white/[0.04] px-3 py-2.5 ring-1 ring-white/5">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-sm font-semibold text-white">
-                {initials}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-100">
-                  {user?.firstName} {user?.lastName}
-                </p>
-                <p className="truncate text-[11px] text-gray-500">{user?.email}</p>
-              </div>
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500"
-                title="Tema e çelët"
-              >
-                <AdminIcon name="sun" size={18} />
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2.5 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
-            >
-              <span aria-hidden>⎋</span>
-              Dil nga platforma
-            </button>
-          </div>
         </div>
       </aside>
 
@@ -240,9 +188,9 @@ export default function AdminLayout() {
         />
       ) : null}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col pt-14 lg:pt-0">
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col pt-14 lg:pt-0 ${adminMainBg}`}>
         <AdminTopBar />
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 lg:px-8 lg:py-6">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-gray-50 px-4 py-4 lg:px-6 lg:py-5">
           <div className="mx-auto flex min-h-full max-w-[1600px] flex-col">
             <Outlet key={location.pathname} />
           </div>

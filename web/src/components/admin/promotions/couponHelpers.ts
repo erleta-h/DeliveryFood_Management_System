@@ -1,4 +1,4 @@
-import type { AdminCouponRow } from '../../lib/adminApi'
+import type { AdminCouponRow } from '../../../lib/adminApi'
 
 export type CouponDisplayStatus = 'active' | 'inactive' | 'expired' | 'scheduled' | 'exhausted'
 
@@ -50,6 +50,21 @@ export function toDateTimeLocalValue(iso: string | null | undefined): string {
   if (Number.isNaN(d.getTime())) return ''
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+export function historyEventLabel(eventType: string): string {
+  switch (eventType) {
+    case 'created':
+      return 'Krijim'
+    case 'updated':
+      return 'Ndryshim'
+    case 'activated':
+      return 'Aktivizim'
+    case 'deactivated':
+      return 'Çaktivizim'
+    default:
+      return eventType
+  }
 }
 
 export function dateTimeLocalToIso(value: string): string | null {

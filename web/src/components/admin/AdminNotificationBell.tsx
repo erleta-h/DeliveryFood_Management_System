@@ -121,13 +121,13 @@ export function AdminNotificationBell() {
           setOpen((o) => !o)
           if (!open) void loadList()
         }}
-        className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-lg transition hover:border-violet-300 hover:bg-violet-50"
+        className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-sm transition hover:border-violet-300 hover:bg-violet-50"
         title="Njoftimet"
         aria-expanded={open}
       >
         <span aria-hidden>🔔</span>
         {unread > 0 ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[9px] font-bold leading-none text-white">
             {unread > 9 ? '9+' : unread}
           </span>
         ) : null}

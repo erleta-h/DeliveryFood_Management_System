@@ -14,9 +14,28 @@ public interface IAdminCouponsService
 
     Task<AdminCouponDetailDto?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
 
-    Task<(bool ok, long? id, string? error)> CreateAsync(
-        AdminCouponCreateRequest request,
+    Task<AdminCouponUsesResultDto?> ListUsesAsync(
+        long id,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken = default);
 
-    Task<string?> SetActiveAsync(long id, bool isActive, CancellationToken cancellationToken = default);
+    Task<AdminCouponHistoryResultDto?> ListHistoryAsync(long id, CancellationToken cancellationToken = default);
+
+    Task<(bool ok, long? id, string? error)> CreateAsync(
+        AdminCouponCreateRequest request,
+        long? adminUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> UpdateAsync(
+        long id,
+        AdminCouponUpdateRequest request,
+        long? adminUserId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<string?> SetActiveAsync(
+        long id,
+        bool isActive,
+        long? adminUserId = null,
+        CancellationToken cancellationToken = default);
 }
