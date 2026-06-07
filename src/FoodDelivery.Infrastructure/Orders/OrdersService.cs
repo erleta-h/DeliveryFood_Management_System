@@ -1,4 +1,5 @@
-﻿using FoodDelivery.Application.Coupons;
+﻿using FoodDelivery.Application.Admin;
+using FoodDelivery.Application.Coupons;
 using FoodDelivery.Application.Delivery;
 using FoodDelivery.Application.Notifications;
 using FoodDelivery.Application.Orders;
@@ -255,6 +256,7 @@ public sealed class OrdersService : IOrdersService
             .Include(o => o.Delivery)
                 .ThenInclude(d => d!.Driver)
                     .ThenInclude(u => u.DriverProfile)
+            .Include(o => o.Reviews)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
 
         if (order is null)
@@ -298,6 +300,8 @@ public sealed class OrdersService : IOrdersService
                 .FirstOrDefaultAsync(cancellationToken);
         }
 
+        var reviewSlots = BuildReviewSlots(order, delivery, driverDto);
+
         return new CustomerOrderDetailDto(
             order.Id,
             order.OrderNumber,
@@ -327,7 +331,137 @@ public sealed class OrdersService : IOrdersService
             delivery?.Status,
             pendingStripePayment,
             driverDto,
-            cancellationReason);
+            cancellationReason,
+            reviewSlots);
+    }
+
+    public async Task<(SubmitOrderReviewResponse? Response, string? Error)> SubmitOrderReviewAsync(
+        long userId,
+        long orderId,
+        SubmitOrderReviewRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.Rating is < 1 or > 5)
+            return (null, "Zgjidhni nga 1 deri 5 yje.");
+
+        var comment = string.IsNullOrWhiteSpace(request.Comment) ? null : request.Comment.Trim();
+        if (comment is { Length: > 2000 })
+            return (null, "Komenti është shumë i gjatë (max 2000 karaktere).");
+
+        if (request.Subject is not (ReviewSubjectKind.Restaurant or ReviewSubjectKind.Driver))
+            return (null, "Subjekti i vlerësimit nuk është i vlefshëm.");
+
+        var order = await _uow.Repository<Order, long>().Query
+            .Include(o => o.Restaurant)
+            .Include(o => o.Delivery)
+            .Include(o => o.Reviews)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId, cancellationToken);
+
+        if (order is null)
+            return (null, "Porosia nuk u gjet.");
+
+        if (order.Status != OrderStatus.Delivered)
+            return (null, "Vlerësimi hapet vetëm pas dorëzimit të porosisë.");
+
+        if (order.Reviews.Any(r => r.Subject == request.Subject))
+            return (null, "E keni vlerësuar këtë pjesë të porosisë tashmë.");
+
+        if (request.Subject == ReviewSubjectKind.Driver)
+        {
+            if (order.FulfillmentType != OrderFulfillmentType.Delivery)
+                return (null, "Porositë me marrje në restorant nuk vlerësojnë deliverin.");
+
+            if (order.Delivery is null || order.Delivery.AcceptedAtUtc is null)
+                return (null, "Nuk ka deliver për këtë porosi.");
+        }
+
+        var now = DateTime.UtcNow;
+        var review = new Review
+        {
+            AuthorUserId = userId,
+            OrderId = order.Id,
+            RestaurantId = order.RestaurantId,
+            DriverUserId = request.Subject == ReviewSubjectKind.Driver ? order.Delivery!.DriverUserId : null,
+            Subject = request.Subject,
+            Rating = request.Rating,
+            Comment = comment,
+            Status = ReviewModerationStatus.Public,
+            ReportCount = 0,
+            CreatedAt = now,
+            CreatedById = userId,
+        };
+
+        _uow.Repository<Review, long>().Add(review);
+
+        if (request.Subject == ReviewSubjectKind.Restaurant)
+            await RefreshRestaurantReviewStatsAsync(order.RestaurantId, cancellationToken);
+
+        await _uow.SaveChangesAsync(cancellationToken);
+
+        return (new SubmitOrderReviewResponse(review.Id), null);
+    }
+
+    private static IReadOnlyList<CustomerOrderReviewSlotDto> BuildReviewSlots(
+        Order order,
+        Delivery? delivery,
+        CustomerOrderDriverDto? driverDto)
+    {
+        var delivered = order.Status == OrderStatus.Delivered;
+        var restaurantReview = order.Reviews.FirstOrDefault(r => r.Subject == ReviewSubjectKind.Restaurant);
+        var slots = new List<CustomerOrderReviewSlotDto>
+        {
+            new(
+                ReviewSubjectKind.Restaurant,
+                order.Restaurant.Name,
+                "Si ishte ushqimi dhe shërbimi i restorantit?",
+                delivered && restaurantReview is null,
+                restaurantReview is not null,
+                restaurantReview?.Rating,
+                restaurantReview?.Comment),
+        };
+
+        if (order.FulfillmentType == OrderFulfillmentType.Delivery
+            && delivery?.AcceptedAtUtc != null)
+        {
+            var driverReview = order.Reviews.FirstOrDefault(r => r.Subject == ReviewSubjectKind.Driver);
+            var driverName = driverDto?.DisplayName?.Trim();
+            if (string.IsNullOrEmpty(driverName))
+                driverName = "Deliveri";
+
+            slots.Add(new CustomerOrderReviewSlotDto(
+                ReviewSubjectKind.Driver,
+                driverName,
+                "Si ishte dërgesa dhe komunikimi?",
+                delivered && driverReview is null,
+                driverReview is not null,
+                driverReview?.Rating,
+                driverReview?.Comment));
+        }
+
+        return slots;
+    }
+
+    private async Task RefreshRestaurantReviewStatsAsync(long restaurantId, CancellationToken cancellationToken)
+    {
+        var q = _uow.Repository<Review, long>().Query
+            .Where(r =>
+                r.RestaurantId == restaurantId &&
+                r.Subject == ReviewSubjectKind.Restaurant &&
+                r.Status == ReviewModerationStatus.Public);
+
+        var count = await q.CountAsync(cancellationToken);
+        var avg = count > 0
+            ? (decimal)await q.AverageAsync(r => (double)r.Rating, cancellationToken)
+            : 0m;
+
+        var restaurant = await _uow.Repository<Restaurant, long>().Query
+            .FirstOrDefaultAsync(r => r.Id == restaurantId, cancellationToken);
+
+        if (restaurant is null)
+            return;
+
+        restaurant.ReviewCount = count;
+        restaurant.AverageRating = count > 0 ? Math.Round(avg, 1) : 0m;
     }
 
     public async Task<(bool Ok, string? Error)> CancelUnpaidStripeOrderAsync(

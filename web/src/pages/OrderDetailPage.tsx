@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { OrderPaymentResultBanner } from '../components/OrderPaymentResultBanner'
 import { OrderDeliveryChatPanel } from '../components/OrderDeliveryChatPanel'
+import { OrderReviewPanel } from '../components/OrderReviewPanel'
 import { OrderTrackingMapLeaflet } from '../components/OrderTrackingMapLeaflet'
 import { normalizeDeliveryChatMessage } from '../lib/deliveryChatApi'
 import { estimateDriveEtaMinutes } from '../lib/geoEta'
@@ -156,6 +157,13 @@ export default function OrderDetailPage() {
   function dismissPay() {
     setPayDismissed(true)
     if (payQ) { const n = new URLSearchParams(searchParams); n.delete('payment'); setSearchParams(n, { replace: true }) }
+  }
+
+  function reloadOrder() {
+    if (!token || !Number.isFinite(orderId)) return
+    void fetchMyOrder(token, orderId).then((o) => {
+      if (o) setOrder(o)
+    })
   }
 
   /* data */
@@ -449,6 +457,15 @@ export default function OrderDetailPage() {
           </button>
         </div>
       </div>
+
+      {token && order.status === ORDER_STATUS_DELIVERED ? (
+        <OrderReviewPanel
+          orderId={order.id}
+          token={token}
+          slots={order.reviewSlots ?? []}
+          onSubmitted={reloadOrder}
+        />
+      ) : null}
 
       {/* ═══ Order details (expandable) ═══ */}
       {showDetails && (

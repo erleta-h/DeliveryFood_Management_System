@@ -31,4 +31,10 @@ public interface IOrdersService
         long userId,
         long orderId,
         CancellationToken cancellationToken = default);
+
+    Task<(SubmitOrderReviewResponse? Response, string? Error)> SubmitOrderReviewAsync(
+        long userId,
+        long orderId,
+        SubmitOrderReviewRequest request,
+        CancellationToken cancellationToken = default);
 }

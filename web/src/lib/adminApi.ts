@@ -938,6 +938,13 @@ export async function adminSetCouponActive(
 
 // --- Vlerësime ---
 
+export const REVIEW_STATUS_PUBLIC = 0
+export const REVIEW_STATUS_HIDDEN = 1
+export const REVIEW_STATUS_REPORTED = 2
+
+export const REVIEW_SUBJECT_RESTAURANT = 0
+export const REVIEW_SUBJECT_DRIVER = 1
+
 export type AdminReviewRow = {
   id: number
   orderId: number
@@ -948,6 +955,10 @@ export type AdminReviewRow = {
   createdAt: string
   authorEmail: string
   restaurantName: string | null
+  restaurantCity: string | null
+  driverDisplayName: string | null
+  status: number
+  reportCount: number
 }
 
 export type AdminReviewListResult = {
@@ -957,16 +968,73 @@ export type AdminReviewListResult = {
   pageSize: number
 }
 
-export async function fetchAdminReviews(
-  token: string,
-  q: { page?: number; pageSize?: number },
-): Promise<AdminReviewListResult> {
+export type AdminReviewStats = {
+  total: number
+  averageRating: number
+  reported: number
+  hidden: number
+  totalChangePercent: number | null
+  averageRatingChange: number
+  reportedChange: number
+  hiddenChange: number
+}
+
+export type AdminReviewsQuery = {
+  page?: number
+  pageSize?: number
+  search?: string
+  status?: number
+  subject?: number
+  rating?: number
+  fromUtc?: string
+  toUtc?: string
+}
+
+function reviewsQueryString(q: AdminReviewsQuery): string {
   const p = new URLSearchParams()
   p.set('page', String(q.page ?? 1))
-  p.set('pageSize', String(q.pageSize ?? 20))
-  const res = await fetch(apiPath(`/api/admin/reviews?${p}`), { headers: { ...authHeader(token) } })
+  p.set('pageSize', String(q.pageSize ?? 15))
+  if (q.search?.trim()) p.set('search', q.search.trim())
+  if (q.status !== undefined && q.status !== null && !Number.isNaN(q.status))
+    p.set('status', String(q.status))
+  if (q.subject !== undefined && q.subject !== null && !Number.isNaN(q.subject))
+    p.set('subject', String(q.subject))
+  if (q.rating !== undefined && q.rating !== null && !Number.isNaN(q.rating))
+    p.set('rating', String(q.rating))
+  if (q.fromUtc) p.set('fromUtc', q.fromUtc)
+  if (q.toUtc) p.set('toUtc', q.toUtc)
+  return p.toString()
+}
+
+export async function fetchAdminReviewStats(token: string): Promise<AdminReviewStats> {
+  const res = await fetch(apiPath('/api/admin/reviews/stats'), { headers: { ...authHeader(token) } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json() as Promise<AdminReviewStats>
+}
+
+export async function fetchAdminReviews(
+  token: string,
+  q: AdminReviewsQuery,
+): Promise<AdminReviewListResult> {
+  const res = await fetch(apiPath(`/api/admin/reviews?${reviewsQueryString(q)}`), {
+    headers: { ...authHeader(token) },
+  })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json() as Promise<AdminReviewListResult>
+}
+
+export async function adminSetReviewStatus(
+  token: string,
+  id: number,
+  status: number,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const res = await fetch(apiPath(`/api/admin/reviews/${id}/status`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({ status }),
+  })
+  if (res.status === 204) return { ok: true }
+  return { ok: false, message: await readApiMessage(res) }
 }
 
 export async function adminDeleteReview(

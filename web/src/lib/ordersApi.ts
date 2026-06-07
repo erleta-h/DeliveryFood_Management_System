@@ -73,7 +73,22 @@ export type CustomerOrderDetail = {
   driver?: CustomerOrderDriver | null
   /** Arsye e anulimit nga restoranti — vetëm kur statusi është anuluar. */
   cancellationReason?: string | null
+  /** Vlerësimet e mundshme pas dorëzimit. */
+  reviewSlots?: CustomerOrderReviewSlot[]
 }
+
+export type CustomerOrderReviewSlot = {
+  subject: number
+  title: string
+  subtitle: string
+  canSubmit: boolean
+  isSubmitted: boolean
+  rating: number | null
+  comment: string | null
+}
+
+export const ORDER_REVIEW_SUBJECT_RESTAURANT = 0
+export const ORDER_REVIEW_SUBJECT_DRIVER = 1
 
 const STRIPE_CHECKOUT_ORDER_KEY = 'fdStripeCheckoutOrderId'
 
@@ -225,6 +240,35 @@ export async function hideMyOrderFromHistory(
   })
   if (res.status === 204) return { ok: true }
   if (res.status === 404) return { ok: false, message: 'Porosia nuk u gjet.' }
+  try {
+    const j = (await res.json()) as { message?: string }
+    return { ok: false, message: j.message ?? `HTTP ${res.status}` }
+  } catch {
+    return { ok: false, message: `HTTP ${res.status}` }
+  }
+}
+
+/** Vlerësim pas porosisë së dorëzuar (restorant ose deliver). */
+export async function submitOrderReview(
+  token: string,
+  orderId: number,
+  body: { subject: number; rating: number; comment?: string | null },
+): Promise<{ ok: true; reviewId: number } | { ok: false; message: string }> {
+  const res = await fetchWithAuth(`/api/orders/my/${orderId}/reviews`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader(token) },
+    body: JSON.stringify({
+      subject: body.subject,
+      rating: body.rating,
+      comment: body.comment?.trim() || null,
+    }),
+  })
+  if (res.status === 201) {
+    const data = (await res.json()) as { reviewId?: number; ReviewId?: number }
+    const reviewId = data.reviewId ?? data.ReviewId
+    if (reviewId == null) return { ok: false, message: 'Përgjigje e papritur nga serveri.' }
+    return { ok: true, reviewId }
+  }
   try {
     const j = (await res.json()) as { message?: string }
     return { ok: false, message: j.message ?? `HTTP ${res.status}` }

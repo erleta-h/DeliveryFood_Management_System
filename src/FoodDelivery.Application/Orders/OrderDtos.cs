@@ -78,7 +78,23 @@ public record CustomerOrderDetailDto(
     /// <summary>Info e korrierit — null kur nuk ka delivery ose nuk është caktuar ende.</summary>
     CustomerOrderDriverDto? Driver,
     /// <summary>Arsye e anulimit nga restoranti — vetëm kur <see cref="Status"/> është anuluar.</summary>
-    string? CancellationReason);
+    string? CancellationReason,
+    /// <summary>Vlerësimet e mundshme pas dorëzimit (restorant / deliver).</summary>
+    IReadOnlyList<CustomerOrderReviewSlotDto> ReviewSlots);
+
+/// <summary>Një vlerësim i mundshëm për porosi (subjekt restorant ose deliver).</summary>
+public record CustomerOrderReviewSlotDto(
+    int Subject,
+    string Title,
+    string Subtitle,
+    bool CanSubmit,
+    bool IsSubmitted,
+    int? Rating,
+    string? Comment);
+
+public record SubmitOrderReviewRequest(int Subject, int Rating, string? Comment);
+
+public record SubmitOrderReviewResponse(long ReviewId);
 
 public record DeliveryChatMessageDto(
     long Id,
