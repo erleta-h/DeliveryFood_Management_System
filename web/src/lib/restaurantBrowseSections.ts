@@ -51,9 +51,6 @@ export function buildBrowseSections(items: RestaurantListItem[]): BrowseSection[
     .sort((a, b) => a.estimatedDeliveryMinutes - b.estimatedDeliveryMinutes)
     .slice(0, 6)
 
-  const used = new Set([...offerIds, ...fast.map((r) => r.id)])
-  const rest = items.filter((r) => !used.has(r.id))
-
   const sections: BrowseSection[] = []
 
   if (featured.length > 0) {
@@ -83,15 +80,13 @@ export function buildBrowseSections(items: RestaurantListItem[]): BrowseSection[
       layout: 'carousel-compact',
     })
   }
-  if (rest.length > 0 || sections.length === 0) {
-    sections.push({
-      id: 'all',
-      title: sections.length > 0 ? 'Të gjitha restorantet' : 'Restorantet',
-      subtitle: undefined,
-      items: sections.length > 0 ? rest : items,
-      layout: 'grid',
-    })
-  }
+  sections.push({
+    id: 'all',
+    title: sections.length > 0 ? 'Të gjitha restorantet' : 'Restorantet',
+    subtitle: undefined,
+    items,
+    layout: 'grid',
+  })
 
   return sections
 }
